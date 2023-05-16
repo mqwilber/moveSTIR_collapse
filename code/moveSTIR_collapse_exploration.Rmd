@@ -1,0 +1,398 @@
+---
+title: "MoveSTIR collapse (study, explorations and thoughts)"
+date: "2023-05-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## The universal MoveSTIR framework
+
+1. **Upper right-hand corner**: *non-uniform space use*, *non-stationary time*
+- The upper right-hand corner of the box is the most general case where we allow transmission to vary at specific times and specific locations.
+
+    
+1. **Lower right-hand corner**: *non-uniform space use*, *stationary time*
+- The lower right-hand corner of the box is where we assume stationarity in movement, but that stationary space use is not necessarily uniform.
+    
+1. **Upper left-hand corner**: *uniform space use*, *non-stationary time*
+- In the upper left-hand corner, we assume space use is uniform (because, for example, we haven't observed space use, just contacts) and assume that contact is non-stationary (for example, there are seasonal fluctuations and pulses in contacts)
+    
+1. **Lower left-hand corner**: *uniform space use*, *stationary time*
+- In the lower left-hand corner, we assume space use is uniform and movement is stationary. Given uncorrelated movements, we get back our standard FOI equation from mean field models.
+    
+The goal here is to understand how we infer $E[h_{i \leftarrow j}(t, x)]$ -- the expected value of the force of infection $i$ feels from $j$ at time $t$ in location $x$ with area $A_x$. We want also want to understand how we can then infer this quantity from different types of movement and contact data.
+
+
+## Upper right-hand corner (general case)
+
+We start with the original formulation for the force of infection, and derive it to obtain the *expected* FOI:
+$$
+\begin{aligned}
+E[h_{i \leftarrow j}(x,t)] &= E\left[\int_{-\infty}^t \beta \lambda \delta_i(x, t) \delta_j(x, u) e^{-\nu(t - u)} du\right] \\
+&= \int_{-\infty}^t \beta \lambda E[\delta_i(x, t) \delta_j(x, u)] e^{-\nu(t - u)} du \\
+&= \beta \lambda \int_{-\infty}^t \left[p_i(x, t) p_j(x, u) + Cov(\delta_i(x, t), \delta_j(x, u))\right] e^{-\nu(t - u)} du \text{ (using } E[XY] = E[X]E[Y] + Cov(X, Y))\text{)}\\ 
+&= \beta \lambda \left[\int_{-\infty}^t p_i(x, t) p_j(x, u) e^{-\nu(t - u)} du + \int_{-\infty}^t Cov(\delta_i(x, t), \delta_j(x, u)) e^{-\nu(t - u)} du\right] \\
+\end{aligned}
+$$
+Scaling by the area of $x$ gives the following general equation for the upper right-hand corner:
+
+$$
+E[h_{i\leftarrow j}(x,t)]=\frac{\beta'}{A_x} \lambda \left[\int_{-\infty}^t p_i(x, t) p_j(x, u) e^{-\nu(t - u)} du  + \int_{-\infty}^t Cov(\delta_i(x, t), \delta_j(x, u)) e^{-\nu(t - u)} du\right]
+$$
+
+where
+
+- $\beta'$: Aquisition rate (area units per time)
+- $\lambda$: Deposition rate ($t^{-1}$)
+- $\nu$: Pathogen decay rate in the environment ($t^{-1}$)
+- $\delta_i(x, t)$: An indicator random variable specifying whether host $i$ is in area $x$ at time $t$
+- $p_i(x, t)$: The marginal probability of host $i$ using habitat area $x$ at time $t$
+- $Cov(\delta_i(x, t), \delta_j(x, u))$:  The covariance of host $i$ and host $j$ both being in area $x$ at time $t$. Specifically, the spatio-temporal covariance of host $i$ and host $j$ being in "contact" at time $t$
+<!-- Is this not actually the covariance for the two individuals at the same location, but for different times? -->
+
+This formulation is slightly different than our previous formulations because $h\_{i \leftarrow j}(t, x)$ is also a *random variable*. This is a more useful formulation when we are thinking about utilization distributions because we want to think about where hosts are going to be with some probability.
+
+## Lower right-hand corner ("collapsing" time)
+
+Now, if we assume a stationary distribution, the time indexes on $p_i(x, t)$ and $p_j(x, u)$ are irrelevant---the logic here is that, by definition, the mean of a stationary distribution is independent of time so $p_i(x, t) = p_i(x)$ and $p_j(x, u) = p_j(x)$. Therefore, we can write
+
+$$
+E[h_{i \leftarrow j}(t, x)] = \beta \lambda \left[p_i(x) p_j(x) (1 / \nu) + \int_{-\infty}^t Cov(\delta_i(x, t), \delta_j(x, u)) e^{-\nu(t - u)} du\right]
+$$
+
+where $\int_{-\infty}^t e^{-\nu(t - u)} du = \frac{1}{\nu}$.
+
+In addition, given stationarity, $E[h_{i \leftarrow j}(t, x)]$ does not depend on time so
+
+$E[h_{i \leftarrow j}(t, x)] = E[h_{i \leftarrow j}(x)]$
+
+Finally, given stationarity, we know that $Cov(\delta_i(x, t), \delta_j(x, u))$ just depends on the the time lag $t - u$ and not specific time stamps, so we are really just focusing on $Cov(\delta_i(x), \delta_j(x) | t - u)$. Thus, we can express the equation as
+
+$$
+E[h_{i \leftarrow j}(x)] = \beta \lambda \left[p_i(x) p_j(x) (1 / \nu) + \int_{0}^\infty Cov(\delta_i(x), \delta_j(x) | s) e^{-\nu s} ds\right]
+$$
+
+where $s = t - u$ (i.e., the lag) and we are integrating over infinite lags.
+
+This equation is pretty cool for a few reasons. First, we see how the UD's of species $i$ and $j$ affect the average FOI. Second, we see that temporal autocorrelation in movement can increase or decrease the average FOI (some examples below show that this can be really important for estimating pairwise FOI). This makes sense. If you have two individuals moving randomly in an area vs. two individuals that are always together in an area the FOI of the second pair of individuals should be higher.
+
+### Estimating from data
+
+Requires estimating transient UDs and spatio-temporal contact covariance functions.  Transient UDs can be estimated with step-selection functions or Fokker-Planck equations using GPS movement data. If $\delta_i(x)$ and $\delta_j(x)$ are independent variables their covariance can be calculated as:
+$$
+Cov(\delta_i(x),\delta_j(x))=\rho[\delta_i(x),\delta_j(x)]\sigma[\delta_i(x)]\sigma[\delta_j(x)]
+$$
+where
+- $\rho(\delta_i(x),\delta_j(x))$ is the correlation between the occurrences of $i$ and $j$ at $x$, and
+- $\sigma(\delta_i(x))$ is the standard deviation of the occurrences of $i$ at $x$. 
+We obtain
+$$
+E[h_{i\leftarrow j}(x)]=\beta\lambda\left[p_i(x)p_j(x)\frac{1}{\nu}+\int_0^\infty \rho[\delta_i(x),\delta_j(x)]\sigma[\delta_i(x)]\sigma[\delta_j(x)] e^{-\nu s}ds\right]
+$$
+If the correlation is constant through time, then we have
+$$
+E[h_{i\leftarrow j}(x)]=\frac{\beta\lambda}{\nu}\left[p_i(x)p_j(x)+ \rho[\delta_i(x),\delta_j(x)]\sigma[\delta_i(x)]\sigma[\delta_j(x)] \right]
+$$
+
+```{r uniform space use, include=FALSE}
+# Uniform space use
+area <- 9
+n <- 100 # total number of cells
+# Probabilities of use for each cell
+probs1 <- rep(1/n, n)
+probs2 <- rep(1/n, n)
+
+# Draw random number of locations at each location
+points <- 1e4 # number of time points
+
+host1 <- host2 <- matrix(0, nrow = points, ncol = n)
+for (i in 1:points) {
+  pos1 <- sample(1:n, size = 1, prob = probs1)
+  pos2 <- sample(1:n, size = 1, prob = probs2)
+  host1[i,pos1] <- 1
+  host2[i,pos2] <- 1
+}
+
+
+# acquisition and deposition parameters
+beta <- 1
+lam <- 1
+nu <- 1
+
+# Calculate probability of use for each host and location
+est_probs1 <- apply(host1, 2, mean)
+est_probs2 <- apply(host2, 2, mean)
+
+# Plot a landscape
+g <- sqrt(n)
+image(matrix(est_probs1, nrow = g))
+
+# calculate the cell FOIs
+cell_fois <- est_probs1*est_probs2*beta*n/area*lam/nu
+# total FOI
+total_foi <- beta/area*lam/nu
+cat("Uniform space use","\nTotal FOI =", total_foi,"\nCell FOI =", sum(cell_fois))
+```
+
+
+```{r non-uniform space use, include=FALSE}
+# Non-uniform space use
+probs1 <- c(1,0.5,rep(0,n-2))
+probs1 <- probs1/sum(probs1)
+probs2 <- c(1,0.5,rep(0,n-2))
+probs2 <- probs2/sum(probs2)
+host1 <- host2 <- matrix(0, nrow = points, ncol = n)
+for (i in 1:points) {
+  pos1 <- sample(1:n, size = 1, prob = probs1)
+  pos2 <- sample(1:n, size = 1, prob = probs2)
+  host1[i,pos1] <- 1
+  host2[i,pos2] <- 1
+}
+# estimate probs
+est_probs1 <- apply(host1, 2, mean)
+est_probs2 <- apply(host2, 2, mean)
+# per-cell FOI 
+cell_fois <- est_probs1*est_probs2*beta*n/area*lam/nu
+total_foi <- beta/area*lam/nu
+
+cat("Non uniform space use:","\nTotal FOI =",total_foi,"\nCell FOI =", sum(cell_fois))
+```
+
+```{r perfectly corr mov, include=FALSE}
+# Correlated movements
+probs1 <- runif(n)
+probs1 <- probs1/sum(probs1)
+probs2 <- runif(n)
+probs2 <- probs2/sum(probs2)
+
+host1 <- matrix(0, nrow = points, ncol = n)
+for (i in 1:points) {
+  pos1 <- sample(1:n, size = 1, prob = probs1)
+  host1[i,pos1] <- 1
+}
+host2 <- host1
+# estimate probs
+est_probs1 <- apply(host1, 2, mean)
+est_probs2 <- apply(host2, 2, mean)
+# calculate correlations between hosts at each cell
+cell_corr <- sapply(1:n, \(x) cor(host1[,x],host2[,x]))
+cell_std1 <- apply(host1, 2, sd)
+cell_std2 <- apply(host2, 2, sd)
+
+# per-cell FOI 
+cell_fois <- beta*n/area*lam/nu*(est_probs1*est_probs2+cell_corr*cell_std1*cell_std2)
+total_foi <- beta/area*lam/nu
+
+cat("Perfectly correlated movement:","\nTotal FOI =",total_foi,"\nCell FOI =", sum(cell_fois))
+```
+
+```{r partially corr mov, include=FALSE}
+# partially correlated movement
+probs1 <- runif(n)
+probs1 <- probs1/sum(probs1)
+probs2 <- runif(n)
+probs2 <- probs2/sum(probs2)
+
+host1 <- host2 <- matrix(0, nrow = points, ncol = n)
+for (i in 1:points) {
+  pos1 <- sample(1:n, size = 1, prob = probs1)
+  host1[i,pos1] <- 1
+}
+
+for (i in 1:points) {
+  if (runif(1)<0.8) {
+      host2[i,] <- host1[i,]
+  } else {
+    pos2 <- sample(1:n, size = 1, prob = probs2)
+    host2[i,pos2] <- 1
+  }
+}
+# estimate probs
+est_probs1 <- apply(host1, 2, mean)
+est_probs2 <- apply(host2, 2, mean)
+# calculate correlations between hosts at each cell
+cell_corr <- sapply(1:n, \(x) cor(host1[,x],host2[,x]))
+cell_std1 <- apply(host1, 2, sd)
+cell_std2 <- apply(host2, 2, sd)
+# per-cell FOI 
+cell_fois <- beta*n/area*lam/nu*(est_probs1*est_probs2+cell_corr*cell_std1*cell_std2)
+total_foi <- beta/area*lam/nu
+
+cat("Partially correlated movement:","\nTotal FOI =",total_foi,"\nCell FOI =", sum(cell_fois))
+```
+
+We can use this expression that accounts for the entire history of locations of $i$ and $j$ in $x$ if the correlation in movement is constant. In practice we should be integrating across all possible values of $s$, the possible time lags between the presence of $i$ and $j$ at $x$. 
+
+To do this, we divide the entire history of occurrences at every x, subsetting to take only times $s$ time units apart. We take the vectors $\delta_i(t)$ and $\delta_j(t-s)$, and calculate the correlation and standard deviations at every location $x$ for every time lag $s$. For long time series there will be a large number of possible lags, so it could make sense to set an upper threshold to relevant lags. A systematic way to do this would be to link the threshold with the parasite decay rate. For a decay rate of $\nu=1$, the initial value would decrease by more than 99.99% after only nine days. We will set 10 days as a relevant threshold (this also significantly speeds things up for the computation). 
+
+```{r cov integration, include=FALSE}
+# Calculate covariance as the product of correlation and st.dev. for every
+# possible value of s 
+# Possible lag values, from 0 (i and j together at the same
+# time), to times-2
+lags <- 0:10
+# list to populate with covariance results
+cov_s <- list()
+# matrix of combinations. A t*t matrix of difference in time. This is used to
+# find the row-col combinations corresponding to a given lag
+lags_mat <- outer(1:points, 1:points, "-")
+
+# For every lag s, find the rows in host 1 and host 2 corresponding to times t
+# and t-s, calculate the correlation, st. dev., and their product
+for (i in seq_along(lags)) {
+  s <- lags[i]
+  # find position where those lags occur
+  indices <- which(lags_mat==s, arr.ind = T)
+  # subset host position matrices with indices
+  h1 <- host1[indices[,1],]
+  h2 <- host2[indices[,2],]
+    # Calculate correlation
+    # estimate probs
+    # est_probs1 <- apply(host1, 2, mean)
+    # est_probs2 <- apply(host2, 2, mean)
+    # calculate correlations, st. dev. at every x
+    cell_corr <- sapply(1:n, \(x) cor(h1[,x],h2[,x]))
+    cell_std1 <- apply(h1, 2, sd)
+    cell_std2 <- apply(h2, 2, sd)
+    # per-cell covariance
+    cov_s[[i]] <- cell_corr*cell_std1*cell_std2
+}
+# Join together, multiply by exp(-nu*s), sum across values of s for each x
+cov_x <- (do.call(rbind,cov_s)*exp(-nu*lags)) |> apply(MARGIN = 2, sum, na.rm = T)
+cell_fois <- beta*n/area*lam*(est_probs1*est_probs2/nu+cov_x)
+total_foi <- beta/area*lam/nu
+
+cat("Partially correlated movement, full integration:","\nTotal FOI =",total_foi,"\nCell FOI =", sum(cell_fois))
+
+```
+As expected, we obtain virtually identical values as the previous calculation, but this could vary if correlation is not constant through time, for example if there is strong avoidance.
+
+```{r strong avoidance}
+# we will  create avoidance by establishing the position of i independently, but
+# j will avoid locations where i has been in the previous 10 time
+# steps.
+probs1 <- runif(n)
+probs1 <- probs1/sum(probs1)
+probs2 <- runif(n)
+probs2 <- probs2/sum(probs2)
+
+host1 <- host2 <- matrix(0, nrow = points, ncol = n)
+for (i in 1:points) {
+  pos1 <- sample(1:n, size = 1, prob = probs1)
+  host1[i,pos1] <- 1
+}
+
+for (i in 1:points) {
+      # get previous 10 locations of host1
+  if (i==1) {
+    h1locs <- which(host1[i,]==1)
+  } else {
+    h1locs <- which(host1[i:max(i-10,1),]==1,arr.ind = TRUE)[,2]
+  }
+# decrease the probability at those locations by 80%
+  p2 <- probs2
+  p2[h1locs] <- p2[h1locs]*0.2
+  pos2 <- sample(1:n, size = 1, prob = p2)
+  host2[i,pos2] <- 1
+}
+# estimate probs
+est_probs1 <- apply(host1, 2, mean)
+est_probs2 <- apply(host2, 2, mean)
+# calculate correlations between hosts at each cell
+cell_corr <- sapply(1:n, \(x) cor(host1[,x],host2[,x]))
+cell_std1 <- apply(host1, 2, sd)
+cell_std2 <- apply(host2, 2, sd)
+# per-cell FOI 
+cell_fois1 <- beta*n/area*lam/nu*(est_probs1*est_probs2+cell_corr*cell_std1*cell_std2)
+total_foi1 <- beta/area*lam/nu
+
+lags <- 0:15
+# list to populate with covariance results
+cov_s <- list()
+# matrix of combinations. A t*t matrix of difference in time. This is used to
+# find the row-col combinations corresponding to a given lag
+lags_mat <- outer(1:points, 1:points, "-")
+
+# For every lag s, find the rows in host 1 and host 2 corresponding to times t
+# and t-s, calculate the correlation, st. dev., and their product
+for (i in seq_along(lags)) {
+  s <- lags[i]
+  # find position where those lags occur
+  indices <- which(lags_mat==s, arr.ind = T)
+  # subset host position matrices with indices
+  h1 <- host1[indices[,1],]
+  h2 <- host2[indices[,2],]
+    # Calculate correlation
+    # estimate probs
+    # est_probs1 <- apply(host1, 2, mean)
+    # est_probs2 <- apply(host2, 2, mean)
+    # calculate correlations, st. dev. at every x
+    cell_corr <- sapply(1:n, \(x) cor(h1[,x],h2[,x]))
+    cell_std1 <- apply(h1, 2, sd)
+    cell_std2 <- apply(h2, 2, sd)
+    # per-cell covariance
+    cov_s[[i]] <- cell_corr*cell_std1*cell_std2
+}
+# Join together, multiply by exp(-nu*s), sum across values of s for each x
+cov_x <- (do.call(rbind,cov_s)*exp(-nu*lags)) |> apply(MARGIN = 2, sum, na.rm = T)
+
+cell_fois2 <- beta*n/area*lam*(est_probs1*est_probs2/nu+cov_x)
+
+cat("Partially correlated movement, full integration:","\nTotal FOI =",total_foi,"\nCell FOI approximation =", sum(cell_fois1, na.rm = T),"\nCell FOI integration =",sum(cell_fois2))
+```
+For local temporal avoidance, the estimated FOI is only slightly lower than the expectation under the assumption of constant correlation. Both values, however, are lower than the expectation that ignores the covariance term.
+
+## Upper left-hand corner ("collapsing" in space)
+There are instances in which we will not have spatially explicit data. The most evident case is that of proximity loggers, for which you can know *when* and *for how long* two individuals were in contact with each other, but you have no information about where that contact occurred, or whether the location was constant--which will matter for indirect contact. For these cases we need to adapt the general framework so that space use can be implicit.
+One option is to assume a uniform probability of spatial use. In this case we  use a slightly different format for the general equation. We don't break it into the covariance and the probability of use, but instead write it in terms of conditional probability as follows:
+
+$$
+\begin{align}
+E[h_{i \leftarrow j}(x, t)] &= \frac{\beta'}{A_x} \lambda \left[\int_{-\infty}^t E[\delta_i(x, t) \delta_j(x, u)] e^{-\nu(t - u)} du\right] \\
+&= \frac{\beta'}{A_x} \lambda \left[\int_{-\infty}^t P(i \in x \text{ at } t | j \in x \text{ at } u) P(j \in x \text{ at } u) e^{-\nu(t - u)} du\right] \\
+&= \frac{\beta'}{A_x} \lambda \left[\int_{-\infty}^t P(i \in x \text{ at } t | j \in x \text{ at } u) \frac{A_x}{A_{j, tot}} e^{-\nu(t - u)} du\right]
+\end{align}
+$$
+
+- $A_{j, tot}$: The total area of use for individual $j$
+- $P(i \in x \text{ at } t | j \in x \text{ at } u)$:  The probability that host $i$ is in $x$ at time $t$, given host $j$ was in $x$ at a previous time $u$.  
+
+The key here is that, because we are assuming space is uniform (or we just don't have information on space use so we are defaulting to an equal probability assumption), any location $x$ with area $A_x$ is just like any other location with area $A_x$.  So the location $x$ doesn't matter, just the area $A_x$.  The area $A_x$ can be defined specifically as the area around an individual within which a contact can occur. $P(j \in x \text{ at } u) = \frac{A_x}{A_{j, tot}}$ because it again doesn't matter what $x$ host $j$ is in because given uniform space use, your probability of being in any area $A_x$ is just $A_x$ over the total area of use. 
+This formulation captures any potential correlation between visits of $i$ and $j$, potentially linked with attractance or avoidance behavior. If there is no correlation (i.e. $i$ and $j$ move independently from each other), $P(i\in x \text{ at }t | j \in x \text{ at } u)=P(i\in x \text{ at }t)$, so
+$$
+\begin{align}
+E[h_{i \leftarrow j}(x, t)] &= \frac{\beta'}{A_x} \lambda \left[\int_{-\infty}^t  \frac{A_x}{A_{i,tot}}\frac{A_x}{A_{j, tot}} e^{-\nu(t - u)} du\right] \\
+&=\frac{\beta'}{A_x} \lambda \frac{(A_x)^2}{A_{i,tot}A_{j,tot}}\int_{-\infty}^t   e^{-\nu(t - u)} du\\
+&=\frac{\beta'}{A_x} \frac{\lambda}{\nu} \frac{(A_x)^2}{A_{i,tot}A_{j,tot}}\\
+&=\beta' \frac{\lambda}{\nu} \frac{A_x}{A_{i,tot}A_{j,tot}}
+\end{align}
+
+$$
+
+### Estimating from data
+
+1. The quantity we need to estimate is $P(i \in x \text{ at } t | j \in x \text{ at } u)$. And because exact location of $x$ is irrelevant, all we need to do is, for each point of host $j$ for all $t$, assess whether there is contact with host $i$.  What this gives is a contact vector of 0s a ones through time, exactly the type of data we would get from proximity loggers. Knowing the lagged versions of $P(i \in x \text{ at } t | j \in x \text{ at } u)$ is impossible from just proximity logger data, but we could start inferring that if we had environmental loggers.   The cool thing is, then all we have to do is use a logistic regression with a time-varying spline (or something similar) to estimate how contact probability varies through time. 
+2. We also need $A_{j, tot}$ for one of the hosts. Alternatively, you could just redefine $\beta = \frac{\beta'}{A_{j, tot}} = \frac{\beta'}{A_x} \frac{A_x}{A_{j, tot}}$. 
+
+## Lower left-hand corner
+
+The general equation for the lower left-hand corner is
+
+$$
+\begin{align}
+E[h_{i \leftarrow j}(x, t)] &= \frac{\beta'}{A_x} \lambda [\int_{-\infty}^t E[\delta_i(x, t) \delta_j(x, u)] e^{-\nu(t - u)} du] \\
+&= \frac{\beta'}{A_x} \lambda [\int_{0}^{\infty} P(i \in x | j \in x, s) \frac{A_x}{A_{j, tot}} e^{-\nu(s)} ds]
+\end{align}
+$$
+
+
+- $P(i \in x | j \in x, s)$: The probability of host $i$ in some location $x$ with area $A_x$ given host $j$ in some location $x$ given a time lag of $s$.
+
+This is similar to the upper left-hand corner, but now time is stationary so we just have one mean contact probability (independent of time) for each lag $s$.  
+
+### Estimating from data
+
+- To estimate $P(i \in x | j \in x, s)$ for lag $s = 0$, you just need a vector of 0 or 1 contacts between host $i$ and $j$ and calculate the probability of contact. 
