@@ -85,7 +85,7 @@ a more useful formulation when we are thinking about utilization
 distributions because we want to think about where hosts are going to be
 with some probability.
 
-## Lower right-hand corner ("collapsing" time)
+## Lower right-hand corner -- stationary spatial use
 
 Now, if we assume a stationary distribution, the time indexes on
 $p_i(x, t)$ and $p_j(x, u)$ are irrelevant---the logic here is that, by
@@ -102,13 +102,11 @@ where $\int_{-\infty}^t e^{-\nu(t - u)} du = \frac{1}{\nu}$.
 In addition, given stationarity, $E[h_{i \leftarrow j}(t, x)]$ does not
 depend on time so
 
-$E[h_{i \leftarrow j}(t, x)] = E[h_{i \leftarrow j}(x)]$
-
-Finally, given stationarity, we know that
-$Cov(\delta_i(x, t), \delta_j(x, u))$ just depends on the the time lag
-$t - u$ and not specific time stamps, so we are really just focusing on
-$Cov(\delta_i(x), \delta_j(x) | t - u)$. Thus, we can express the
-equation as
+$E[h_{i \leftarrow j}(t, x)] = E[h_{i \leftarrow j}(x)]$. Finally, given
+stationarity, we know that $Cov(\delta_i(x, t), \delta_j(x, u))$ just
+depends on the the time lag $t - u$ and not specific time stamps, so we
+are really just focusing on $Cov(\delta_i(x), \delta_j(x) | t - u)$.
+Thus, we can express the equation as
 
 $$
 E[h_{i \leftarrow j}(x)] = \beta \lambda \left[p_i(x) p_j(x) (1 / \nu) + \int_{0}^\infty Cov(\delta_i(x), \delta_j(x) | s) e^{-\nu s} ds\right]
@@ -132,11 +130,15 @@ Requires estimating transient UDs and spatio-temporal contact covariance
 functions. Transient UDs can be estimated with step-selection functions
 or Fokker-Planck equations using GPS movement data. If $\delta_i(x)$ and
 $\delta_j(x)$ are independent variables their covariance can be
-calculated as: $$
+calculated as:
+
+$$
 Cov(\delta_i(x),\delta_j(x))=\rho[\delta_i(x),\delta_j(x)]\sigma[\delta_i(x)]\sigma[\delta_j(x)]
-$$ where - $\rho(\delta_i(x),\delta_j(x))$ is the correlation between
-the occurrences of $i$ and $j$ at $x$, and - $\sigma(\delta_i(x))$ is
-the standard deviation of the occurrences of $i$ at $x$. We obtain $$
+$$
+
+where $\rho(\delta_i(x),\delta_j(x))$ is the correlation between the
+occurrences of $i$ and $j$ at $x$, and $\sigma(\delta_i(x))$ is the
+standard deviation of the occurrences of $i$ at $x$. We obtain $$
 E[h_{i\leftarrow j}(x)]=\beta\lambda\left[p_i(x)p_j(x)\frac{1}{\nu}+\int_0^\infty \rho[\delta_i(x),\delta_j(x)]\sigma[\delta_i(x)]\sigma[\delta_j(x)] e^{-\nu s}ds\right]
 $$ If the correlation is constant through time, then we have $$
 E[h_{i\leftarrow j}(x)]=\frac{\beta\lambda}{\nu}\left[p_i(x)p_j(x)+ \rho[\delta_i(x),\delta_j(x)]\sigma[\delta_i(x)]\sigma[\delta_j(x)] \right]
@@ -286,7 +288,7 @@ would decrease by more than 99.99% after only nine days. We will set 10
 days as a relevant threshold (this also significantly speeds things up
 for the computation).
 
-```{r cov integration, include=FALSE}
+```{r cov integration}
 # Calculate covariance as the product of correlation and st.dev. for every
 # possible value of s 
 # Possible lag values, from 0 (i and j together at the same
@@ -410,7 +412,7 @@ than the expectation under the assumption of constant correlation. Both
 values, however, are lower than the expectation that ignores the
 covariance term.
 
-## Upper left-hand corner ("collapsing" in space)
+## Upper left-hand corner -- uniform space use
 
 There are instances in which we will not have spatially explicit data.
 The most evident case is that of proximity loggers, for which you can
@@ -493,20 +495,57 @@ symmetrical. This is the same result as the home range overlap metric.
 
 1.  If movement is not independent, we need to determine the conditional
     probability $P(i \in x \text{ at }t|j \in x \text{ at }u)$. In the
-    special case of direct contact, $t=u$, this is simply the
+    special case of only direct contact, $t=u$, this is simply the
     probability of $i$ and $j$ being at the same location at the same
     time. What this gives is a contact vector of 0s and 1s through time,
     exactly the type of data we would get from proximity loggers.
 2.  Knowing the lagged versions of
     $P(i \in x \text{ at } t | j \in x \text{ at } u)$ is impossible
     from just proximity logger data, but we could start inferring that
-    if we had environmental loggers. The cool thing is, then all we have
-    to do is use a logistic regression with a time-varying spline (or
+    if we had stationary environmental loggers, or with camera-traps. In
+    this case, you can know the exact time lag between individuals
+    coming to a common location. The cool thing is, then all we have to
+    do is use a logistic regression with a time-varying spline (or
     something similar) to estimate how contact probability varies
     through time.
 3.  We also need $A_{j, tot}$ for one of the hosts. Alternatively, you
     could just redefine
     $\beta = \frac{\beta'}{A_{j, tot}} = \frac{\beta'}{A_x} \frac{A_x}{A_{j, tot}}$
+
+```{r, fig.cap="Distribution of waiting times for appearance of i at a given location x following the appearance of j at a previous time - Independent movement"}
+#' Create a detection history for two individuals at a stationary logger. 
+#' Both appear at constant rates lambda_i = 1/2 and lambda_j = 1/3
+lami = 1/2
+lamj = 1/3
+# The inter-event waiting times are given by the exponential distribution
+lag_i = rexp(20, rate = lami)
+lag_j = rexp(20, rate = lamj)
+
+# get absolute times
+timesi = cumsum(lag_i)
+timesj = cumsum(lag_j)
+
+# get the lag between i and j
+lags_ij <- outer(timesi, timesj, "-")
+
+# get the minimum positive lag (i.e. the time since the most recent j) for every i
+minlag <- apply(lags_ij, 1, \(x) min(x[x>0])) 
+lag_dens <- density(minlag, from = 0)
+hist(minlag, freq = F,xlab = "Time lag s", main = "", ylab = "Probability")
+lines(lag_dens$x, lag_dens$y, col="red")
+```
+
+```{r}
+with(
+  data.frame(beta = 1, lam = 1, mu = 1,
+             Ax = 1, Ai = 2, Aj = 3),
+  cat("Estimated FOI =", beta*lam/Aj*sum(lag_dens$y*exp(-1*lag_dens$x)))
+)
+```
+
+------------------------------------------------------------------------
+
+***NOTE: THIS NEEDS CHECKING***
 
 For indirect contact ($t \gt u$), the conditional probability can be
 interpreted as the probability that $i$ arrives in $x$ ($t-u$) time
@@ -566,7 +605,7 @@ C\int_0^\infty(Fe^{-\nu})^sds&=C\frac{(Fe^{-\nu})^s}{\ln(Fe^{-\nu})}\\
 \end{align}
 $$
 
-$F<1$, so evaluating we would obtain
+$0<F<1$ and $0<e^{-\nu}<1$, so evaluating we obtain
 
 $$
 \begin{align}
@@ -575,32 +614,48 @@ $$
 \end{align}
 $$
 
-replacing $C$ and $F$ we obtain
+Replacing $C$ and $F$ gives
 
 $$
 E[h_{i\leftarrow j}(x,t)]=\frac{\beta'\lambda A_x^2}{A_iA_j^2}\frac{1}{\nu-\ln\left[\left(1-\frac{A_x}{A_i}\right)\left(1-\frac{A_x}{A_j}\right)\right]}
 $$
 
-Let's look at an example:
+Is this just the same as the special case described above for
+independent movement,
+$E[h_{i \leftarrow j}(x,t)]=\frac{\beta'\lambda}{\nu}  \frac{A_x}{A_{i,tot}A_{j,tot}}$?
 
-```{r, fig.cap="Conditional probability of the time lag between two individuals i and j at the same location x"}
-# Define two overlapping ranges in one dimension
-xmin1 <- 0
-xmax1 <- 10
-xmin2 <- 7
-xmax2 <- 15
-# Calculate their areas
-Ai <- abs(xmax1-xmin1)
-Aj <- abs(xmax2-xmin2)
-# Area of overlap
-Ax <- abs(xmin2-xmax1)
-# plot the conditional probability for different time lags
-curve(Ax^2/(Ai*Aj)*((1-Ax/Ai)*(1-Ax/Aj))^x,from = 0,to = 10,
+Let's look at an example. Say we have two individuals with $A_i=2$ and
+$A_j=3$, and the area of overlap is $A_x=1$.
+
+```{r, echo = FALSE, fig.cap="Conditional probability of the time lag between two individuals i and j at the same location x"}
+with(
+  data.frame(
+    Ax=1,Ai=2,Aj=3
+  ),
+  # plot the conditional probability for different time lags
+  curve(Ax^2/(Ai*Aj)*((1-Ax/Ai)*(1-Ax/Aj))^x,from = 0,to = 10,
       xlab = "Time lag s", ylab = "Conditional probability")
-
-b <- 1
-lam <- 1
+)
 ```
+
+The conditional probability depends only on the areas of use and of
+overlap. This probability of $i$ appearing at $x$ decreases
+exponentially as the time lag following the appearance of $j$ increases.
+Assuming $\beta=\lambda=\nu=1$, we have
+
+```{r}
+b=1
+nu=1
+lam=1
+Ax=1
+Ai=2
+Aj=3
+Eh1 = b*lam/nu*Ax/(Ai*Aj)
+Eh2 = b*lam*Ax^2/(Ai*Aj^2)*1/(nu-log((1-Ax/Ai)*(1-Ax/Aj)))
+cat("FOI indep. mov =",Eh1,"\nFOI derived =",Eh2)
+```
+
+<!--# I'm not sure this difference is real or just some miscalculation -->
 
 ## Lower left-hand corner
 
