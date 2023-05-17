@@ -561,6 +561,9 @@ $s$ that we care about. Assuming uniform space use, we define:
 
 -   $P(i \notin x \text{ at }t)=1-1/A_{i,tot}$ The probability that $i$
     is anywhere but $x$ at a certain point in time
+    
+    
+**Mark here**: I think we are getting different answers here because your verbal interpretation of $P(i \in x \text{ at } t | j \in x \text{ at } u)$ is different than mine. I would verbally interpret  $P(i \in x \text{ at } t | j \in x \text{ at } u)$ as instantaneous where you are interpreting it (I think) as cumulative.  For example, you state that $P(i \in x \text{ at } t | j \in x \text{ at } u)$ also tells us where $j$ wasn't for $t - u$. My interpretation that it doesn't tell us anything about where $j$ wasn't.  $j$ could have been in $x$ for part of $t - u$ or all of $t - u$.  I would argue we don't know that from $P(i \in x \text{ at } t | j \in x \text{ at } u)$ -- we just know given $j$ was there at past time $u$, is $i$ there right now?  We could start multiplying these $P(i \in x \text{ at } t | j \in x \text{ at } u)$ together over different lags to ask for the probability that $i$ is in $x$ for some time period $t + \delta t$ but not in $x$ for the time period $t - u$, but I don't think $P(i \in x \text{ at } t | j \in x \text{ at } u)$ alone can tell us that.
 
 Then we have
 
