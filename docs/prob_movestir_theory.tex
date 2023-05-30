@@ -26,6 +26,7 @@
 
 % Bibliography
 \usepackage[numbers, compress]{natbib} % Bibliography - APA
+\addbibresource{references.bib}
 \bibpunct{(}{)}{;}{a}{}{,}
 \usepackage{lineno} % Line numbers
 \def\linenumberfont{\normalfont\footnotesize\ttfamily}
@@ -42,35 +43,35 @@
 
 \section*{Methods}
 
-A fundamental quantity in disease ecology and epidemiology is the force of infection (FOI) exerted by one host on another host. FOI is an essential ingredient for building disease models.  The force of infection exerted from one host to another can vary in time and space and quantifying this variability can highlight spatio-temporal hotspots of infection where risk is highest.  Our goal in this section is to develop a theoretical framework that builds on a previously developed movement-driven modeling of spatio-temporal infection risk (MoveSTIR).  In contrast to MoveSTIR which focused primarily on \emph{observed} host movements (from GPS data, proximity collars, etc.) to construct empirically-driven transmission kernels and generate spatio-temporal predictions of infection risk, this framework will consider probabilistic host movements and contacts to construct transmission kernels and predict spatio-temporal infection risk. This is an important generalization of MoveSTIR because it provides an inferential foundation to begin linking spatial and social covariates driving host movement to infection risk.  Ultimately, this could improve out of sample predictions of contact and transmission in novel spatial and social environments.  We refer to the modeling approach we develop here as Probabilistic MoveSTIR.     
+A fundamental quantity in disease ecology and epidemiology is the force of infection (FOI) exerted by one host on another host. FOI is an essential ingredient for building disease models.  The force of infection exerted from one host to another can vary in time and space and quantifying this variability can highlight spatio-temporal hotspots of infection where risk is highest.  Our goal in this section is to develop a theoretical framework that builds on a previously developed movement-driven modeling of spatio-temporal infection risk (MoveSTIR).  In contrast to MoveSTIR, which focused primarily on \emph{observed} host movements (from GPS data, proximity collars, etc.) to construct empirically-driven transmission kernels and generate spatio-temporal predictions of infection risk, this framework will consider probabilistic host movements and contacts to construct transmission kernels and predict spatio-temporal infection risk. This is an important generalization of MoveSTIR because it provides an inferential foundation to begin linking spatial and social covariates driving host movement to infection risk.  Ultimately, this could improve out of sample predictions of contact and transmission in novel spatial and social environments.  We refer to the modeling approach we develop here as Probabilistic MoveSTIR.     
 
 We start by considering two individuals, $i$ and $j$ moving across a landscape.  We want to ask: on average across space and time what is the force of infection host $i$ feels from host $j$?   Conceptually, we begin with a gridded landscape as a starting point, though we show in the SI that our approach can be applied beyond a gridded landscape.  Moreover, we focus on pairwise interactions in this study and will consider higher order interactions in a future study.   
 
-To answer our question, we need to make some assumptions about how transmission is occurring.  We assume that transmission happens by one host depositing pathogen into the environment and another host picking that pathogen up.  Deposition and acquisition can represent a range of processes, from one individual coughing and another inhaling in a matter of seconds to one host depositing parasite eggs in the environment and another individual consuming these eggs days or weeks later.  This fairly general assumption encompasses standard density-dependent transmission as a special case (Cortez and Duffy).  Moreover, considering transmission through deposition and acquisition components clearly links direct transmission and indirect transmission along a continuum (Wilber et al. 2022).  
+To answer our question, we need to make some assumptions about how transmission is occurring.  We assume that transmission happens by one host depositing pathogen into the environment and another host picking that pathogen up.  Deposition and acquisition can represent a range of processes, from one individual coughing and another inhaling in a matter of seconds to one host depositing parasite eggs in the environment and another individual consuming these eggs days or weeks later.  This fairly general assumption encompasses standard density-dependent transmission as a special case \cite{Cortez and Duffy}.  Moreover, considering transmission through deposition and acquisition components clearly links direct transmission and indirect transmission along a continuum \cite{Wilber2022}.  
 
-Given these transmission assumptions, we can define the pairwise force of infection felt by host $i$ in location $x$ from host $j$ at time $t$ as (Wilber et al. 2022)
+Given these transmission assumptions, we can define the pairwise force of infection felt by host $i$ in location $x$ from host $j$ at time $t$ as \cite{Wilber2022}
 
 \begin{equation}
-	h_{i \leftarrow j}(t, x) = \int_{-\infty}^{t} \beta' \lambda \delta_{x_j(u)}(x) \delta_{I_j(u)}(I) e^{-\nu(t - u)} du
-	\label{eq:original_foi}
+    h_{i \leftarrow j}(t, x) = \int_{-\infty}^{t} \beta' \lambda \delta_{x_j(u)}(x) \delta_{I_j(u)}(I) e^{-\nu(t - u)} du
+    \label{eq:original_foi}
 \end{equation}
 where $\beta'$ is the pathogen acquisition rate of host $i$, $\lambda$ is the pathogen deposition rate of host $j$, $\delta_{x_j(u)}(x)$ is an indicator variable that is one if host $j$ is in location $x$ at time $u$ and zero otherwise, $\delta_{I_j(u)}(I)$ is an indicator function that is one if host $j$ is in an infected state at time $u$ and zero otherwise, and $e^{-\nu(t - u)}$ is probability that any pathogen deposited at time $u < t$ is still alive at time $t$ (see Wilber et al. for a full derivation).  Moving forward we will make an assumption of maximum transmission risk and assume that host $j$ is always infected. This is equivalent to building a contact network (Wilber et al. 2022) and also represents the structural form of FOI needed to compute pathogen invasion thresholds (Wilber et al. 2022). 
 
-It is beneficial to pause and consider the interpretation of ``contact'' and the parameter $\beta'$.  First, our interpretation of contact is that contact can occur when both individuals are in location $x$.  In terms, of our gridded landscape, this means that contact and transmission can potentially occur when hosts are in a grid cell.  Conceptually, we are assuming that when host $j$ enters a grid cell, it deposits pathogen in that cell that host $i$ can then pick up immediately or after some lag. Host $i$ is not picking up pathogen from other neighboring grid cells in this interpretation.  An alternative approach to the grid assumption is to assume that contact can only occur when present or past host $j$ is within some distance $r$ of present host $i$ (i.e., a top-hat assumption; Ovaskainen, Wilber). While this approach to defining contact requires different mathematical notation then the grid cell assumption, the overall results are the same (described in the SI). Thus, for conceptual clarity we use the grid interpretation in the main text.
+It is beneficial to pause and consider the interpretation of ``contact'' and the parameter $\beta'$.  First, our interpretation of contact is that contact can occur when both individuals are in location $x$.  In terms, of our gridded landscape, this means that contact and transmission can potentially occur when hosts are in a grid cell.  Conceptually, we are assuming that when host $j$ enters a grid cell, it deposits pathogen in that cell that host $i$ can then pick up immediately or after some lag. Host $i$ is not picking up pathogen from other neighboring grid cells in this interpretation.  An alternative approach to the grid assumption is to assume that contact can only occur when present or past host $j$ is (was) within some distance $r$ of host $i$ at its present location (i.e., a top-hat assumption; Ovaskainen, Wilber). While this approach to defining contact requires different mathematical notation than the grid cell assumption, the overall results are the same (described in the SI). Thus, for conceptual clarity we use the grid interpretation in the main text.
 
-The term $\beta'$ is the rate at which host $i$ picks up pathogen within the grid cells and can be re-written as $\tilde{\beta} / \text{Area}(x)$, where $\tilde{\beta}$ has units area units / time (e.g., $m^2 / \text{day}$) and $\text{Area}(x) = A_x$ gives the area of location $x$ (e.g., 10 $m^2$). Therefore, the total acquisition rate scales with the area in which contact can occur. In a large area, the same amount of pathogen deposited by host $j$ would be spread over a larger area (or, equivalently, host $i$ would have to traverse a larger area to find the ``packet'' of pathogen), reducing total acquisition rate of host $i$ and reducing FOI.  As we derive the key results for PMoveSTIR, it is critical to be specific about our definition of contact and the area units associated with $\beta'$.  
+The term $\beta'$ is the rate at which host $i$ picks up pathogen within the grid cells and can be re-written as $\tilde{\beta} / \text{Area}(x)$, where $\tilde{\beta}$ has units area units / time (e.g., $m^2 / \text{day}$) and $\text{Area}(x) = A_x$ gives the area of the grid cell $x$ (e.g., 10 $m^2$). Therefore, the total acquisition rate scales with the area in which contact can occur. In a large area, the same amount of pathogen deposited by host $j$ would be spread over a larger area (or, equivalently, host $i$ would have to traverse a larger area to find the ``packet'' of pathogen), reducing total acquisition rate of host $i$ and the corresponding FOI.  As we derive the key results for PMoveSTIR, it is critical to be specific about our definition of contact and the area units associated with $\beta'$.  
 
-Returning to equation \ref{eq:original_foi}, this equation assumes we know the trajectory of host $i$ and host $j$.  Given the increasingly wide availability of fine-scale movement data and tools in movement ecology, this is often approximately true over some finite time interval.  However, as we start extrapolating beyond the time intervals and locations over which we observe animal movement, it is more useful to consider a probabilistic version of equation \ref{eq:original_foi}, where we only know, with some probability, where host $i$ and $j$ are at any point in time.  With this framing, we can re-write equation \ref{eq:original_foi} as 
+Returning to equation \ref{eq:original_foi}, this equation assumes we know the trajectory of host $i$ and host $j$.  Given the increasingly wide availability of fine-scale movement data and tools in movement ecology, this is often approximately true over some finite time interval. However, as we start extrapolating beyond the time intervals and locations over which we observe animal movement, it is more useful to consider a probabilistic version of equation \ref{eq:original_foi}, where we only know, with some probability, where host $i$ and $j$ are at any point in time. With this framing, we can re-write equation \ref{eq:original_foi} as
 
 \begin{equation}
-	h_{i \leftarrow j}(t, x) = \int_{-\infty}^{t} \beta' \lambda \delta'_{x_i(t)}(x) \delta'_{x_j(u)}(x) e^{-\nu(t - u)} du
-	\label{eq:prob_foi}
+    h_{i \leftarrow j}(t, x) = \int_{-\infty}^{t} \beta' \lambda \delta'_{x_i(t)}(x) \delta'_{x_j(u)}(x) e^{-\nu(t - u)} du
+    \label{eq:prob_foi}
 \end{equation}
 where $\delta'_{x_i(\tau)}(x)$ and $\delta'_{x_j(\tau)}(x)$ are random variables that specify whether or not (i.e., 0 or 1) host $i$ or host $j$ is in location $x$ at time $\tau$.  This means that $h_{i \leftarrow j}(t, x)$ is also a random variable. Taking the expectation of $h_{i \leftarrow j}(t, x)$ we obtain
 
 \begin{equation}
-	E[h_{i \leftarrow j}(t, x)] = h^*_{i \leftarrow j}(t, x) = \int_{-\infty}^{t} \beta' \lambda E[\delta'_{x_i(t)}(x) \delta'_{x_j(u)}(x)] e^{-\nu(t - u)} du
-	\label{eq:expected_foi}
+    E[h_{i \leftarrow j}(t, x)] = h^*_{i \leftarrow j}(t, x) = \int_{-\infty}^{t} \beta' \lambda E[\delta'_{x_i(t)}(x) \delta'_{x_j(u)}(x)] e^{-\nu(t - u)} du
+    \label{eq:expected_foi}
 \end{equation}
 
 Interpreting this expectation, what we are conceptually doing is asking: if we simulated some unknown movement process thousands of times, what is the probability that host $i$ is in location $x$ at time $t$ and host $j$ is location $x$ at time $u$. 
@@ -78,24 +79,24 @@ Interpreting this expectation, what we are conceptually doing is asking: if we s
 We can re-write this equation in two equivalent ways, both of which will be useful moving forward.  First, if $Y$ and $Z$ are two random variables, then $E[YZ] = E[Y]E[Z] + Cov(Y, Z)$.  We can therefore write
 
 \begin{equation}
-	\begin{aligned}
-		h^*_{i \leftarrow j}(t, x) &= \int_{-\infty}^{t} \beta' \lambda E[\delta'_{x_i(t)}(x) \delta'_{x_j(u)}(x)] e^{-\nu(t - u)} du \\
-		&= \beta' \lambda \int_{-\infty}^{t} [E[\delta'_{x_i(t)}(x)] E[\delta'_{x_j(u)}(x)] + Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x))] e^{-\nu(t - u)} du \\
-		&= \beta' \lambda \int_{-\infty}^{t} [p_i(x, t) p_j(x, u) + Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x))] e^{-\nu(t - u)} du \\
-	\end{aligned}
-	\label{eq:foi_cov}
+    \begin{aligned}
+        h^*_{i \leftarrow j}(t, x) &= \int_{-\infty}^{t} \beta' \lambda E[\delta'_{x_i(t)}(x) \delta'_{x_j(u)}(x)] e^{-\nu(t - u)} du \\
+        &= \beta' \lambda \int_{-\infty}^{t} [E[\delta'_{x_i(t)}(x)] E[\delta'_{x_j(u)}(x)] + Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x))] e^{-\nu(t - u)} du \\
+        &= \beta' \lambda \int_{-\infty}^{t} [p_i(x, t) p_j(x, u) + Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x))] e^{-\nu(t - u)} du \\
+    \end{aligned}
+    \label{eq:foi_cov}
 \end{equation}
-where we use the fact that the expectation of an indicator variable is a probability (Grimmer probability book).
+where we use the fact that the expectation of an indicator variable is a probability \cite{Grimmer}.
 
 Second, we could write equation \ref{eq:expected_foi} as 
 
 \begin{equation}
-	\begin{aligned}
-	h^*_{i \leftarrow j}(t, x) &= \int_{-\infty}^{t} \beta' \lambda E[\delta'_{x_i(t)}(x) \delta'_{x_j(u)}(x)] e^{-\nu(t - u)} du \\
-	&= \beta' \lambda \int_{-\infty}^{t} p(i \in x \text{ at } t, j \in x \text{ at } u) e^{-\nu(t - u)} du) \\
-	&= \beta' \lambda \int_{-\infty}^{t} p(i \in x \text{ at } t | j \in x \text{ at } u) p(j \in x \text{ at } u) e^{-\nu(t - u)} du \\
-	\end{aligned}
-	\label{eq:foi_prob}
+    \begin{aligned}
+    h^*_{i \leftarrow j}(t, x) &= \int_{-\infty}^{t} \beta' \lambda E[\delta'_{x_i(t)}(x) \delta'_{x_j(u)}(x)] e^{-\nu(t - u)} du \\
+    &= \beta' \lambda \int_{-\infty}^{t} p(i \in x \text{ at } t, j \in x \text{ at } u) e^{-\nu(t - u)} du) \\
+    &= \beta' \lambda \int_{-\infty}^{t} p(i \in x \text{ at } t | j \in x \text{ at } u) p(j \in x \text{ at } u) e^{-\nu(t - u)} du \\
+    \end{aligned}
+    \label{eq:foi_prob}
 \end{equation}
 
 We describe the intuition behind these equations in the following sections.
@@ -105,16 +106,16 @@ We describe the intuition behind these equations in the following sections.
 To better understand the meaning of equations \ref{eq:foi_cov} and \ref{eq:foi_prob}, consider the special case of statistical stationarity in movement. Note that statistical stationarity is not assuming a stationary host (i.e., we are not assuming that a host is not moving), but rather that the mean location and covariance in host movements over time have certain statistical properties (citations, see SI). When we use ``stationary'' throughout, we mean ``statistically stationary'' unless explicitly specified.  Assuming stationarity, we can simplify equation \ref{eq:foi_cov} to (derivation in SI)
 
 \begin{equation}
-	\begin{aligned}
-	E[h_{i \leftarrow j}(x)] = \beta' \lambda [p_i(x)p_j(x) \frac{1}{\nu} + \int_{0}^{\infty} Cov(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds]
-	\end{aligned}
-	\label{eq:foi_stationary}
+    \begin{aligned}
+    E[h_{i \leftarrow j}(x)] = \beta' \lambda [p_i(x)p_j(x) \frac{1}{\nu} + \int_{0}^{\infty} Cov(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds]
+    \end{aligned}
+    \label{eq:foi_stationary}
 \end{equation}
 The key insight here is that, given a stationary assumption, the expected force of infection in contact area $x$ (think a grid cell) depends on i) the marginal probabilities that host $i$ and host $j$ use area $x$, where $p_i(x)$ and $p_j(x)$ are utilization distributions (citations) and ii) the covariance in how host $i$ and host $j$ use the location $x$ at different time lags $s$. For example, if host $i$ and $j$ always use area $x$ together (a positive correlation at time lag $s = 0$), this will increase the force of infection relative to the product of their utilization distributions.
 
-To understand this further, consider the case of two hosts moving independently across a gridded landscape.  Because hosts are moving independently, the covariance is zero such that we are left with $\beta' \frac{\lambda}{\nu} p_i(x)p_j(x)$.  Remembering that $\beta' = \frac{\tilde{\beta}}{A_x}$, we have $\frac{\tilde{\beta}}{A_x} \frac{\lambda}{\nu} p_i(x)p_j(x)$ -- the expected FOI experienced by two hosts is exactly proportional to the products of their utilization distributions.
+To understand this further, consider the case of two hosts moving independently across a gridded landscape.  Because hosts are moving independently, the covariance is zero such that we are left with $\beta' \frac{\lambda}{\nu} p_i(x)p_j(x)$.  Remembering that $\beta' = \frac{\tilde{\beta}}{A_x}$, we have $\frac{\tilde{\beta}}{A_x} \frac{\lambda}{\nu} p_i(x)p_j(x)$ -- the expected FOI experienced by two hosts is exactly proportional to the products of their utilization distributions. In this particular case the FOI is symmetrical, i.e. the FOI from $i$ to $j$ is the same as from $j$ to $i$.
 
-Now assume hosts are moving independently and use space uniformly on a gridded landscape. The area of contact $x$ is $A_x$ on a total area of $A_{tot} = n A_x$, where $n$ grid cells comprise the total area $A_{tot}$ over which hosts can move. Because movement is random with respect to location $p_i(x) = p_j(x) = \frac{A_x}{A_{tot}}$ and the force of infection at location $x$ is $\frac{\tilde{\beta}}{A_{tot}} \frac{\lambda}{\nu} \frac{A_x}{A_{tot}}$.  Finally, if we want the expected FOI from $j$ to $i$ over all space, we sum over all grid cells and get $\frac{\tilde{\beta}}{A_{tot}} \frac{\lambda}{\nu}$. This is exactly equivalent to the FOI we would expect using a mass action assumption of hosts moving independently and transmitting within an area $A_{tot}$ (McCallum).
+Now assume hosts are moving independently and use space uniformly on a gridded landscape, meaning that the probability that $i$ is at any location $x$ at time $t$ is the same across all locations $x$. The area of contact $x$ is $A_x$ on a total area of $A_{tot} = n A_x$, where $n$ grid cells comprise the total area $A_{tot}$ over which hosts can move. Because movement is random with respect to location, $p_i(x) = p_j(x) = \frac{A_x}{A_{tot}}$ and the force of infection at location $x$ is $\frac{\tilde{\beta}}{A_{tot}} \frac{\lambda}{\nu} \frac{A_x}{A_{tot}}$.  Finally, if we want the expected FOI from $j$ to $i$ over all space, we sum over all grid cells and get $\frac{\tilde{\beta}}{A_{tot}} \frac{\lambda}{\nu}$. This is exactly equivalent to the FOI we would expect using a mass action assumption of hosts moving independently and transmitting within an area $A_{tot}$ \cite{McCallum2001}
 
 Instead of assuming hosts are moving uniformly across all $n$ grid cells, assume that they only occupy one grid cell on the landscape.  Now $p_i(x) = p_j(x) = 1$ if $x$ is the grid cell they use and is zero otherwise.  Applying the same steps and summing over all space we get $\frac{\tilde{\beta}}{A_{x}} \frac{\lambda}{\nu}$ -- the FOI from $j$ to $i$ is what we would expect if hosts were moving uniformly over a smaller area $A_x$. 
 
@@ -131,22 +132,22 @@ The upper right-hand corner is the most general case captured by equation \ref{e
 In the lower-right corner of Fig. 1, we assume stationarity in time, but continue to allow heterogeneity in space, obtaining equation \ref{eq:foi_stationary} discussed above.  To improve intuition, we can redefine $Cov(\delta_{i \in x}, \delta_{j \in x} | s) = \sigma_i(x) \sigma_j(x) Cor(\delta_{i \in x}, \delta_{j \in x} | s)$, where $\sigma_i(x) = \sqrt{p_i(x)(1 - p_i(x))}$  and $\sigma_j(x) = \sqrt{p_j(x)(1 - p_j(x))}$ are the standard deviation in probability of host $i$ and $j$ using location $x$, respectively.  We can then write
 
 \begin{equation}
-	\begin{aligned}
-	h^*_{i \leftarrow j}(x) = \beta' \lambda [p_i(x)p_j(x) \frac{1}{\nu} + \sigma_i(x) \sigma_j(x) \int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds].
-	\end{aligned}
-	\label{eq:stationary_cor}
+    \begin{aligned}
+    h^*_{i \leftarrow j}(x) = \beta' \lambda [p_i(x)p_j(x) \frac{1}{\nu} + \sigma_i(x) \sigma_j(x) \int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds].
+    \end{aligned}
+    \label{eq:stationary_cor}
 \end{equation}
-Equation \ref{eq:stationary_cor} highlights that the key quantity we need to understand is the correlation in host $i$'s and host $j$'s use of location $x$ at different time lags $s$. Given an assumption of stationary, the correlation term must be strictly related to social interactions.  Any use of $x$ because of environmental resources is picked up by $p_i(x)$ or $p_j(x)$, and the correlation term is specifically capturing whether hosts are synchronously (positive correlation) or asynchronously (negative correlation) using location $x$ more than we would expect by chance.  This is useful because it clearly highlights how social processes (whether direct or indirect) can alter the predictions of contact relative to the overlap of utilization distributions (Anni's stuff). However, it is important to note that the additive terms in equation \ref{eq:stationary_cor} are not a perfect separation of spatial and social drivers of contact. If social factors are driving co-location they will also be present in determining $p_i(x)$ and $p_j(x)$. Thus, the marginal utilization distributions contain the effects of both spatial and social factors, but the correlation term is strictly related to social factors.  If the correlation is zero, then hosts are moving independently and $p_i(x)$ and $p_j(x)$ only reflect spatial factors.
+Equation \ref{eq:stationary_cor} highlights that the key quantity we need to understand is the correlation in host $i$'s and host $j$'s use of location $x$ at different time lags $s$. Given an assumption of stationarity, the correlation term must be strictly related to social interactions.  Any use of $x$ because of environmental resources is picked up by $p_i(x)$ or $p_j(x)$, and the correlation term is specifically capturing whether hosts are using location $x$ synchronously (positive correlation) or asynchronously (negative correlation) more than we would expect by chance.  This is useful because it clearly highlights how social processes (whether direct or indirect) can alter the predictions of contact relative to the overlap of utilization distributions (Anni's stuff). However, it is important to note that the additive terms in equation \ref{eq:stationary_cor} are not a perfect separation of spatial and social drivers of contact. If social factors are driving co-location they will also be present in determining $p_i(x)$ and $p_j(x)$. Thus, the marginal utilization distributions contain the effects of both spatial and social factors, but the correlation term is strictly related to social factors.  If the correlation is zero, then hosts are moving independently and $p_i(x)$ and $p_j(x)$ only reflect spatial factors.
 
 \subsubsection*{The upper left-hand corner: Uniform space and heterogeneous time}
 
 Another special case of our framework is when space use is uniform, but movement is non-stationary.  In this case, it is not important where an individual is, just when. Considering this framing from an empirical point of view, proximity loggers deployed on individual hosts -- a commonly used tool to measure among animal contacts -- only tell us when contacts between individuals occur, but not where.  Thus, we cannot make inference about spatial factors driving contacts, but can make inference on temporal processes. Leveraging equation \ref{eq:foi_prob}, we can write the FOI for this special case as
 
 \begin{equation}
-	\begin{aligned}
-	h^*_{i \leftarrow j}(t, A_x) = \frac{\tilde{\beta}}{A_x}\frac{A_x}{A_{tot}} \lambda \int_{-\infty}^{t} p(i \in x \text{ at } t | j \in x \text{ at } u) e^{-\nu(t - u)} du \\
-	\end{aligned}
-	\label{eq:foi_uniform_space}
+    \begin{aligned}
+    h^*_{i \leftarrow j}(t, A_x) = \frac{\tilde{\beta}}{A_x}\frac{A_x}{A_{tot}} \lambda \int_{-\infty}^{t} p(i \in x \text{ at } t | j \in x \text{ at } u) e^{-\nu(t - u)} du \\
+    \end{aligned}
+    \label{eq:foi_uniform_space}
 \end{equation}
 where our uniform space use assumption leads to $p(j \in x \text{ at } u) = \frac{A_x}{A_{tot}}$ and $p(i \in x \text{ at } t | j \in x \text{ at } u)$ can be interpreted as the probability of contact between host $i$ at time $t$ and host $j$ at time $u$.  
 
@@ -155,40 +156,40 @@ where our uniform space use assumption leads to $p(j \in x \text{ at } u) = \fra
 In the lower left-hand corner of the PMoveSTIR framework (Fig. 1), we have the special case where space use is uniform and time is stationary. Given these assumptions, we can write the FOI equation as
 
 \begin{equation}
-	\begin{aligned}
-		h^*_{i \leftarrow j}(A_x) = \beta' \lambda [\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \frac{1}{\nu} + \sigma_i(x) \sigma_j(x) \int_{0}^{\infty} Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) e^{-\nu s} ds]
-	\end{aligned}
-	\label{eq:uniform_stationary1}
+    \begin{aligned}
+        h^*_{i \leftarrow j}(A_x) = \beta' \lambda [\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \frac{1}{\nu} + \sigma_i(x) \sigma_j(x) \int_{0}^{\infty} Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) e^{-\nu s} ds]
+    \end{aligned}
+    \label{eq:uniform_stationary1}
 \end{equation}
 where the correlation in contact is constant across all areas $A_x$ on the landscape (such that $\delta_{i \in A_x}$ indicates the use of some arbitrary area $A_x$).  We could also derive this equation directly from the upper left-hand corner (equation \ref{eq:foi_uniform_space}, SI).
 
 Specifically, rewrite equation \ref{eq:foi_uniform_space} as 
 
 \begin{equation}
-	\begin{aligned}
-		h^*_{i \leftarrow j}(A_x) &= \beta' \lambda [\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \frac{1}{\nu} + \int_{0}^{\infty} Cov(\delta_{i \in A_x}, \delta_{j \in A_x} | s) e^{-\nu s} ds] \\
-		&= \beta' \lambda [\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \frac{1}{\nu} + \int_{0}^{\infty} ( - p_i(A_x)p_j(A_x) + p(i \in A_x, j \in A_x | s)) e^{-\nu s} ds] \\
-		&= \beta' \lambda [\int_{0}^{\infty} p(i \in A_x, j \in A_x | s) e^{-\nu s} ds] \\
-		&= \frac{\tilde{\beta}}{A_x} \frac{A_x}{A_{tot}} \lambda [\int_{0}^{\infty} p(i \in A_x | j \in A_x \text{ at lag } s) e^{-\nu s} ds]
-	\end{aligned}
-	\label{eq:uniform_stationary2}
+    \begin{aligned}
+        h^*_{i \leftarrow j}(A_x) &= \beta' \lambda [\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \frac{1}{\nu} + \int_{0}^{\infty} Cov(\delta_{i \in A_x}, \delta_{j \in A_x} | s) e^{-\nu s} ds] \\
+        &= \beta' \lambda [\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \frac{1}{\nu} + \int_{0}^{\infty} ( - p_i(A_x)p_j(A_x) + p(i \in A_x, j \in A_x | s)) e^{-\nu s} ds] \\
+        &= \beta' \lambda [\int_{0}^{\infty} p(i \in A_x, j \in A_x | s) e^{-\nu s} ds] \\
+        &= \frac{\tilde{\beta}}{A_x} \frac{A_x}{A_{tot}} \lambda [\int_{0}^{\infty} p(i \in A_x | j \in A_x \text{ at lag } s) e^{-\nu s} ds]
+    \end{aligned}
+    \label{eq:uniform_stationary2}
 \end{equation}
 
 In both cases, if hosts are moving independently (i.e., correlation is 0) we obtain $\frac{\tilde{\beta}}{A_x} \frac{A_x}{A_{tot}} \frac{A_x}{A_{tot}}  \frac{\lambda}{\nu}$. Averaging over all $n$ areas $A_x$ that comprise the landscape, we obtain $\bar{h}_{i \leftarrow j} =\frac{\tilde{\beta}}{A_\text{tot}} \frac{\lambda}{\nu}$, which is the standard mass action assumption.
 
 \subsection*{Beyond the corners of PMoveSTIR}
 
-The PMoveSTIR framework described in Fig. 1 also accounts for other useful cases regarding how heterogeneity in space and time relate to the expected FOI host $i$ feels from host $j$.  We give two examples below
+The PMoveSTIR framework described in Fig. 1 also accounts for other useful cases regarding how heterogeneity in space and time relate to the expected FOI host $i$ feels from host $j$.  We give two examples below.
 
 \subsubsection*{Home range overlap}
 
 A commonly used assumption for the edge weight between host $i$ and host $j$ is that it is proportional to home range overlap.  Home range overlap is an intermediate case of of PMoveSTIR (Fig. 1), where time is stationary and space use is uniform within a home range, and the area of contact is the home range overlap.  Given that the area of home range overlap between host $i$ and host $j$ is $A_{hro}$ and the home range sizes of host $i$ and $j$ are $A_{tot, i}$ and $A_{tot, j}$, we can write
 
 \begin{equation}
-	\begin{aligned}
-	h^*_{i \leftarrow j}(A_{hro}) = \frac{\tilde{\beta}}{A_{hro}} \lambda [\frac{A_{hro}}{A_{tot, i}} \frac{A_{hro}}{A_{tot, j}}  \frac{1}{\nu} + \int_{0}^{\infty} Cov(\delta_{i \in A_{hro}}, \delta_{j \in A_{hro}} | s) e^{-\nu s} ds]
-	\end{aligned}
-	\label{eq:home_range}
+    \begin{aligned}
+    h^*_{i \leftarrow j}(A_{hro}) = \frac{\tilde{\beta}}{A_{hro}} \lambda [\frac{A_{hro}}{A_{tot, i}} \frac{A_{hro}}{A_{tot, j}}  \frac{1}{\nu} + \int_{0}^{\infty} Cov(\delta_{i \in A_{hro}}, \delta_{j \in A_{hro}} | s) e^{-\nu s} ds]
+    \end{aligned}
+    \label{eq:home_range}
 \end{equation}
 which gives us an explicit equation for how home range overlap determines FOI and how correlation in use of the home range overlap area affects FOI. 
 
@@ -196,7 +197,7 @@ which gives us an explicit equation for how home range overlap determines FOI an
 
 In many cases, animals shift their home range seasonally (citations) such that assuming a constant UD is incorrect. This can be accounted for in PMoveSTIR as a special case of temporal heterogeneity (Fig. 1).  Specifically, consider equation \ref{eq:expected_foi}. The expected FOI over the time interval 0 to $t$ in location $x$ is $\bar{h^*}_{i \leftarrow j}(x) = \frac{\int_0^t h^*_{i \leftarrow j}(\tau, x) d\tau}{t}$ (Wilber et al. 2022).  One could approximate this as $\sum_{k = 0}^{n_t} h^*_{i \leftarrow j}(t_k, x) \frac{\Delta \tau}{t}$ where $n_t$ is the number of bins that comprise the interval 0 to $t$, $t_k$ is the midpoint of the $k$th time interval, and $\Delta \tau$ is the width of a time interval.  The equation is a weighted sum where each component is a constant FOI within a time interval multiplied by the length of the time interval relative to the total interval length $t$.  
 
-The summation perspective helps us frame PMoveSTIR in a seasonal context.  For example, consider that hosts use two primary movement patterns that repeat on a period of $T$ (e.g., over the course of a year).  The first movement pattern lasts for $\tau_1$ time units and the second lasts for $\tau_2$ time units where $\tau_1 + \tau_2 = T$.  Assuming stationarity within each time interval, the average FOI felt by host $i$ from host $j$ in location $x$ over period $T$ is $\bar{h^*}_{i \leftarrow j}(x) = \frac{\tau_1}{T} h^*_{\tau_1, i \leftarrow j}(x) + \frac{\tau_2}{T} h^*_{\tau_2, i \leftarrow j}(x)$.  This could be generalized to any number of intervals within the period $T$, depending on the biology of the system.  Importantly, when considering the epidemiological implications of these seasonally shifting movement patterns, one should consider each seasonal FOI component separately to build dynamic contact networks with time-varying edges (Wilber et al. 2022). 
+The summation perspective helps us frame PMoveSTIR in a seasonal context.  For example, consider that hosts use two primary movement patterns that repeat on a period of $T$ (e.g., over the course of a year).  The first movement pattern lasts for $\tau_1$ time units and the second lasts for $\tau_2$ time units where $\tau_1 + \tau_2 = T$.  Assuming stationarity within each time interval, the average FOI felt by host $i$ from host $j$ in location $x$ over period $T$ is $\bar{h^*}_{i \leftarrow j}(x) = \frac{\tau_1}{T} h^*_{\tau_1, i \leftarrow j}(x) + \frac{\tau_2}{T} h^*_{\tau_2, i \leftarrow j}(x)$.  This could be generalized to any number of intervals within the period $T$, depending on the biology of the system.  Importantly, when considering the epidemiological implications of these seasonally shifting movement patterns, one should consider each seasonal FOI component separately to build dynamic contact networks with time-varying edges \cite{Wilber2022}.
 
 
 \end{document}
