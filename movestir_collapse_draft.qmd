@@ -1,0 +1,143 @@
+---
+title: "Parasite collapse"
+author: "Juan S. Vargas Soto, Mark. Q. Wilber"
+format: pdf
+editor: visual
+references: references.bib
+---
+
+## Introduction
+
+Individual movement is among the most critical factors that determine the possibility of transmission of parasites and infectious disease. How an animal moves determines whether they come into contact with other individuals of the same and other species, or with infectious stages in the environment, as well as where these contacts occur, and how often. Yet movement itself is the product of a complex interaction between resource availability, physiology, landscape features, inter- and intraspecific interactions, and it can be hard to disentangle their influence. <!--# are these items in the same category? -->
+
+Substantial technological advances now make it possible to track a wide diversity of animal species with high spatial and temporal resolution. At the same time, the development of analytic methods for these increasingly detailed movement data provide insights about the influence of different environmental factors on movement. Similarly, we can use fine-scale spatiotemporal data to infer where and when contact between animals occurs ([@Noonan2021]), and to build contact networks for direct and indirect interactions ([@Yang2023]). These indirect interactions are particularly important in the context of disease transmission, given that many parasites can persist some time in the environment, which can lead to transmission even without direct contact. Integrating these indirect interactions can drastically reshape disease transmission networks and the inferences about epidemiological dynamics ([@Wilber2022]).
+
+-   Previous research has tried to infer contact from the spatial overlap between individuals. E.g. KDE overlap as a measure of FOI (XXX, XXX).
+-   Different movement histories could lead to different transmission dynamics if movement of individuals is somehow correlated (e.g. due to avoidance/attraction). Incorporating the temporal history of locations can also reveal asymmetric potential of acquiring parasites. These factors have been explored in the moveSTIR paper ([@Wilber2022]). This framework reveals the importance of accounting for indirect transmission.
+
+Calculating the full transmission kernel can be computationally costly, and this cost increases with finer temporal resolution---observed or interpolated---, more individuals, and longer tracking time. Depending on the study system, a more general approach with simplifying assumptions could capture the epidemiological dynamics in a similar way.
+
+-   The full contact/transmission network is structurally similar to that from home-range overlap analysis, but with some important differences.
+
+<!--# This language is very vague right now, need to fix and clarify -->
+
+-   Here, we generalize the moveSTIR framework for multiple scenarios. Our goal is to develop a common framework that captures a majority of study cases related to wildlife movement and disease transmission, and that can put different data streams together. By putting the moveSTIR transmission kernel in a similar framework to existing methods of movement analysis (e.g. SSF) could facilitate linking mechanistically environmental variables with the transmission process. We develop the general analytic framework and the different special cases, explore benefits and implications of particular cases using simulations, and apply our framework to observed data for representative study systems
+
+### Motivation
+
+-   Using the utilization distribution, or some other framework that summarizes spatial use instead of the whole movement history would allow to effectively collapse the temporal dimension of the transmission kernel
+
+## Methods
+
+### Theoretical framework
+
+The force of infection experienced by a focal individual $i$ at location $x$ and time $t$ from all previous $N-1$ individuals that have been in $x$ can be expressed as follows [@Wilber2022]:
+
+$$
+h_i(t,x)=\sum_{j=1}^{N-1}\int_0^t\beta'\delta_{x_j(u)}(x)\lambda\delta_{I_j(u)}(I)e^{-\nu(t-u)}du
+$$
+
+The pairwise transmission kernel, which accounts for the risk of infection experienced by a focal individual due to the entire trajectories of it and another focal host, is given by:
+
+$$
+K_{a_i\leftarrow d_j}(\tau_a,\tau_d)=\Biggl\{\begin{align}
+&[\beta][\Phi (s_j(\tau_d),s_i(\tau_a))][\lambda\delta_{I_j (\tau_d)}(I)][e^{-\nu(\tau_a-\tau_d)}] 
+&\textrm{for} \quad \tau_a\ge\tau_d
+\\
+&0 &\textrm{otherwise}
+\end{align}
+$$
+
+#### Collapsing the temporal dimension
+
+Start with the general equation for force of infection as defined by MoveSTIR
+
+$$
+h_{i \leftarrow j}(t, x) = \int_{-\infty}^t \beta \lambda \delta_i(x, t) \delta_j(x, u) e^{-\nu(t - u)} du
+$$
+
+This is the force of infection felt by \$i\$ due to \$j\$ in location \$x\$ at time \$t\$. \$j\$ is the depositing host and \$i\$ is the acquiring host.  \$\\beta\$ and \$\\lambda\$ are the acquisition and deposition rates respectively, where \$\\beta\$ is scaled by the area of location \$x\$.  \$\\delta_i(x, t)\$ and \$\\delta_j(x, u)\$ are **\*\*random variables\*\*** specifiying whether or not host \$i\$ or \$j\$ are in location \$x\$ at time \$t\$ and \$u\$ respectively. The term \$e\^{-\\nu(t - u)}\$ gives the pathogen decay from the depositing host.
+
+This formulation is slightly different than our previous formulations because \$h\_{i \\leftarrow j}(t, x)\$ is also a **\*\*random variable\*\***.  This is a more useful formulation when we are thinking about utilization distributions because we want to think about where hosts are going to be with some probability.
+
+I now want to find the expected FOI at location \$x\$ at time \$t\$.  I can do this as
+
+$$
+\begin{aligned}E[h_{i \leftarrow j}(t, x)] &= E[\int_{-\infty}^t \beta \lambda \delta_i(x, t) \delta_j(x, u) e^{-\nu(t - u)} du] \\ &= \int_{-\infty}^t \beta \lambda E[\delta_i(x, t) \delta_j(x, u)] e^{-\nu(t - u)} du \\ &= \beta \lambda \int_{-\infty}^t [p_i(x, t) p_j(x, u) + Cov(\delta_i(x, t), \delta_j(x, u))] e^{-\nu(t - u)} du \text{   (using ($E[XY] = E[X]E[Y] + Cov(X, Y)$)}\\  &= \beta \lambda [\int_{-\infty}^t p_i(x, t) p_j(x, u) e^{-\nu(t - u)} du  + \int_{-\infty}^t Cov(\delta_i(x, t), \delta_j(x, u)) e^{-\nu(t - u)} du] \\\end{aligned}
+$$
+
+where \$p_i(x, t)\$ gives the time varying **utilization distribution** for host $i$ \-- the probability of being in location \$x\$ and at time \$t\$.  Same for host \$j\$.
+
+Now, if we assume a stationary distribution, the time indexes on $p_i(x, t)$ and $p_j(x, u)$ are irrelevant \-- the logic here is that, by definition, a the mean of a stationary distribution is independent of time so $p_i(x, t) = p_i(x)$ and $p_j(x, u) = p_j(x)$. Therefore, we can write  
+
+$$
+E\[h\_{i \leftarrow j}(t, x)\] = \beta \lambda \left[p_i(x) p_j(x) (1 / \nu)  + \int_{-\infty}^t Cov(\delta_i(x, t), \delta_j(x, u)) e^{-\nu(t - u)} du\right]
+$$
+
+where $\int_{-\infty}^t e^{-\nu(t - u)} du = 1 / \nu$.
+
+In addition, given stationarity, $E[h_{i \leftarrow j}(t, x)]$ does not depend on time so
+
+$E[h_{i \leftarrow j}(t, x)] = E[h_{i \leftarrow j}(x)]$
+
+Finally, given stationarity, we know that $Cov(\delta_i(x, t), \delta_j(x, u))$ just depends on the the time lag $t - u$ and not specific time stamps, so we are really just focusing on $Cov(\delta_i(x), \delta_j(x) | t - u)$.  Thus, we can express the equation as
+
+$$E[h_{i \leftarrow j}(x)] = \beta \lambda [p_i(x) p_j(x) (1 / \nu)  + \int_{0}^\infty Cov(\delta_i(x), \delta_j(x) | s) e^{-\nu s} ds]$$
+
+where $s = t - u$ (i.e., the lag) and we are integrating over infinite lags.
+
+<!--# This equation is pretty cool for a few reasons.  First, we see how the UD's of species $i$ and $j$ affect the average FOI.  Second, we see that temporal autocorrelation in movement can increase or decrease the average FOI (some examples below show that this can be really important for estimating pairwise FOI).  This makes sense.  If you have two individuals moving randomly in an area vs. two individuals that are always together in an area the FOI of the second pair of individuals should be higher.  -->
+
+#### Collapsing the spatial dimension
+
+Similar to collapsing over time to obtain the expected force of infection for different locations *x*, we can collapse over space to obtain the expected FOI at any moment *t* . <!--# I'm not too sure about the utility of this -->
+
+The procedure can be as done previously, we have that the expected force of infection from \*j\* to *i* at location *x* and time *t* is given by:
+
+$$
+E[h_{i\leftarrow j}(t,x)]=\beta \lambda [\int_{-\infty}^t p_i(x, t) p_j(x, u) e^{-\nu(t - u)} du  + \int_{-\infty}^t Cov(\delta_i(x, t), \delta_j(x, u)) e^{-\nu(t - u)} du]
+$$
+
+If we assume uniform probabilities $p_i(x,t)$ and $p_j(x,u)$ across space, or that we know the trajectory and $x$ is not a random variable, then their product can be expressed <!--# maybe. Check that this does not assume independent movement -->as:
+
+$$
+\begin{align}
+p_i(x,t)p_j(x,u)&=P(t_i=t)P(t_j=u)\\
+&=P(t_i\le u+z |t_j=u)\\
+&=P(t_i\le z)
+\end{align}$$
+
+The first two terms in the first integral represent the probability that $i$ is at $x$ at time $t$, multiplied by the probability that $j$ was at $x$ at a previous time $u$. If we assume that $x$ is not a random variable but rather we know the trajectories of $i$ and $j$, then we can ignore the spatial term, and focus just on the times (an alternative interpretation is that space use is uniform). The product is then the probability that $i$ is at some spatial location at a time $t$, multiplied by the probability that $j$ was at that same location at time $u$:
+
+$$
+P(t_i\le t)P(t_j\le u)
+$$
+
+where $t_i$ and $t_j$ are random variables that represent the waiting time until the passage of $i$ and $j$, respectively, at the same location. <!--#  -->
+
+$$
+\begin{align}
+E[h_{i\leftarrow j}(t,x)]&=\beta \lambda [\int_{-\infty}^t p_i(x, t) p_j(x, u) e^{-\nu(t - u)} du  + \int_{-\infty}^t Cov(\delta_i(x, t), \delta_j(x, u)) e^{-\nu(t - u)} du]\\
+&=\beta\lambda [\int_{-\infty}^tP(t_i\le u+z|t_j=u)e^{-\nu(t-u)}du+ \int_{-\infty}^t Cov(\delta_i(x, t), \delta_j(x, u)) e^{-\nu(t - u)} du]\\
+&=\beta\lambda
+\end{align}
+$$
+
+$$
+\begin{align}
+K_{i\leftarrow j}(t, x)&=\int_0^t{\beta'\delta_{x_j(u)}\lambda\delta_{I_j(u)}(I)e^{-\nu(t-u)}du}\\
+&=
+\end{align}
+$$
+
+### Simulations
+
+### Case study
+
+We tested these extensions to the moveSTIR framework, and compared them against the estimations from the fully spatially and temporally resolved method. As a case study we used GPS-collar data from two wild pig populations, in Florida and North Carolina.
+
+## Results
+
+## Discussion
+
+## References
