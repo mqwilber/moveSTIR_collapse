@@ -1,5 +1,10 @@
 \documentclass[letterpaper]{article}
 
+\title{PMoveSTIR---A general framework to incorporate movement and space use information in epidemiological models}
+\author{Juan S. Vargas Soto \and Mark Q. Wilber}
+\date{}
+
+
 \usepackage[english]{babel}
 \usepackage[utf8x]{inputenc}
 \usepackage{amsmath}
@@ -25,13 +30,14 @@
 \makeatother
 
 % Bibliography
-\usepackage[numbers, compress]{natbib} % Bibliography - APA
-\addbibresource{references.bib}
-\bibpunct{(}{)}{;}{a}{}{,}
-\usepackage{lineno} % Line numbers
-\def\linenumberfont{\normalfont\footnotesize\ttfamily}
-\setlength\linenumbersep{0.2 in}
+\usepackage[round, colon]{natbib} % Bibliography - APA
+\bibliographystyle{abbrvnat}
+%\bibpunct{(}{)}{;}{a}{}{,}
 
+% Line numbers
+\usepackage{lineno}
+%\def\linenumberfont{\normalfont\footnotesize\ttfamily}
+%\setlength\linenumbersep{0.2 in}
 
 \usepackage{setspace}
 
@@ -39,33 +45,39 @@
 
 \begin{document}
 
+
+\maketitle
+
+\linenumbers
 \doublespacing
 
 \section*{Introduction}
 
-Individual movement is among the most critical factors that determine the possibility of transmission of parasites and infectious disease. How an animal moves determines whether they come into contact with other individuals of the same and other species, or with infectious stages in the environment, as well as where these contacts occur, and how often. Yet movement itself is the product of a complex interaction between resource availability, physiology, landscape features, inter- and intraspecific interactions, and it can be hard to disentangle their influence.
+Individual movement is among the most critical factors that determine the possibility of transmission of parasites and infectious disease \citep{Manlove2022,Dougherty2022}. How an animal moves determines whether they come into contact with other individuals of the same and other species, or with parasites in the environment, as well as where these contacts occur, and how often. These contacts are the component of transmission that is most influenced by environmental drivers (the other component being probability of transmission given contact). Yet movement itself is the product of a complex interaction between resource availability, physiology, landscape features, inter- and intraspecific interactions \citep{Nathan2008}, and it can be hard to disentangle their influence. Understanding mechanistically how movement influences transmission risk is therefore an outstanding task in disease ecology. % so? Talk about previous attempts at linking movement and contact/transmission/epidemiological
 
-Substantial technological advances now make it possible to track a wide diversity of animal species with high spatial and temporal resolution. At the same time, the development of analytic methods for these increasingly detailed movement data provide insights about the influence of different environmental factors on movement. Similarly, we can use fine-scale spatiotemporal data to infer where and when contact between animals occurs \cite{Noonan2021}, and to build contact networks for direct and indirect interactions \cite{@Yang2023}. These indirect interactions are particularly important in the context of disease transmission, given that many parasites can persist some time in the environment, which can lead to transmission even without direct contact. Integrating these indirect interactions can drastically reshape disease transmission networks and the inferences about epidemiological dynamics \cite{Wilber2022}.
+Substantial technological advances now make it possible to track a wide diversity of animal species with high spatial and temporal resolution. At the same time, the development of analytic methods for these increasingly detailed movement data provide insights about the influence of different environmental factors on movement. Similarly, we can use fine-scale spatiotemporal data to infer where and when contact between animals occurs \citep{Noonan2021}, and to build contact networks for direct \citep{Craft2015} and indirect interactions \citep{Yang2023}. These indirect interactions are particularly important in the context of disease transmission, given that many parasites can persist in the environment, which can lead to transmission without direct contact. Integrating these indirect interactions can drastically reshape disease transmission networks and the inferences about epidemiological dynamics \citep{Wilber2022,Richardson2015}.
 
-Previous research has tried to infer contact from the spatial overlap between individuals. E.g. KDE overlap as a measure of FOI (XXX, XXX).
 
-Different movement histories could lead to different transmission dynamics if movement of individuals is somehow correlated (e.g. due to avoidance/attraction). Incorporating the temporal history of locations can also reveal asymmetric potential of acquiring parasites. These factors have been explored in the moveSTIR paper \cite{Wilber2022}. This framework reveals the importance of accounting for indirect transmission.
+% Previous research has tried to infer contact from the spatial overlap between individuals. E.g. KDE overlap as a measure of FOI (XXX, XXX).
 
-Calculating the full transmission kernel can be computationally costly, and this cost increases with finer temporal resolution—observed or interpolated—, more individuals, and longer tracking time. Depending on the study system, a more general approach with simplifying assumptions could capture the epidemiological dynamics in a similar way.
+% Different movement histories could lead to different transmission dynamics if movement of individuals is somehow correlated (e.g. due to avoidance/attraction). Incorporating the temporal history of locations can also reveal asymmetric potential of acquiring parasites. These factors have been explored in the moveSTIR paper \citep{Wilber2022}. This framework reveals the importance of accounting for indirect transmission.
+
+Calculating the full transmission kernel can be computationally costly, and this cost increases with finer temporal resolution—observed or interpolated—, more individuals, and longer tracking time. Depending on the study system, a more general approach with simplifying assumptions could capture the epidemiological dynamics in a similar way. 
 
 % <!--# This language is very vague right now, need to fix and clarify -->
 
-Here, we generalize the moveSTIR framework for multiple scenarios. Our goal is to develop a common framework that captures a majority of study cases related to wildlife movement and disease transmission, and that can put different data streams together. By putting the moveSTIR transmission kernel in a similar framework to existing methods of movement analysis (e.g. SSF) could facilitate linking mechanistically environmental variables with the transmission process. We develop the general analytic framework and the different special cases, explore benefits and implications of particular cases using simulations, and apply our framework to observed data for representative study systems
+Here, we generalize the moveSTIR framework for multiple scenarios. Our goal is to develop a common framework that captures a majority of study cases related to wildlife movement and disease transmission, and that can make use of different data streams (e.g. GPS tracking, proximity/contact loggers, camera-traps). Putting the moveSTIR transmission kernel in a similar framework to existing methods of movement analysis (e.g. SSF) could facilitate linking mechanistically environmental variables with the transmission process. We develop the general analytic framework and the different special cases, explore benefits and implications of particular cases using simulations, and apply our framework to observed data for representative study systems.
 
 \section*{Methods}
+\subsection*{Derivation of the probabilistic MoveSTIR framework}
 
 A fundamental quantity in disease ecology and epidemiology is the force of infection (FOI) exerted by one host on another host. FOI is an essential ingredient for building disease models.  The force of infection exerted from one host to another can vary in time and space and quantifying this variability can highlight spatio-temporal hotspots of infection where risk is highest.  Our goal in this section is to develop a theoretical framework that builds on a previously developed movement-driven modeling of spatio-temporal infection risk (MoveSTIR).  In contrast to MoveSTIR, which focused primarily on \emph{observed} host movements (from GPS data, proximity collars, etc.) to construct empirically-driven transmission kernels and generate spatio-temporal predictions of infection risk, this framework will consider probabilistic host movements and contacts to construct transmission kernels and predict spatio-temporal infection risk. This is an important generalization of MoveSTIR because it provides an inferential foundation to begin linking spatial and social covariates driving host movement to infection risk.  Ultimately, this could improve out of sample predictions of contact and transmission in novel spatial and social environments.  We refer to the modeling approach we develop here as Probabilistic MoveSTIR.     
 
 We start by considering two individuals, $i$ and $j$ moving across a landscape.  We want to ask: on average across space and time what is the force of infection host $i$ feels from host $j$?   Conceptually, we begin with a gridded landscape as a starting point, though we show in the SI that our approach can be applied beyond a gridded landscape.  Moreover, we focus on pairwise interactions in this study and will consider higher order interactions in a future study.   
 
-To answer our question, we need to make some assumptions about how transmission is occurring.  We assume that transmission happens by one host depositing pathogen into the environment and another host picking that pathogen up.  Deposition and acquisition can represent a range of processes, from one individual coughing and another inhaling in a matter of seconds to one host depositing parasite eggs in the environment and another individual consuming these eggs days or weeks later.  This fairly general assumption encompasses standard density-dependent transmission as a special case \cite{Cortez and Duffy}.  Moreover, considering transmission through deposition and acquisition components clearly links direct transmission and indirect transmission along a continuum \cite{Wilber2022}.  
+To answer our question, we need to make some assumptions about how transmission is occurring.  We assume that transmission happens by one host depositing pathogen into the environment and another host picking that pathogen up.  Deposition and acquisition can represent a range of processes, from one individual coughing and another inhaling in a matter of seconds to one host depositing parasite eggs in the environment and another individual consuming these eggs days or weeks later.  This fairly general assumption encompasses standard density-dependent transmission as a special case \citep{Cortez2021}.  Moreover, considering transmission through deposition and acquisition components clearly links direct transmission and indirect transmission along a continuum \citep{Wilber2022}.  
 
-Given these transmission assumptions, we can define the pairwise force of infection felt by host $i$ in location $x$ from host $j$ at time $t$ as \cite{Wilber2022}
+Given these transmission assumptions, we can define the pairwise force of infection felt by host $i$ in location $x$ from host $j$ at time $t$ as \citep{Wilber2022}
 
 \begin{equation}
     h_{i \leftarrow j}(t, x) = \int_{-\infty}^{t} \beta' \lambda \delta_{x_j(u)}(x) \delta_{I_j(u)}(I) e^{-\nu(t - u)} du
@@ -102,7 +114,7 @@ We can re-write this equation in two equivalent ways, both of which will be usef
     \end{aligned}
     \label{eq:foi_cov}
 \end{equation}
-where we use the fact that the expectation of an indicator variable is a probability \cite{Grimmer}.
+where we use the fact that the expectation of an indicator variable is a probability \citep{Grimmett2001}.
 
 Second, we could write equation \ref{eq:expected_foi} as 
 
@@ -131,7 +143,7 @@ The key insight here is that, given a stationary assumption, the expected force 
 
 To understand this further, consider the case of two hosts moving independently across a gridded landscape.  Because hosts are moving independently, the covariance is zero such that we are left with $\beta' \frac{\lambda}{\nu} p_i(x)p_j(x)$.  Remembering that $\beta' = \frac{\tilde{\beta}}{A_x}$, we have $\frac{\tilde{\beta}}{A_x} \frac{\lambda}{\nu} p_i(x)p_j(x)$ -- the expected FOI experienced by two hosts is exactly proportional to the products of their utilization distributions. In this particular case the FOI is symmetrical, i.e. the FOI from $i$ to $j$ is the same as from $j$ to $i$.
 
-Now assume hosts are moving independently and use space uniformly on a gridded landscape, meaning that the probability that $i$ is at any location $x$ at time $t$ is the same across all locations $x$. The area of contact $x$ is $A_x$ on a total area of $A_{tot} = n A_x$, where $n$ grid cells comprise the total area $A_{tot}$ over which hosts can move. Because movement is random with respect to location, $p_i(x) = p_j(x) = \frac{A_x}{A_{tot}}$ and the force of infection at location $x$ is $\frac{\tilde{\beta}}{A_{tot}} \frac{\lambda}{\nu} \frac{A_x}{A_{tot}}$.  Finally, if we want the expected FOI from $j$ to $i$ over all space, we sum over all grid cells and get $\frac{\tilde{\beta}}{A_{tot}} \frac{\lambda}{\nu}$. This is exactly equivalent to the FOI we would expect using a mass action assumption of hosts moving independently and transmitting within an area $A_{tot}$ \cite{McCallum2001}
+Now assume hosts are moving independently and use space uniformly on a gridded landscape, meaning that the probability that $i$ is at any location $x$ at time $t$ is the same across all locations $x$. The area of contact $x$ is $A_x$ on a total area of $A_{tot} = n A_x$, where $n$ grid cells comprise the total area $A_{tot}$ over which hosts can move. Because movement is random with respect to location, $p_i(x) = p_j(x) = \frac{A_x}{A_{tot}}$ and the force of infection at location $x$ is $\frac{\tilde{\beta}}{A_{tot}} \frac{\lambda}{\nu} \frac{A_x}{A_{tot}}$.  Finally, if we want the expected FOI from $j$ to $i$ over all space, we sum over all grid cells and get $\frac{\tilde{\beta}}{A_{tot}} \frac{\lambda}{\nu}$. This is exactly equivalent to the FOI we would expect using a mass action assumption of hosts moving independently and transmitting within an area $A_{tot}$ \citep{McCallum2001}
 
 Instead of assuming hosts are moving uniformly across all $n$ grid cells, assume that they only occupy one grid cell on the landscape.  Now $p_i(x) = p_j(x) = 1$ if $x$ is the grid cell they use and is zero otherwise.  Applying the same steps and summing over all space we get $\frac{\tilde{\beta}}{A_{x}} \frac{\lambda}{\nu}$ -- the FOI from $j$ to $i$ is what we would expect if hosts were moving uniformly over a smaller area $A_x$. 
 
@@ -149,11 +161,13 @@ In the lower-right corner of Fig. 1, we assume stationarity in time, but continu
 
 \begin{equation}
     \begin{aligned}
-    h^*_{i \leftarrow j}(x) = \beta' \lambda [p_i(x)p_j(x) \frac{1}{\nu} + \sigma_i(x) \sigma_j(x) \int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds].
+    h^*_{i \leftarrow j}(x) = \beta' \lambda \left[ p_i(x)p_j(x) \frac{1}{\nu} + \sigma_i(x) \sigma_j(x) \int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds\right].
     \end{aligned}
     \label{eq:stationary_cor}
 \end{equation}
-Equation \ref{eq:stationary_cor} highlights that the key quantity we need to understand is the correlation in host $i$'s and host $j$'s use of location $x$ at different time lags $s$. Given an assumption of stationarity, the correlation term must be strictly related to social interactions.  Any use of $x$ because of environmental resources is picked up by $p_i(x)$ or $p_j(x)$, and the correlation term is specifically capturing whether hosts are using location $x$ synchronously (positive correlation) or asynchronously (negative correlation) more than we would expect by chance.  This is useful because it clearly highlights how social processes (whether direct or indirect) can alter the predictions of contact relative to the overlap of utilization distributions (Anni's stuff). However, it is important to note that the additive terms in equation \ref{eq:stationary_cor} are not a perfect separation of spatial and social drivers of contact. If social factors are driving co-location they will also be present in determining $p_i(x)$ and $p_j(x)$. Thus, the marginal utilization distributions contain the effects of both spatial and social factors, but the correlation term is strictly related to social factors.  If the correlation is zero, then hosts are moving independently and $p_i(x)$ and $p_j(x)$ only reflect spatial factors.
+Equation \ref{eq:stationary_cor} highlights that the key quantity we need to understand is the correlation in host $i$'s and host $j$'s use of location $x$ at different time lags $s$. Given an assumption of stationarity, the correlation term must be strictly related to social interactions.  Any use of $x$ because of environmental resources is picked up by $p_i(x)$ or $p_j(x)$, and the correlation term is specifically capturing whether hosts are using location $x$ synchronously (positive correlation) or asynchronously (negative correlation) more than we would expect by chance.  This is useful because it clearly highlights how social processes (whether direct or indirect) can alter the predictions of contact relative to the overlap of utilization distributions (Anni's stuff); synchronous habitat use would increase the FOI, while asynchronous use would decrease it. However, it is important to note that the additive terms in equation \ref{eq:stationary_cor} are not a perfect separation of spatial and social drivers of contact. If social factors are driving co-location they will also be present in determining $p_i(x)$ and $p_j(x)$. Thus, the marginal utilization distributions contain the effects of both spatial and social factors, but the correlation term is strictly related to social factors.  If the correlation is zero, then hosts are moving independently and $p_i(x)$ and $p_j(x)$ only reflect spatial factors.
+
+Given the scaling effect of parasite decay---capured in the term $e^{-\nu s}$---the effect of the correlation decreases with longer time lags $s$. In practice this means that, beyond a certain threshold time lag, correlation has only minor and possibly negligible effects on the FOI. This will of course depend on the biology of the parasite, for parasites that can persist long times in the environment (anthrax, for example) correlation may play a role even at long time lags.
 
 \subsubsection*{The upper left-hand corner: Uniform space and heterogeneous time}
 
@@ -173,7 +187,7 @@ In the lower left-hand corner of the PMoveSTIR framework (Fig. 1), we have the s
 
 \begin{equation}
     \begin{aligned}
-        h^*_{i \leftarrow j}(A_x) = \beta' \lambda [\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \frac{1}{\nu} + \sigma_i(x) \sigma_j(x) \int_{0}^{\infty} Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) e^{-\nu s} ds]
+        h^*_{i \leftarrow j}(A_x) = \beta' \lambda \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \frac{1}{\nu} + \sigma_i(x) \sigma_j(x) \int_{0}^{\infty} Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) e^{-\nu s} ds\right]
     \end{aligned}
     \label{eq:uniform_stationary1}
 \end{equation}
@@ -211,9 +225,26 @@ which gives us an explicit equation for how home range overlap determines FOI an
 
 \subsubsection*{Temporally varying utilization distributions}
 
-In many cases, animals shift their home range seasonally (citations) such that assuming a constant UD is incorrect. This can be accounted for in PMoveSTIR as a special case of temporal heterogeneity (Fig. 1).  Specifically, consider equation \ref{eq:expected_foi}. The expected FOI over the time interval 0 to $t$ in location $x$ is $\bar{h^*}_{i \leftarrow j}(x) = \frac{\int_0^t h^*_{i \leftarrow j}(\tau, x) d\tau}{t}$ (Wilber et al. 2022).  One could approximate this as $\sum_{k = 0}^{n_t} h^*_{i \leftarrow j}(t_k, x) \frac{\Delta \tau}{t}$ where $n_t$ is the number of bins that comprise the interval 0 to $t$, $t_k$ is the midpoint of the $k$th time interval, and $\Delta \tau$ is the width of a time interval.  The equation is a weighted sum where each component is a constant FOI within a time interval multiplied by the length of the time interval relative to the total interval length $t$.  
+In many cases, animals shift their home range seasonally (citations) such that assuming a constant UD is incorrect. This can be accounted for in PMoveSTIR as a special case of temporal heterogeneity (Fig. 1).  Specifically, consider equation \ref{eq:expected_foi}. The expected FOI over the time interval 0 to $t$ in location $x$ is $\bar{h^*}_{i \leftarrow j}(x) = \frac{\int_0^t h^*_{i \leftarrow j}(\tau, x) d\tau}{t}$ \citep{Wilber2022}.  One could approximate this as $\sum_{k = 0}^{n_t} h^*_{i \leftarrow j}(t_k, x) \frac{\Delta \tau}{t}$ where $n_t$ is the number of bins that comprise the interval 0 to $t$, $t_k$ is the midpoint of the $k$th time interval, and $\Delta \tau$ is the width of a time interval.  The equation is a weighted sum where each component is a constant FOI within a time interval multiplied by the length of the time interval relative to the total interval length $t$.  
 
-The summation perspective helps us frame PMoveSTIR in a seasonal context.  For example, consider that hosts use two primary movement patterns that repeat on a period of $T$ (e.g., over the course of a year).  The first movement pattern lasts for $\tau_1$ time units and the second lasts for $\tau_2$ time units where $\tau_1 + \tau_2 = T$.  Assuming stationarity within each time interval, the average FOI felt by host $i$ from host $j$ in location $x$ over period $T$ is $\bar{h^*}_{i \leftarrow j}(x) = \frac{\tau_1}{T} h^*_{\tau_1, i \leftarrow j}(x) + \frac{\tau_2}{T} h^*_{\tau_2, i \leftarrow j}(x)$.  This could be generalized to any number of intervals within the period $T$, depending on the biology of the system.  Importantly, when considering the epidemiological implications of these seasonally shifting movement patterns, one should consider each seasonal FOI component separately to build dynamic contact networks with time-varying edges \cite{Wilber2022}.
+The summation perspective helps us frame PMoveSTIR in a seasonal context.  For example, consider that hosts use two primary movement patterns that repeat on a period of $T$ (e.g., over the course of a year).  The first movement pattern lasts for $\tau_1$ time units and the second lasts for $\tau_2$ time units where $\tau_1 + \tau_2 = T$.  Assuming stationarity within each time interval, the average FOI felt by host $i$ from host $j$ in location $x$ over period $T$ is $\bar{h^*}_{i \leftarrow j}(x) = \frac{\tau_1}{T} h^*_{\tau_1, i \leftarrow j}(x) + \frac{\tau_2}{T} h^*_{\tau_2, i \leftarrow j}(x)$.  This could be generalized to any number of intervals within the period $T$, depending on the biology of the system.  Importantly, when considering the epidemiological implications of these seasonally shifting movement patterns, one should consider each seasonal FOI component separately to build dynamic contact networks with time-varying edges \citep{Wilber2022}.
 
+\subsection*{Implementation--example with simulated data}
+
+We will illustrate the calculation of the pairwise FOI using simulated tracks for different potential cases of movement. We focus here on the lower-right corner of the PMoveSTIR square (\ref{eq:stationary_cor}), where we assume stationarity in movement across time. Thus, we emphasize differences in movement that result in different correlation values. We start with spatially and temporally explicit data, as could be obtained from GPS collars, or high-resolution radio telemetry \citep{Aspillaga2021}. We simulate the movement process following the model by \citet{Hooten2017}. 
+
+\subsubsection{Independent movement}
+
+In the simplest case, individuals are moving independently of each other, so there is no expected correlation between their visits to any given location. The correlation term can be ignored, and we have simply 
+$h_{i\leftarrow j}(x)=\frac{\tilde\beta}{\nu A_x} p_i(x)p_j(x)$
+
+
+\subsubsection{Joint movement}
+
+\subsubsection{Interacting trajectories}
+ 
+
+
+\bibliography{references}
 
 \end{document}
