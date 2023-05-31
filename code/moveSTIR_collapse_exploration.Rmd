@@ -5,6 +5,7 @@ output: html_document
 editor_options: 
   markdown: 
     wrap: 72
+bibliography: references.bib
 ---
 
 ```{r setup, include=FALSE}
@@ -412,6 +413,54 @@ than the expectation under the assumption of constant correlation. Both
 values, however, are lower than the expectation that ignores the
 covariance term.
 
+### Implementation for the moveSTIR paper
+
+Here I will use simulated tracks following the approach by Hooten and
+Johnson [@hooten2017]. This is also the method used in the original
+moveSTIR paper. I can use the same tracks first, and then make changes
+to test different case studies. I should try out:
+
+-   Different levels of overlap
+
+-   Correlated movement (see [@scharf2018] for joint movement)
+
+```{r}
+# import the data simulated in the original moveSTIR paper. The tracks are csv files generated using the moveSTIR tutorial notebook, and the simulate_movement function in moveSTIR.
+sim_tracks <- lapply(list.files("../data", ".csv",full.names = TRUE), read.csv)
+library(sp)
+library(adehabitatHR)
+# join together
+sim_tracks_db <- do.call(rbind, sim_tracks)[,2:3] |> cbind(ind = rep(seq_along(sim_tracks), sapply(sim_tracks,nrow))) 
+# create the spatialPoints object with id column
+sim_tracks_sppoints <- SpatialPointsDataFrame(sim_tracks_db[,1:2], data = data.frame(id = sim_tracks_db$ind))
+# get the UDs with a common grid
+kuds <- kernelUD(sim_tracks_sppoints, same4all = TRUE)
+
+# Get the cell area
+cell_area <- kuds[[1]]@grid@cellsize |> prod()
+
+# Calculate the per-cell product of expected values, and plot it
+SpatialPixelsDataFrame(coordinates(kuds[[1]]), data = data.frame(kuds[[1]]@data*kuds[[2]]@data)) |> plot()
+
+# create an array with the presence of each individual in each cell for each time step. THis will be used to calculate the correlation.
+expand.grid()
+```
+
+```{r}
+# Create a figure to illustrate the example. This figure will have the tracks of multiple individuals, then their respective UDs, as well as the UD product.
+plot(sim_tracks_db$x, sim_tracks_db$y, type = "n", asp = 1, axes = F, ann = F)
+for (i in unique(sim_tracks_db$ind)) {
+  lines(sim_tracks_db[sim_tracks_db$ind == i, ], col = hcl.colors(6, palette = "Set 2")[i])
+}
+
+```
+
+```{r}
+par(mfrow = c(1,2))
+plot(kuds[[1]])
+plot(kuds[[2]])
+```
+
 ## Upper left-hand corner -- uniform space use
 
 There are instances in which we will not have spatially explicit data.
@@ -561,9 +610,25 @@ $s$ that we care about. Assuming uniform space use, we define:
 
 -   $P(i \notin x \text{ at }t)=1-1/A_{i,tot}$ The probability that $i$
     is anywhere but $x$ at a certain point in time
-    
-    
-**Mark here**: I think we are getting different answers here because your verbal interpretation of $P(i \in x \text{ at } t | j \in x \text{ at } u)$ is different than mine. I would verbally interpret  $P(i \in x \text{ at } t | j \in x \text{ at } u)$ as instantaneous where you are interpreting it (I think) as cumulative.  For example, you state that $P(i \in x \text{ at } t | j \in x \text{ at } u)$ also tells us where $j$ wasn't for $t - u$. My interpretation that it doesn't tell us anything about where $j$ wasn't.  $j$ could have been in $x$ for part of $t - u$ or all of $t - u$.  I would argue we don't know that from $P(i \in x \text{ at } t | j \in x \text{ at } u)$ -- we just know given $j$ was there at past time $u$, is $i$ there right now?  We could start multiplying these $P(i \in x \text{ at } t | j \in x \text{ at } u)$ together over different lags to ask for the probability that $i$ is in $x$ for some time period $t + \delta t$ but not in $x$ for the time period $t - u$, but I don't think $P(i \in x \text{ at } t | j \in x \text{ at } u)$ alone can tell us that.
+
+**Mark here**: I think we are getting different answers here because
+your verbal interpretation of
+$P(i \in x \text{ at } t | j \in x \text{ at } u)$ is different than
+mine. I would verbally interpret
+$P(i \in x \text{ at } t | j \in x \text{ at } u)$ as instantaneous
+where you are interpreting it (I think) as cumulative. For example, you
+state that $P(i \in x \text{ at } t | j \in x \text{ at } u)$ also tells
+us where $j$ wasn't for $t - u$. My interpretation that it doesn't tell
+us anything about where $j$ wasn't. $j$ could have been in $x$ for part
+of $t - u$ or all of $t - u$. I would argue we don't know that from
+$P(i \in x \text{ at } t | j \in x \text{ at } u)$ -- we just know given
+$j$ was there at past time $u$, is $i$ there right now? We could start
+multiplying these $P(i \in x \text{ at } t | j \in x \text{ at } u)$
+together over different lags to ask for the probability that $i$ is in
+$x$ for some time period $t + \delta t$ but not in $x$ for the time
+period $t - u$, but I don't think
+$P(i \in x \text{ at } t | j \in x \text{ at } u)$ alone can tell us
+that.
 
 Then we have
 
@@ -625,7 +690,7 @@ $$
 
 Is this just the same as the special case described above for
 independent movement,
-$E[h_{i \leftarrow j}(x,t)]=\frac{\beta'\lambda}{\nu}  \frac{A_x}{A_{i,tot}A_{j,tot}}$?
+$E[h_{i \leftarrow j}(x,t)]=\frac{\beta'\lambda}{\nu} \frac{A_x}{A_{i,tot}A_{j,tot}}$?
 
 Let's look at an example. Say we have two individuals with $A_i=2$ and
 $A_j=3$, and the area of overlap is $A_x=1$.

@@ -72,7 +72,7 @@ where \$p_i(x, t)\$ gives the time varying **utilization distribution** for host
 Now, if we assume a stationary distribution, the time indexes on $p_i(x, t)$ and $p_j(x, u)$ are irrelevant \-- the logic here is that, by definition, a the mean of a stationary distribution is independent of time so $p_i(x, t) = p_i(x)$ and $p_j(x, u) = p_j(x)$. Therefore, we can write  
 
 $$
-E\[h\_{i \leftarrow j}(t, x)\] = \beta \lambda \left[p_i(x) p_j(x) (1 / \nu)  + \int_{-\infty}^t Cov(\delta_i(x, t), \delta_j(x, u)) e^{-\nu(t - u)} du\right]
+E[h\_{i \leftarrow j}(t, x)] = \beta \lambda \left[p_i(x) p_j(x) (1 / \nu)  + \int_{-\infty}^t Cov(\delta_i(x, t), \delta_j(x, u)) e^{-\nu(t - u)} du\right]
 $$
 
 where $\int_{-\infty}^t e^{-\nu(t - u)} du = 1 / \nu$.
