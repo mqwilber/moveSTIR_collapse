@@ -436,22 +436,39 @@ sim_tracks_sppoints <- SpatialPointsDataFrame(sim_tracks_db[,1:2], data = data.f
 # get the UDs with a common grid
 kuds <- kernelUD(sim_tracks_sppoints, same4all = TRUE)
 
-# Get the cell area
+# Get the cell area, for FOI calculation
 cell_area <- kuds[[1]]@grid@cellsize |> prod()
 
+# Next we need to determine the location histories. The location history is a matrix with time in rows, locations (grid cells) in columns. Matrix values represent whether the individual was (1) or was not (0) at that location at that time. So, we need to assign a cell to every location.
+loc_histories <- list()
+
+# get grid
+kuds[[1]]@grid
+
+# Get cell coordinates
+grid_cell_coords <- SpatialPointsDataFrame(coordinates(kuds[[1]]), data = data.frame(kuds[[1]]@grid.index))
+# Get the distance between the grid cell centers and every point in the tracking history. THis creates a numeric matrix with points in rows, and grid cell centers in columns. We need only keep the lowest distance.
+point_grid_dists <- spDists(sim_tracks_sppoints, grid_cell_coords)
+nearest_cell <- apply(point_grid_dists, MARGIN = 1, which.min)
+loc_history <- matrix(0, nrow = nrow(sim_tracks[[1]]), ncol = length(kuds[[1]]))
+for (i in nrow(loc_history)) {
+  loc_history[i,nearest_cell[i]] <- 1
+}
+# calculate standard deviation. For a Bernoulli process, the sd is sqrt(p(1-p)). p is just the column mean for the location history matrix.
+sig <- loc_history |> apply(2,\(x) sqrt(mean(x)*(1-mean(x))))
 # Calculate the per-cell product of expected values, and plot it
 SpatialPixelsDataFrame(coordinates(kuds[[1]]), data = data.frame(kuds[[1]]@data*kuds[[2]]@data)) |> plot()
 
-# create an array with the presence of each individual in each cell for each time step. THis will be used to calculate the correlation.
-expand.grid()
+
 ```
 
 ```{r}
 # Create a figure to illustrate the example. This figure will have the tracks of multiple individuals, then their respective UDs, as well as the UD product.
 plot(sim_tracks_db$x, sim_tracks_db$y, type = "n", asp = 1, axes = F, ann = F)
 for (i in unique(sim_tracks_db$ind)) {
-  lines(sim_tracks_db[sim_tracks_db$ind == i, ], col = hcl.colors(6, palette = "Set 2")[i])
+  lines(sim_tracks_db[sim_tracks_db$ind == i, ], col = hcl.colors(6, palette = "Set 2")[i], lwd  = 2)
 }
+legend(x = "bottomright",legend = 1:6, col = hcl.colors(6,palette = "Set 2"),border = F, lty = 1)
 
 ```
 
@@ -459,6 +476,12 @@ for (i in unique(sim_tracks_db$ind)) {
 par(mfrow = c(1,2))
 plot(kuds[[1]])
 plot(kuds[[2]])
+```
+
+Draw the joint probability distribution grid
+
+```{r}
+
 ```
 
 ## Upper left-hand corner -- uniform space use
