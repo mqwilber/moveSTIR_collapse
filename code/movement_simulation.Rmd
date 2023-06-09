@@ -1,0 +1,315 @@
+---
+title: "Track simulation"
+author: "Juan S. Vargas Soto"
+output: html_notebook
+---
+
+```{r libraries}
+library(tidyverse)
+```
+
+
+The goal is to generate simulated tracks for individuals that do not move independently from each other, but rather have correlated movement. The most straightforward way to do this (at least conceptually) is to have individuals be attracted to each other, or avoid each other. This would generate temporal correlation that is not driven by spatial environmental factors. Nonetheless, some specific cells would have significant correlations. 
+There are multiple alternatives to generate the tracks for the collapse paper. Ideally, I need a common framework that can generate independent tracks (this is the simplest), but also temporally correlated tracks. For example, individuals moving together (high positive correlation at all lags), or temporal avoidance (negative correlation at short lags). Perhaps the best option comes from Scharf's paper [@Scharf2018], which has a model for joint movement using process convolution chains to account for covariance. Other options include:
+* Haydon et al. 2008, a two-state CRW that classified whether animals were in a group or not (<https://doi.org/10.1098/rspb.2007.1688>)
+* Langrock et al. 2013, MC model with a centre for the group but individualized behavior w.r.t. the centre (<https://doi.org/10.1111/2041-210X.12155>). Supposedly better than a mixture of CRW in simulating non-diffusive behavior.
+* Russell et al. 2015, include a marginal movement model using point process. Flexible, can incorporate marginal movement behavior and interactions separately (<https://doi.org/10.1007/s13253-015-0219-0>)
+* Scharf et al. 2016. Same authors, killer whale example. The model is hierarchical, with an underlying social component. (<https://doi.org/10.1214/16-AOAS970>). This paper is following up this approach.
+
+
+# Process model
+
+The process of movement is given by
+
+$$
+\begin{aligned}
+\tau &\equiv (\tau_1=0, \tau_2, ..., \tau_{m-1}, \tau_m=1)'\\
+\Delta\tau_k &\equiv\tau_k-\tau_{k-1}, 1<k\le m \\
+dB_i(\tau_k)&\sim\left\lbrace
+\begin{array}
+\mathcal{N}(0,\sigma^2_0); k=0\\
+\mathcal{N}(0,\Delta\tau_k); k>0
+\end{array}
+\right.\\
+dB_i&=(dB_i(\tau_1),...,dBi(\tau_m))'\\
+dB &=(dB_1',...,dB_p')\\
+\tilde{\mu}&=H^{inl}H^{soc}H^{bm}dB=\tilde{H}dB
+\end{aligned}
+$$
+$\tau$ are the discrete time steps (from 0 to 1),$\Delta\tau_k$ is the interval between them, $dB_i(\tau_k)$ is the Gaussian process difference between the positions, with a standard deviation proportional to the time interval. These are then processed with the brownian motion, social, and inertial convolution kernels to obtain the true position $\tilde\mu$.
+
+## Gaussian process and Brownian motion
+So first we get a set of positions. The position given Brownian motion is just the cumulative sum of deviations. The example below is in one dimension only to start.
+
+```{r brownian motion}
+# Fixed parameters
+nind <- 5 # number of individuals
+phi <- 0.04 # 0.04/3 for high tortuosity
+sigma0 <- 1 # IG(1e-3, 1e-3)
+sigmas <- 0.0125
+sigmau <- 10
+nsteps <- 24*60 # two months, hourly positions
+
+tau <- seq(0, 1, length.out = nsteps) # time vector from 0 to 1
+dtau <- diff(tau) # for regular interval this value will be constant
+
+# create array of Gaussian base process
+dB <- matrix(nrow = nsteps, ncol = nind)
+
+# First positions come from a Normal dist with mean 0 and sd the fixed parameter sigma0. The remaining values of the Gaussian process are a function of the time interval.
+set.seed(3)
+dB[1,] <- rnorm(n = nind, mean = 0, sd = sqrt(sigma0))
+dB[2:length(tau),] <- rnorm(n = nind*length(dtau), mean = 0,sd = sqrt(dtau))
+
+# First kernel is Brownian motion, with convolution kernel h_bm = 1{tau<t}1{i=j}. This is simply the cumulative sum of noise
+h_bm <- diag(nrow = nsteps)
+h_bm[lower.tri(h_bm)] <- 1
+mu_BM <- h_bm%*%dB
+
+# Plot the trajectories
+pdat_bm <- as_tibble(mu_BM) %>% mutate(time = tau, stage = "BM")
+pdat_bm %>% 
+  pivot_longer(cols = 1:5, names_to = "ind") %>% 
+  ggplot(aes(time, value))+geom_path(aes(color = ind), size = 1, show.legend = F)+
+  theme_classic(base_size = 14)+
+  labs(x = "Time", y = "Position", color = "Individual")
+```
+
+
+## Social smoothing
+
+Once we have the Brownian motion, we apply a social filter. The social smoothing kernel proposed in the paper is
+$$
+h_{ij}^{(soc)}\equiv1_{\{\tau=\tau_{soc}\}}\frac{w_{ij}(\tau_{soc})}{|w_i.(\tau_{soc})|}\\
+|w_i.(\tau_{soc})|\equiv\sum_{j=1}^pw_{ij}(\tau_{soc})
+$$
+The position is obtained as:
+
+$$
+\mu_1^{(soc)}(\tau_{soc})\equiv\sum_{j=1}^p\int_\mathcal{T} h_{ij}^{(soc)}(\tau_{soc},\tau)\mu_j(\tau)d\tau
+$$
+
+Simply, the x or y position is the weighted average of the positions of the individual and the other individuals, with the weights the social network edge values at that moment. 
+
+```{r social convolution}
+# Social network edge strengths. This can be time dependent, e.g. a list of length nsteps where each element is a matrix of edge weights
+create_soc_net <- function(n) {
+  A <- matrix(runif(n*n), nrow = n)
+  A <- A*upper.tri(A)+t(A*upper.tri(A)) #make symmetric
+  diag(A) <- 1 # set diagonal to 1
+  A
+}
+# w <- lapply(tau, \(x) create_soc_net(5)) # this is if you want a randomly changing matrix
+# I could also have a stable matrix, where some individuals are associated but other aren't
+A <- matrix(runif(nind*nind), nrow = nind)*rbinom(nind*nind, size = 1, prob = 0.2) 
+A <- A*upper.tri(A)+t(A*upper.tri(A)) #make symmetric
+diag(A) <- 1 # set diagonal to 1
+w <- replicate(n = nsteps,expr = A, simplify = FALSE) # this for a constant weight matrix
+
+# convolution kernel hij(tau) is the weights matrix, divided by the row sums
+h_soc <- lapply(w, \(x) x/rowSums(x))
+# create an empty array with the same dimensions as mu_BM
+mu_soc <- matrix(nrow = nsteps, ncol = nind)
+# fill the array using dot product of the step*ind x and y matrices, multiplied by the rows of h_soc
+for (t in 1:nsteps) {
+    mu_soc[t,] <- h_soc[[t]]%*%mu_BM[t,]
+}
+
+pdat_soc <- as_tibble(mu_soc) %>% mutate(time = tau, stage = "Social")
+```
+
+## Inertial smoothing
+There are multiple methods to make a broken-up Brownian motion path smoother. The one in the paper is 
+
+$$
+h_{ij}^{(inl)}(t,\tau)\equiv\frac{|t-\tau|}{\phi_{inl}}K_1(|t-\tau|/\phi_{inl})1_{\{i=j\}}
+$$
+
+where $K_1$ is a modified Bessel function with parameter $\nu=1$. These are the weights that you multiply each position by, to obtain a smooth line. Below is an example with two individuals
+```{r}
+# Inertial smoothing kernel
+# The process here is just smoothing to better simulate real movement. The smoothing is done through a Bessel function
+# mu_inl <- array(dim = dim(mu_BM), dimnames = dimnames(mu_BM))
+h_inl <- outer(tau,tau, \(x,y) abs(x-y)/phi*besselK(abs(x-y)/phi, nu = 1))
+diag(h_inl) <- 1
+h_inl <- h_inl/rowSums(h_inl) # this is the only way I found to make it work, have mu_inl be a weighted average, where the weights are the values in the h_inl matrix
+mu_inl <- h_inl%*%mu_soc
+
+# Plot
+pdat_inl <- as_tibble(mu_inl) %>% mutate(time = tau, stage = "inertial")
+
+rbind(pdat_bm, pdat_soc, pdat_inl) %>% 
+  pivot_longer(cols = 1:5, names_to = "Individual") %>% 
+  filter(Individual %in% c("V2","V5")) %>% 
+  ggplot(aes(time, value))+geom_path(aes(color = Individual, linetype = stage), size = 1)+
+  theme_classic(base_size = 14)+
+  labs(x = "Time", y = "Position", color = "Individual")
+```
+## Data model
+
+Finally, based on the real position, the data model is obtained as a random variable. 
+$$
+\begin{align}
+s&\sim \mathcal{N}(0,\sigma^2_s(\mathbf{I}+\sigma^2_{\mu/s}\Delta\tau\mathbf{\tilde{H}}\Sigma_{dB}\mathbf{\tilde{H}}' ))\\
+\mathbf{\tilde{H}}&=\mathbf{H}^{(inl)}(\phi_{inl})\mathbf{H^{(soc)}}(d\mathbf{B}_w,\phi_w,\sigma^2_w)\mathbf{H}^{(bm)}\\
+\Sigma_{dB}(t, \tau, i, j)&=\mathbf{1}_{\{t=\tau\}}(\sigma^2\mathbf{1}_{\{t=0\}}+\mathbf{1}_{\{t>0\}})\mathbf{1}_{\{i=j\}}
+\end{align}
+$$
+In practice this comes down to adding a measurement error to the true position:
+$$
+s_i(t)\equiv\sigma_\mu\tilde\mu_i(t)+\varepsilon_i(t),
+$$
+where the the error is normally distributed, with mean 0 and variance $\sigma_s^2$.
+
+```{r data process}
+# Sample 20% of points. get index of positions
+fix_t_index <- round(seq(1, nsteps, length.out = nsteps/5))
+# Calculate the position with the measurement error
+s <- sigmau*mu_inl[fix_t_index,]+rnorm(n = nind*length(fix_t_index), mean = 0, sd = sqrt(sigmas))
+
+# Plot
+pdat_inl %>% pivot_longer(1:nind, names_to = "ind", values_to = "position") %>% 
+  mutate(position = sigmau*position)->pinl
+
+cbind(s, time = tau[fix_t_index]) %>% as_tibble() %>% 
+  pivot_longer(1:nind, names_to = "ind", values_to = "position") %>% 
+  ggplot()+
+  geom_point(aes(time, position,color = ind), shape = 1, show.legend = F)+
+  geom_path(aes(time, position, color = ind), data = pinl, show.legend = F)+
+  theme_classic(base_size = 14)+
+  labs(x="Time", y="Position", color = "Individual")
+```
+
+# Simulations
+
+## Independent movement
+
+First I will create a simulation where there is no interaction between the individuals, i.e. the social kernel is the identity matrix.
+
+```{r mov fx}
+# create Brownian motion in 2D
+simulate_BM <- function(nind = 5, nsteps = 24*60,sigma0 = 1) {
+  tau <- seq(0, 1, length.out = nsteps) # time vector from 0 to 1
+  dtau <- diff(tau) # for regular interval this value will be constant
+  # create array of Gaussian base process
+  dB <- matrix(nrow = nsteps, ncol = nind)
+  # First positions come from a Normal dist with mean 0 and sd the fixed parameter sigma0. The remaining values of the Gaussian process are a function of the time interval.
+  dB[1,] <- rnorm(n = nind, mean = 0, sd = sqrt(sigma0))
+  dB[2:length(tau),] <- rnorm(n = nind*length(dtau), mean = 0,sd = sqrt(dtau))
+  # First kernel is Brownian motion, with convolution kernel h_bm = 1{tau<t}1{i=j}. This is simply the cumulative sum of noise
+  h_bm <- diag(nrow = nsteps)
+  h_bm[lower.tri(h_bm)] <- 1
+  mu_BM <- h_bm%*%dB
+  return(mu_BM)
+}
+
+convolve_soc <- function(mu, w) {
+  mu_soc <- matrix(nrow = nrow(mu),ncol = ncol(mu))
+  # create social kernel
+  h <- lapply(w, \(x) x/rowSums(x))
+  # iteratively fill in the rows of matrix
+  for (t in 1:length(w)) {
+    mu_soc[t,] <- h[[t]]%*%mu[t,]
+  }
+  return(mu_soc)
+}
+
+convolve_inl <- function(mu, phi) {
+  # get time vector
+  tau <- seq(0, 1, length.out = nrow(mu))
+  # create inertial smoothing kernel
+  h_inl <- outer(tau,tau, \(x,y) abs(x-y)/phi*besselK(abs(x-y)/phi, nu = 1))
+  diag(h_inl) <- 1
+  h_inl <- h_inl/rowSums(h_inl) 
+  # Update position matrix
+  mu_inl <- h_inl%*%mu
+  return(mu_inl)
+}
+
+get_est_locs <- function(mu, prop = 0.2, reg = TRUE, sigmau, sigmas) {
+  # Get position index, depends on whether sampling is regular or not
+  ix <- if(reg) round(seq.int(from = 1, to = nrow(mu), length.out = nrow(mu)*prop)) else sample(1:nrow(mu), size = round(nrow(mu)*prop))
+  # Calculate the position with the measurement error
+  s <- sigmau*mu[ix,]+rnorm(n = ncol(mu)*length(ix), mean = 0, sd = sqrt(sigmas))
+  return(s)
+}
+```
+
+
+```{r indep mov}
+## Fixed parameters
+nind <- 5 # number of individuals
+phi <- 0.04 # 0.04/3 for high tortuosity
+sigma0 <- 1 # IG(1e-3, 1e-3)
+sigmas <- 0.0125
+sigmau <- 10
+nsteps <- 24*60 # two months, hourly positions
+
+x_BM_indep <- simulate_BM(nind,nsteps,sigma0)
+y_BM_indep <- simulate_BM(nind,nsteps,sigma0)
+
+# For independent movement, social kernel is identity matrix at every step
+w <- replicate(n = nsteps,expr = diag(nrow = nind), simplify = FALSE) 
+# Update mu with the social kernel
+x_soc_indep <- convolve_soc(w = w, mu = x_BM_indep)
+y_soc_indep <- convolve_soc(w = w, mu = y_BM_indep)
+# Update mu with the inertial smoothing kernel
+x_inl_indep <- convolve_inl(mu = x_soc_indep, phi = phi)
+y_inl_indep <- convolve_inl(mu = y_soc_indep, phi = phi)
+
+# Get positions s
+ix <- round(seq.int(1,nrow(sx), length.out = nrow(sx)/5))
+sx <- sigmau*x_inl_indep[ix,]+rnorm(length(x_inl_indep[ix,]), 0, sqrt(sigmas))
+sy <- sigmau*y_inl_indep[ix,]+rnorm(length(y_inl_indep[ix,]), 0, sqrt(sigmas))
+```
+
+These are the tracks produced by this simulation.
+```{r plot indep mov}
+pdattrue <- bind_rows(x = as_tibble(sigmau*x_inl_indep),y = as_tibble(sigmau*y_inl_indep), .id = "coord") %>% add_column(time = rep(tau, 2)) %>% 
+  pivot_longer(starts_with("V"), names_to = "ind") %>% 
+  pivot_wider(names_from = coord, values_from = value) 
+
+pdatobs <- bind_rows(x = as_tibble(sx),y = as_tibble(sy), .id = "coord") %>% add_column(time = rep(tau[ix], 2)) %>% 
+  pivot_longer(starts_with("V"), names_to = "ind") %>% 
+  pivot_wider(names_from = coord, values_from = value)
+
+ggplot()+
+  geom_point(aes(x, y, color = ind), data = pdatobs, shape = 1)+
+  geom_path(aes(x, y, color = ind), data = pdattrue)+
+  theme_classic(base_size = 14)+
+  coord_sf()
+```
+## Joint movement
+For joint movement we will simulate a constant social weight matrix with only 1s and 0s. This should create joint movement between some pairs of individuals, but random between other pairs.
+Actually this doesn't work, as one individual is affected by multiple. I need to have only one pair that is interacting. 
+
+```{r joint movement}
+x_BM_joint <- simulate_BM(nind,nsteps,sigma0)
+y_BM_joint <- simulate_BM(nind,nsteps,sigma0)
+
+# For joint movement, social kernel is binary matrix. I'll have only one pair interact
+w_t <- matrix(0, nrow = nind, ncol = nind)
+w_t[1,2] <- 1
+w_t <- w_t*upper.tri(w_t)+t(w_t*upper.tri(w_t)) #make symmetric
+diag(w_t) <- 1
+w <- replicate(n = 1000,expr = w_t, simplify = FALSE) 
+sx_joint <- simulate_BM(nsteps = 1000,sigma0 = 0.01) |> convolve_soc(w = w) |> convolve_inl(phi = 0.01) |> get_est_locs(prop = 0.2, sigmau = sigmau, sigmas = sigmas)
+sy_joint <- simulate_BM(nsteps = 1000,sigma0 = 0.01) |> convolve_soc(w = w) |> convolve_inl(phi = 0.01) |> get_est_locs(prop = 0.2, sigmau = sigmau, sigmas = sigmas)
+
+pdatobs <- bind_rows(x = as_tibble(sx_joint),y = as_tibble(sy_joint), .id = "coord") %>% add_column(time = rep(seq(0,1,length.out = nrow(sx_joint)), 2)) %>% 
+  pivot_longer(starts_with("V"), names_to = "ind") %>% 
+  pivot_wider(names_from = coord, values_from = value)
+
+ggplot()+
+  geom_point(aes(x, y, color = ind), data = pdatobs, shape = 1)+
+  theme_classic(base_size = 14)+
+  coord_sf()
+```
+Generate tracks and export them as csv files.
+```{r}
+for (i in 1:nind) {
+  d <- split(pdatobs, ~ind)[[i]]
+  write.csv(d[,-2], file = paste0("../data/joint_mov_ex_",i,".csv"), row.names = F, quote = F)
+}
+```
+
