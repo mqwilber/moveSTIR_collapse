@@ -415,22 +415,44 @@ covariance term.
 
 ### Implementation for the moveSTIR paper
 
-Here I will use simulated tracks following the approach by Hooten and
-Johnson [@hooten2017]. This is also the method used in the original
-moveSTIR paper. I can use the same tracks first, and then make changes
-to test different case studies. I should try out:
+Here I will use simulated tracks following the approach by Scharf et el.
+[@Scharf2018]. This is similar to the method used in the examples in the
+original moveSTIR paper, but it has an additional social smoothing
+kernel which allows to account for joint movement. I can use the simple,
+independent tracks first, and then make changes to test different case
+studies.
 
--   Different levels of overlap
+#### Independent movement
 
--   Correlated movement (see [@scharf2018] for joint movement)
+First we will test the framework for a simulated scenario where movement
+is independent across individuals. While there could be overlap in the
+resulting utilization distributions and points where the tracks cross
+each other, there should be no significant temporal correlation in the
+location histories.
 
-```{r}
-# import the data simulated in the original moveSTIR paper. The tracks are csv files generated using the moveSTIR tutorial notebook, and the simulate_movement function in moveSTIR.
-sim_tracks <- lapply(list.files("../data", ".csv",full.names = TRUE), read.csv)
+```{r import-plot-tracks}
 library(sp)
 library(adehabitatHR)
+
+# import the simulated data. The tracks are csv files generated using the movement_simulation.Rmd notebook
+sim_tracks <- lapply(list.files("../data", "indep(.*).csv",full.names = TRUE), read.csv)
+
 # join together
 sim_tracks_db <- do.call(rbind, sim_tracks)[,2:3] |> cbind(ind = rep(seq_along(sim_tracks), sapply(sim_tracks,nrow))) 
+
+# Create a figure to illustrate the example. This figure will have the tracks of multiple individuals, then their respective UDs, as well as the UD product.
+plot(sim_tracks_db$x, sim_tracks_db$y, type = "n", asp = 1, axes = F, ann = F)
+for (i in unique(sim_tracks_db$ind)) {
+  lines(sim_tracks_db[sim_tracks_db$ind == i, ], col = hcl.colors(5, palette = "Set 2")[i], lwd  = 2)
+}
+legend(x = "bottomright",legend = 1:5, col = hcl.colors(5,palette = "Set 2"),border = F, lty = 1)
+```
+
+We then get the utilization distribution for every track. In this case I
+am using simple kernel density estimation, i.e. I'm not using any
+mechanistic movement model, but the same procedure would apply.
+
+```{r get-plot-kernels, fig.height=3}
 # create the spatialPoints object with id column
 sim_tracks_sppoints <- SpatialPointsDataFrame(sim_tracks_db[,1:2], data = data.frame(id = sim_tracks_db$ind))
 # get the UDs with a common grid
@@ -439,49 +461,179 @@ kuds <- kernelUD(sim_tracks_sppoints, same4all = TRUE)
 # Get the cell area, for FOI calculation
 cell_area <- kuds[[1]]@grid@cellsize |> prod()
 
+sapply(kuds, plot)
+```
+
+We multiply these UDs pairwise to get the probability $p_i(x)p_j(x)$.
+This is the first component of the equation. The figure below shows an
+example of the result; we get a matrix of the same size, but the highest
+values will be the areas of overlap between individuals.
+
+```{r UD-prod, fig.height=3}
+# Calculate the per-cell product of expected values
+udprod <- function(k1, k2) {k1@data*k2@data}
+
+# Plot one example
+plot(SpatialPixelsDataFrame(coordinates(kuds[[1]]), 
+                            data = data.frame(udprod(kuds[[1]],kuds[[2]]))))
+# Get all the products in a list
+ind_combs <- expand.grid(ind2 = seq_along(kuds), ind1 = seq_along(kuds))
+ind_combs <- ind_combs[ind_combs$ind1!=ind_combs$ind2,]
+UDprods <- apply(ind_combs, 1, \(x) udprod(kuds[[x[2]]],kuds[[x[1]]]), simplify = FALSE)
+```
+
+For the remaining components, i.e. the standard deviation and the
+correlation, we need the location history for every individual. The
+location history is a $T$ by $X$ binary matrix, with $T$ the number of
+discrete time steps and $X$ the number of sites, that shows in which
+cell the individual was at every time point. We do this finding which
+grid cell center is closest for every spatial point.
+
+```{r loc-hist}
 # Next we need to determine the location histories. The location history is a matrix with time in rows, locations (grid cells) in columns. Matrix values represent whether the individual was (1) or was not (0) at that location at that time. So, we need to assign a cell to every location.
-loc_histories <- list()
 
-# get grid
-kuds[[1]]@grid
+# Get the distance between the grid cell centers and every point in the tracking history. This creates a numeric matrix with points in rows, and grid cell centers in columns. 
+point_grid_dists <- spDists(sim_tracks_sppoints, kuds[[1]])
 
-# Get cell coordinates
-grid_cell_coords <- SpatialPointsDataFrame(coordinates(kuds[[1]]), data = data.frame(kuds[[1]]@grid.index))
-# Get the distance between the grid cell centers and every point in the tracking history. THis creates a numeric matrix with points in rows, and grid cell centers in columns. We need only keep the lowest distance.
-point_grid_dists <- spDists(sim_tracks_sppoints, grid_cell_coords)
-nearest_cell <- apply(point_grid_dists, MARGIN = 1, which.min)
-loc_history <- matrix(0, nrow = nrow(sim_tracks[[1]]), ncol = length(kuds[[1]]))
-for (i in nrow(loc_history)) {
-  loc_history[i,nearest_cell[i]] <- 1
+# Create a binary matrix and split it by individual
+loc_histories <-  apply(point_grid_dists, MARGIN = 1, \(x) x==min(x)) |> t() |>
+  split(factor(sim_tracks_db$ind)) |> 
+  lapply(matrix, ncol = ncol(point_grid_dists))
+
+#### Important, the grid cells are not in order!!!
+
+# # Create a function to do this more formally (In prgress)
+# get_lochist <- function(s, k) {
+#   pt_grid_dist <- spDists(s,k)
+#   l <- apply(pt_grid_dist, 1, \(x) x == min(x))
+#   return(l)
+# }
+```
+
+The location histories are iteratively resampled, to select times in the
+history of $i$ and match them with times in the history of $j$ $s$ time
+units before. Once we have these subsets of the location histories, we
+calculate the covariance across matching matrix columns for two
+different individuals. Another way is to divide the covariance,
+expressing it as the product of the per-cell standard deviation as
+$\sigma=\sqrt{\hat p(1-\hat p)}$, where $\hat p$ is the estimated
+probability for a binomial process, and the correlation across the same
+cells for two individuals. It would seem there is no gain in speed in
+calculating the correlation as opposed to the covariance.
+
+```{r covariance}
+# We need to integrate the product of the covariance between the presence of i at x at time t, and the presence of j at x at time u = t-s, across all lags s. This is then multiplied by e^(-mu*s)
+# matrix of combinations. A t*t matrix of difference in time. This is used to
+# find the row-col combinations corresponding to a given lag
+
+lag_mat <- round(outer(sim_tracks[[1]]$time, sim_tracks[[1]]$time, "-"),5)
+lags <- unique(lag_mat[lower.tri(lag_mat,diag = TRUE)])
+lags <- lags[-length(lags)] # remove final value that would have only one possible combination
+
+# For every lag s, find the rows in host 1 and host 2 corresponding to times t
+# and t-s, calculate the correlation, st. dev., and their product
+cell_covs <- replicate(n = nrow(ind_combs), 
+                       expr = matrix(nrow = length(lags), 
+                                     ncol = ncol(loc_histories[[1]])),
+                       simplify = FALSE)
+cell_cors <- replicate(n = nrow(ind_combs), 
+                       expr = matrix(nrow = length(lags), 
+                                     ncol = ncol(loc_histories[[1]])), 
+                       simplify = FALSE)
+
+for (r in 1:nrow(ind_combs)) {
+  i <- ind_combs[r,2]
+  j <- ind_combs[r,1]
+  covmat <- matrix(nrow = length(lags), ncol = ncol(loc_histories[[1]]))
+  cormat <- matrix(nrow = length(lags), ncol = ncol(loc_histories[[1]]))
+  tic("comb")
+  for (l in lags) {
+    # l <- lags[s]
+    # find position where those lags occur
+    indices <- which(lag_mat==l, arr.ind = T)
+    # subset host position matrices with indices
+    h1 <- loc_histories[[i]][indices[,1],]
+    h2 <- loc_histories[[j]][indices[,2],]
+    tic("cov")
+    covmat[s,] <- diag(cov(h1,h2)) # only the diagonal as we care only about same cells
+    toc(log = T, quiet = T)
+    tic("cor")
+    cormat[s,] <- diag(cor(h1,h2)) # only the diagonal as we care only about same cells
+    toc(log = T, quiet = T)
+  }
+  cell_covs[[r]] <- covmat
+  cell_cors[[r]] <- covmat
+  toc(log = T, quiet = T)
 }
-# calculate standard deviation. For a Bernoulli process, the sd is sqrt(p(1-p)). p is just the column mean for the location history matrix.
-sig <- loc_history |> apply(2,\(x) sqrt(mean(x)*(1-mean(x))))
-# Calculate the per-cell product of expected values, and plot it
-SpatialPixelsDataFrame(coordinates(kuds[[1]]), data = data.frame(kuds[[1]]@data*kuds[[2]]@data)) |> plot()
+# for (i in seq_along(loc_histories)) {
+#   for (j in seq_along(loc_histories)) {
+    # if (i == j) next
+    # # exclude cells that only one individual visited
+    # visitprod <- colSums(loc_histories[[i]])*colSums(loc_histories[[j]])
+    # ovlpcells <- which(visitprod!=0)
+    # if(length(ovlpcells)>0) {
+    #   cellcorrs <- rbind(cellcorrs, cbind(ind1=i,ind2=j,cell = goodcells, cor = r))
+    # }
 
+#     names(cell_covs)[counter] <- paste(i,j)
+#     counter = counter+1
+#   }
+# }
 
+# multiply by the decay, and sum across 
+cell_covsum <- lapply(cell_covs, "*", exp(-nu*lags)) |> 
+  lapply(colSums, na.rm = TRUE)
 ```
 
-```{r}
-# Create a figure to illustrate the example. This figure will have the tracks of multiple individuals, then their respective UDs, as well as the UD product.
-plot(sim_tracks_db$x, sim_tracks_db$y, type = "n", asp = 1, axes = F, ann = F)
-for (i in unique(sim_tracks_db$ind)) {
-  lines(sim_tracks_db[sim_tracks_db$ind == i, ], col = hcl.colors(6, palette = "Set 2")[i], lwd  = 2)
-}
-legend(x = "bottomright",legend = 1:6, col = hcl.colors(6,palette = "Set 2"),border = F, lty = 1)
+We obtain a matrix with cells in rows, and combinations of individuals
+in columns. For every column we need to add the product of the UDs at
+that cell, and then scale by the epidemiological parameters to obtain
+the cell FOI.
 
+```{r foi}
+UDmu <- lapply(UDprods, "*", 1/nu)
+cell_foi <- mapply("+", cell_covsum, UDmu) |> sapply("*", beta*lam)
 ```
 
-```{r}
-par(mfrow = c(1,2))
-plot(kuds[[1]])
-plot(kuds[[2]])
+We obtain a matrix where each column is a combination of two
+individuals, and every row is a cell in the landscape. The matrix values
+are the estimated FOI experienced by individual 1 from individual 2. By
+adding across the columns we can estimate the total FOI for that pair of
+individuals. From this matrix we can also calculate the total FOI that
+an individual experiences from all other individuals, either at a
+specific location or across the whole landscape.
+
+```{r tracks-gg}
+sim_tracks_db %>% ggplot()+geom_path(aes(x,y,color = factor(ind)), size=1)+theme_void()+coord_sf()+labs(color="Individual")+theme(legend.position = "left") -> gg.tracks
 ```
 
-Draw the joint probability distribution grid
+```{r pairwise-foi}
+# total FOI from for every pair of individuals
+colSums(cell_foi) |> cbind(ind_combs) |> ggplot()+geom_raster(aes(factor(ind1),factor(ind2),fill=colSums(cell_foi)))+theme_classic(base_size = 14)+labs(fill = "FOI", y = "Acquiring individual", x = "Depositing individual")+scale_x_discrete(breaks = 1:6)+scale_y_discrete(breaks = 1:6)+theme(aspect.ratio = 1) -> gg.pairfoi
+cowplot::plot_grid(gg.tracks,gg.pairfoi, rel_widths = c(1,1.3))
+```
 
-```{r}
+We can see for example that individual 1 has hardly any overlap, and its
+FOI values are the lowest. The FOI in this case is symmetrical. The
+product of the UDs is symmetrical, and the covariance is zero for all
+pairwise interactions. This makes sense because there is no real
+interaction across hosts.
 
+```{r ind-foi}
+# total FOI experienced across from all hosts combined
+tapply(colSums(cell_foi), ind_combs$ind1, sum)
+# total FOI contributed to all other hosts
+tapply(colSums(cell_foi), ind_combs$ind2, sum)
+```
+
+```{r st-dev}
+# # We can calculate the sd from the estimated p_i. Can we?
+# stdevs_est <- lapply(kuds, \(x) sqrt(as.matrix(x)*(1-as.matrix(x))))
+
+# calculate standard deviation from the data. For a Bernoulli process, the sd is sqrt(p(1-p)), where p is the column mean for the binary location history matrix.
+getcellSD <- function(h) sqrt(colMeans(h)*(1-colMeans(h)))
+# apply(h, 2, \(x) sqrt(mean(x)*(1-mean(x))))
+stdevs <- lapply(loc_histories, getcellSD)
 ```
 
 ## Upper left-hand corner -- uniform space use
