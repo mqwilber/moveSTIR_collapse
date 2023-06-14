@@ -125,7 +125,7 @@ $$
 h_{ij}^{(inl)}(t,\tau)\equiv\frac{|t-\tau|}{\phi_{inl}}K_1(|t-\tau|/\phi_{inl})1_{\{i=j\}}
 $$
 
-where $K_1$ is a modified Bessel function with parameter $\nu=1$. These are the weights that you multiply each position by, to obtain a smooth line. Below is an example with two individuals
+This is essentially a Gaussian filter that smooths the path and makes it differentiable, where $K_1$ is a modified Bessel function with parameter $\nu=1$. These are the weights that you multiply each position by. Below is an example with two individuals
 ```{r}
 # Inertial smoothing kernel
 # The process here is just smoothing to better simulate real movement. The smoothing is done through a Bessel function
@@ -238,9 +238,9 @@ get_est_locs <- function(mu, prop = 0.2, reg = TRUE, sigmau, sigmas) {
 
 ```{r indep mov}
 ## Fixed parameters
-nind <- 5 # number of individuals
+nind <- 6 # number of individuals
 phi <- 0.04 # 0.04/3 for high tortuosity
-sigma0 <- 1 # IG(1e-3, 1e-3)
+sigma0 <- 0.01 # IG(1e-3, 1e-3)
 sigmas <- 0.0125
 sigmau <- 10
 nsteps <- 24*60 # two months, hourly positions
@@ -259,8 +259,8 @@ y_inl_indep <- convolve_inl(mu = y_soc_indep, phi = phi)
 
 # Get positions s
 ix <- round(seq.int(1,nrow(sx), length.out = nrow(sx)/5))
-sx <- sigmau*x_inl_indep[ix,]+rnorm(length(x_inl_indep[ix,]), 0, sqrt(sigmas))
-sy <- sigmau*y_inl_indep[ix,]+rnorm(length(y_inl_indep[ix,]), 0, sqrt(sigmas))
+sx <- get_est_locs(x_inl_indep, sigmau = sigmau, sigmas = sigmas)
+sy <- get_est_locs(y_inl_indep, sigmau = sigmau, sigmas = sigmas)
 ```
 
 These are the tracks produced by this simulation.
@@ -274,16 +274,35 @@ pdatobs <- bind_rows(x = as_tibble(sx),y = as_tibble(sy), .id = "coord") %>% add
   pivot_wider(names_from = coord, values_from = value)
 
 ggplot()+
-  geom_point(aes(x, y, color = ind), data = pdatobs, shape = 1)+
+  geom_point(aes(x*sigmau, y*sigmau, color = ind), data = pdatobs, shape = 1)+
   geom_path(aes(x, y, color = ind), data = pdattrue)+
   theme_classic(base_size = 14)+
   coord_sf()
 ```
+Generate tracks and export them as csv files.
+
+```{r generate indep mov files}
+with(data = list(nind = 6, nsteps = 1000, 
+                 sigma0 = 0.01, sigmau = 10, sigmas = 0.0125,
+                 phi = 0.01, prop = 0.2), 
+     expr = {
+                   w <- replicate(nsteps, diag(nrow = nind), simplify = FALSE) # Identity matrix of social weights
+                   sx <- simulate_BM(nind = nind, nsteps = nsteps, sigma0 = sigma0) |> convolve_soc(w = w) |> convolve_inl(phi = phi) |> get_est_locs(prop = prop, sigmau = sigmau, sigmas = sigmas)
+                   sy <- simulate_BM(nind = nind, nsteps = nsteps, sigma0 = sigma0) |> convolve_soc(w = w) |> convolve_inl(phi = phi) |> get_est_locs(prop = prop, sigmau = sigmau, sigmas = sigmas)
+                   pdatobs <- bind_rows(x = as_tibble(sx),y = as_tibble(sy), .id = "coord") %>% add_column(time = rep(seq(0,1,length.out = nrow(sx_joint)), 2)) %>% 
+                     pivot_longer(starts_with("V"), names_to = "ind") %>% 
+                     pivot_wider(names_from = coord, values_from = value) %>% 
+                     split(~ind)
+                   sapply(seq_along(pdatobs), function(x) write.csv(pdatobs[[x]][,-2], file = paste0("../data/indep_mov_example_",x,".csv"), quote = F, row.names = F))
+                 }
+)
+```
+
 ## Joint movement
 For joint movement we will simulate a constant social weight matrix with only 1s and 0s. This should create joint movement between some pairs of individuals, but random between other pairs.
 Actually this doesn't work, as one individual is affected by multiple. I need to have only one pair that is interacting. 
 
-```{r joint movement}
+```{r joint movement plot}
 x_BM_joint <- simulate_BM(nind,nsteps,sigma0)
 y_BM_joint <- simulate_BM(nind,nsteps,sigma0)
 
@@ -301,15 +320,32 @@ pdatobs <- bind_rows(x = as_tibble(sx_joint),y = as_tibble(sy_joint), .id = "coo
   pivot_wider(names_from = coord, values_from = value)
 
 ggplot()+
-  geom_point(aes(x, y, color = ind), data = pdatobs, shape = 1)+
+  geom_path(aes(x, y, color = ind), data = pdatobs, shape = 1)+
   theme_classic(base_size = 14)+
   coord_sf()
 ```
-Generate tracks and export them as csv files.
-```{r}
-for (i in 1:nind) {
-  d <- split(pdatobs, ~ind)[[i]]
-  write.csv(d[,-2], file = paste0("../data/joint_mov_ex_",i,".csv"), row.names = F, quote = F)
-}
+
+
+```{r joint movement}
+with(data = list(nind = 6, nsteps = 1000, 
+                 sigma0 = 0.01, sigmau = 10, sigmas = 0.0125,
+                 phi = 0.01, prop = 0.2), 
+     expr = {
+       w_t <- matrix(0, nrow = nind, ncol = nind)
+       w_t[1,2] <- 1
+       w_t <- w_t*upper.tri(w_t)+t(w_t*upper.tri(w_t)) #make symmetric
+       diag(w_t) <- 1
+       w <- replicate(n = 1000,expr = w_t, simplify = FALSE) 
+       sx <- simulate_BM(nind = nind, nsteps = nsteps, sigma0 = sigma0) |> convolve_soc(w = w) |> convolve_inl(phi = phi) |> get_est_locs(prop = prop, sigmau = sigmau, sigmas = sigmas)
+       sy <- simulate_BM(nind = nind, nsteps = nsteps, sigma0 = sigma0) |> convolve_soc(w = w) |> convolve_inl(phi = phi) |> get_est_locs(prop = prop, sigmau = sigmau, sigmas = sigmas)
+       pdatobs <- bind_rows(x = as_tibble(sx),y = as_tibble(sy), .id = "coord") %>% add_column(time = rep(seq(0,1,length.out = nrow(sx_joint)), 2)) %>% 
+         pivot_longer(starts_with("V"), names_to = "ind") %>% 
+         pivot_wider(names_from = coord, values_from = value) %>% 
+         split(~ind)
+       sapply(seq_along(pdatobs), function(x) write.csv(pdatobs[[x]][,-2], file = paste0("../data/joint_mov_example_",x,".csv"), quote = F, row.names = F))
+     }
+)
 ```
+
+
 
