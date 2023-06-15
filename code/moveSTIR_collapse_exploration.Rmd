@@ -418,9 +418,9 @@ covariance term.
 Here I will use simulated tracks following the approach by Scharf et el.
 [@Scharf2018]. This is similar to the method used in the examples in the
 original moveSTIR paper, but it has an additional social smoothing
-kernel which allows to account for joint movement. I can use the simple,
-independent tracks first, and then make changes to test different case
-studies.
+kernel which allows to account for animals moving closer to each other,
+or moving together. I will use the simple, independent tracks first, and
+then make changes to test different case studies.
 
 #### Independent movement
 
@@ -433,6 +433,8 @@ location histories.
 ```{r import-plot-tracks}
 library(sp)
 library(adehabitatHR)
+library(tidyverse)
+library(cowplot)
 
 # import the simulated data. The tracks are csv files generated using the movement_simulation.Rmd notebook
 sim_tracks <- lapply(list.files("../data", "indep(.*).csv",full.names = TRUE), read.csv)
@@ -441,11 +443,12 @@ sim_tracks <- lapply(list.files("../data", "indep(.*).csv",full.names = TRUE), r
 sim_tracks_db <- do.call(rbind, sim_tracks)[,2:3] |> cbind(ind = rep(seq_along(sim_tracks), sapply(sim_tracks,nrow))) 
 
 # Create a figure to illustrate the example. This figure will have the tracks of multiple individuals, then their respective UDs, as well as the UD product.
+
 plot(sim_tracks_db$x, sim_tracks_db$y, type = "n", asp = 1, axes = F, ann = F)
 for (i in unique(sim_tracks_db$ind)) {
-  lines(sim_tracks_db[sim_tracks_db$ind == i, ], col = hcl.colors(5, palette = "Set 2")[i], lwd  = 2)
+  lines(sim_tracks_db[sim_tracks_db$ind == i, ], col = hcl.colors(length(sim_tracks), palette = "Set 2")[i], lwd  = 1.2)
 }
-legend(x = "bottomright",legend = 1:5, col = hcl.colors(5,palette = "Set 2"),border = F, lty = 1)
+legend(x = "left",legend = 1:length(sim_tracks), col = hcl.colors(length(sim_tracks),palette = "Set 2"),border = F, lty = 1)
 ```
 
 We then get the utilization distribution for every track. In this case I
@@ -502,7 +505,7 @@ loc_histories <-  apply(point_grid_dists, MARGIN = 1, \(x) x==min(x)) |> t() |>
 
 #### Important, the grid cells are not in order!!!
 
-# # Create a function to do this more formally (In prgress)
+# Create a function to do this more formally (In prgress)
 # get_lochist <- function(s, k) {
 #   pt_grid_dist <- spDists(s,k)
 #   l <- apply(pt_grid_dist, 1, \(x) x == min(x))
@@ -523,66 +526,47 @@ calculating the correlation as opposed to the covariance.
 
 ```{r covariance}
 # We need to integrate the product of the covariance between the presence of i at x at time t, and the presence of j at x at time u = t-s, across all lags s. This is then multiplied by e^(-mu*s)
-# matrix of combinations. A t*t matrix of difference in time. This is used to
-# find the row-col combinations corresponding to a given lag
-
-lag_mat <- round(outer(sim_tracks[[1]]$time, sim_tracks[[1]]$time, "-"),5)
-lags <- unique(lag_mat[lower.tri(lag_mat,diag = TRUE)])
-lags <- lags[-length(lags)] # remove final value that would have only one possible combination
-
-# For every lag s, find the rows in host 1 and host 2 corresponding to times t
-# and t-s, calculate the correlation, st. dev., and their product
-cell_covs <- replicate(n = nrow(ind_combs), 
-                       expr = matrix(nrow = length(lags), 
-                                     ncol = ncol(loc_histories[[1]])),
-                       simplify = FALSE)
-cell_cors <- replicate(n = nrow(ind_combs), 
-                       expr = matrix(nrow = length(lags), 
-                                     ncol = ncol(loc_histories[[1]])), 
-                       simplify = FALSE)
-
-for (r in 1:nrow(ind_combs)) {
-  i <- ind_combs[r,2]
-  j <- ind_combs[r,1]
-  covmat <- matrix(nrow = length(lags), ncol = ncol(loc_histories[[1]]))
-  cormat <- matrix(nrow = length(lags), ncol = ncol(loc_histories[[1]]))
-  tic("comb")
-  for (l in lags) {
-    # l <- lags[s]
-    # find position where those lags occur
-    indices <- which(lag_mat==l, arr.ind = T)
-    # subset host position matrices with indices
-    h1 <- loc_histories[[i]][indices[,1],]
-    h2 <- loc_histories[[j]][indices[,2],]
-    tic("cov")
-    covmat[s,] <- diag(cov(h1,h2)) # only the diagonal as we care only about same cells
-    toc(log = T, quiet = T)
-    tic("cor")
-    cormat[s,] <- diag(cor(h1,h2)) # only the diagonal as we care only about same cells
-    toc(log = T, quiet = T)
+get_cov <- function(lh) {
+  # matrix of combinations. A t*t matrix of difference in time. This is used to
+  # find the row-col combinations corresponding to a given lag
+  lag_mat <- round(outer(sim_tracks[[1]]$time, sim_tracks[[1]]$time, "-"),5)
+  lags <- unique(lag_mat[lower.tri(lag_mat,diag = TRUE)])
+  lags <- lags[-length(lags)] # remove final value that would have only one possible combination
+  
+  # For every lag s, find the rows in host 1 and host 2 corresponding to times t
+  # and t-s, calculate the covariance
+  cell_covs <- replicate(n = nrow(ind_combs), 
+                         expr = matrix(0, nrow = length(lags), 
+                                       ncol = ncol(loc_histories[[1]])),
+                         simplify = FALSE)
+  
+  for (r in 1:nrow(ind_combs)) {
+    i <- ind_combs[r,2]
+    j <- ind_combs[r,1]
+    covmat <- cell_covs[[r]]
+    for (s in seq_along(lags)) {
+      l <- lags[s]
+      # find position where those lags occur
+      indices <- which(lag_mat==l, arr.ind = T)
+      # subset host position matrices with indices
+      h1 <- lh[[i]][indices[,1],]
+      h2 <- lh[[j]][indices[,2],]
+      ovlpcells <- which((colSums(h1)*colSums(h2))>0)
+      if(length(ovlpcells)==0) next
+      if (length(ovlpcells)>0) {
+        h1sub <- h1[,ovlpcells]
+        h2sub <- h2[,ovlpcells]
+        covmat[s,ovlpcells] <- diag(as.matrix(cov(h1sub,h2sub)))# only the diagonal as we care only about same cells
+      }
+    }
+    cell_covs[[r]] <- covmat
   }
-  cell_covs[[r]] <- covmat
-  cell_cors[[r]] <- covmat
-  toc(log = T, quiet = T)
+  return(cell_covs)
 }
-# for (i in seq_along(loc_histories)) {
-#   for (j in seq_along(loc_histories)) {
-    # if (i == j) next
-    # # exclude cells that only one individual visited
-    # visitprod <- colSums(loc_histories[[i]])*colSums(loc_histories[[j]])
-    # ovlpcells <- which(visitprod!=0)
-    # if(length(ovlpcells)>0) {
-    #   cellcorrs <- rbind(cellcorrs, cbind(ind1=i,ind2=j,cell = goodcells, cor = r))
-    # }
 
-#     names(cell_covs)[counter] <- paste(i,j)
-#     counter = counter+1
-#   }
-# }
-
+cell_covs <- get_cov(loc_histories)
 # multiply by the decay, and sum across 
-cell_covsum <- lapply(cell_covs, "*", exp(-nu*lags)) |> 
-  lapply(colSums, na.rm = TRUE)
+cell_cov_int <- lapply(cell_covs, "*", exp(-nu*lags)) |> lapply(colSums)
 ```
 
 We obtain a matrix with cells in rows, and combinations of individuals
@@ -591,8 +575,16 @@ that cell, and then scale by the epidemiological parameters to obtain
 the cell FOI.
 
 ```{r foi}
-UDmu <- lapply(UDprods, "*", 1/nu)
-cell_foi <- mapply("+", cell_covsum, UDmu) |> sapply("*", beta*lam)
+calculate_cell_foi <- function(ud, ci) {
+  # ud are the products of the utilization distributions, cv is the list of integrated cell-specific covariance multiplied by the exponential decay
+  UDmu <- lapply(ud, "*", 1/nu)
+  compsum <- mapply("+", ci, UDmu,USE.NAMES = F) # add the UD product and the integrated covariance term
+  cell_foi <- sapply(compsum, "*", beta*lam) # multiply by the epidemiological parameters
+  cell_foi <- replace(cell_foi, cell_foi<0, 0)  # substitute negative values for 0s
+  return(cell_foi)
+}
+
+cell_foi_indep <- calculate_cell_foi(UDprods, cell_cov_int)
 ```
 
 We obtain a matrix where each column is a combination of two
@@ -604,26 +596,38 @@ an individual experiences from all other individuals, either at a
 specific location or across the whole landscape.
 
 ```{r tracks-gg}
-sim_tracks_db %>% ggplot()+geom_path(aes(x,y,color = factor(ind)), size=1)+theme_void()+coord_sf()+labs(color="Individual")+theme(legend.position = "left") -> gg.tracks
+sim_tracks_db %>% ggplot()+geom_path(aes(x,y,color = factor(ind)), size=1)+theme_void(base_size = 14)+coord_sf()+labs(color="Individual")+theme(legend.position = "left") -> gg.tracks
 ```
 
 ```{r pairwise-foi}
 # total FOI from for every pair of individuals
-colSums(cell_foi) |> cbind(ind_combs) |> ggplot()+geom_raster(aes(factor(ind1),factor(ind2),fill=colSums(cell_foi)))+theme_classic(base_size = 14)+labs(fill = "FOI", y = "Acquiring individual", x = "Depositing individual")+scale_x_discrete(breaks = 1:6)+scale_y_discrete(breaks = 1:6)+theme(aspect.ratio = 1) -> gg.pairfoi
-cowplot::plot_grid(gg.tracks,gg.pairfoi, rel_widths = c(1,1.3))
+data.frame(ind_combs, foi = colSums(cell_foi_indep)) |>
+  ggplot()+
+  geom_raster(aes(factor(ind1),factor(ind2, levels = 6:1),fill=foi))+
+  theme_minimal(base_size = 14)+
+  labs(fill = "FOI", y = "Acquiring individual", x = "Depositing individual")+
+  scale_x_discrete(breaks = 1:6, position = "top",expand = c(0,0))+
+  scale_y_discrete(breaks = 1:6, expand = c(0,0))+
+  theme(aspect.ratio = 1, panel.grid = element_blank(), axis.ticks = element_line("black")) -> gg.pairfoi
+cowplot::plot_grid(gg.tracks,gg.pairfoi)
 ```
 
-We can see for example that individual 1 has hardly any overlap, and its
-FOI values are the lowest. The FOI in this case is symmetrical. The
-product of the UDs is symmetrical, and the covariance is zero for all
-pairwise interactions. This makes sense because there is no real
-interaction across hosts.
+We can see that individual 1 has hardly any overlap, and its FOI values
+are the lowest. The product of the UDs is symmetrical, but the
+difference in order of arrival at a given site creates small differences
+due to the covariance term.
 
 ```{r ind-foi}
 # total FOI experienced across from all hosts combined
-tapply(colSums(cell_foi), ind_combs$ind1, sum)
+tapply(colSums(cell_foi_indep), ind_combs$ind1, sum)
 # total FOI contributed to all other hosts
-tapply(colSums(cell_foi), ind_combs$ind2, sum)
+tapply(colSums(cell_foi_indep), ind_combs$ind2, sum)
+```
+
+```{r plot-cellfoi}
+# Plot one example
+plot(SpatialPixelsDataFrame(coordinates(kuds[[1]]), 
+                            data = data.frame(rowSums(cell_foi_indep))))
 ```
 
 ```{r st-dev}
@@ -634,6 +638,140 @@ tapply(colSums(cell_foi), ind_combs$ind2, sum)
 getcellSD <- function(h) sqrt(colMeans(h)*(1-colMeans(h)))
 # apply(h, 2, \(x) sqrt(mean(x)*(1-mean(x))))
 stdevs <- lapply(loc_histories, getcellSD)
+```
+
+```{r}
+sapply(cell_covs, rowMeans) %>% as_tibble() %>% add_column(lag = lags) %>% 
+  pivot_longer(cols = starts_with("v")) %>% 
+  ggplot()+geom_point(aes(lag,value,color = name))
+```
+
+#### Joint movement
+
+Now we will do the same for a case where there is joint movement for two
+hosts, but the rest are moving independently.
+
+```{r joint-mov}
+## 1. Import data, calculate UDs
+sim_tracks <- lapply(list.files("../data", "joint(.*).csv",full.names = TRUE), read.csv)
+sim_tracks_db <- do.call(rbind, sim_tracks)[,2:3] |> cbind(ind = rep(seq_along(sim_tracks), sapply(sim_tracks,nrow))) 
+# create the spatialPoints object with id column
+sim_tracks_sppoints <- SpatialPointsDataFrame(coords = sim_tracks_db[,1:2], 
+                                              data = data.frame(id = sim_tracks_db$ind))
+# get the UDs with a common grid
+kuds <- kernelUD(sim_tracks_sppoints, same4all = TRUE)
+# Get the cell area, for FOI calculation
+cell_area <- kuds[[1]]@grid@cellsize |> prod()
+
+## 2. UD product
+ind_combs <- expand.grid(ind2 = seq_along(kuds), ind1 = seq_along(kuds))
+ind_combs <- ind_combs[ind_combs$ind1!=ind_combs$ind2,]
+UDprods <- apply(ind_combs, 1, \(x) udprod(kuds[[x[2]]],kuds[[x[1]]]), simplify = FALSE)
+
+## 3. Location history
+# Get the distance between the grid cell centers and every point in the tracking history. 
+point_grid_dists <- spDists(sim_tracks_sppoints, kuds[[1]])
+# Create a binary matrix and split it by individual
+loc_histories <-  apply(point_grid_dists, MARGIN = 1, \(x) x==min(x)) |> t() |>
+  split(factor(sim_tracks_db$ind)) |> 
+  lapply(matrix, ncol = ncol(point_grid_dists))
+
+## 4. Get the covariance
+cell_covs_joint <- get_cov(loc_histories)
+
+## 5. multiply by the decay, and sum across to integrate
+cell_cov_int <- lapply(cell_covs_joint, "*", exp(-nu*lags)) |> lapply(colSums)
+
+## 6. Combine the integrated covariance term and the  UD product, and scale by the epi parameters
+cell_foi_joint <- calculate_cell_foi(UDprods, cell_cov_int)
+```
+
+```{r plot_joint_sim}
+## 7. plots
+data.frame(ind_combs, foi = colSums(cell_foi_joint))|>
+  ggplot()+
+  geom_raster(aes(factor(ind1),factor(ind2, levels = 6:1),fill=foi))+
+  theme_minimal(base_size = 14)+
+  labs(fill = "FOI", y = "Acquiring individual", x = "Depositing individual")+
+  scale_x_discrete(breaks = 1:6, position = "top",expand = c(0,0))+
+  scale_y_discrete(breaks = 1:6, expand = c(0,0))+
+  theme(aspect.ratio = 1, panel.grid = element_blank()) -> gg.pairfoi
+
+data.frame(ind_combs, foi = beta*lam*sapply(UDprods, sum)) |>
+  ggplot()+
+  geom_raster(aes(factor(ind1),factor(ind2, levels = 6:1),fill=foi))+
+  theme_minimal(base_size = 14)+
+  labs(fill = "FOI", y = "Acquiring individual", x = "Depositing individual")+
+  scale_x_discrete(breaks = 1:6, position = "top",expand = c(0,0))+
+  scale_y_discrete(breaks = 1:6, expand = c(0,0))+
+  theme(aspect.ratio = 1, panel.grid = element_blank())-> gg.pairfoiindep
+
+gg.tracks <- sim_tracks_db %>% ggplot()+geom_path(aes(x,y,color = factor(ind)), size=1)+theme_void(base_size = 14)+coord_sf()+labs(color="Individual")+theme(legend.position = "left")
+
+plot_grid(gg.tracks,plot_grid(gg.pairfoi,gg.pairfoiindep,nrow=2, align = "v"))
+```
+
+There is a clear difference in FOI between the two individuals who are
+moving together, and the rest. The estimated FOI is at least twice as
+high for that pair as for the others. This difference is not due solely
+to the degree of overlap; while they do have the highest degree of
+overlap, they also overlap similarly with other individuals,
+
+What happens if we do not incorporate the covariance term? This is, what
+if we assumed independent movement, and only used the product of the
+UDs, how much error would we be incurring?
+
+```{r, fig.height=3}
+tibble(ind_combs, foi_full = colSums(cell_foi_joint), foi_ud = beta*lam*sapply(UDprods,sum)) %>% mutate(udprop = (foi_full-foi_ud)/foi_full) %>% 
+  ggplot()+geom_raster(aes(ind1,ind2, fill = udprop))+
+  # scale_fill_gradient2(midpoint = 1)+
+  theme_minimal()+
+  theme(aspect.ratio = 1, panel.grid = element_blank())+
+  labs(x = "Depositing individual", y = "Acquiring individual", fill = "Cov contribution")
+```
+
+In cases where there is little overlap the product of the UDs makes up
+the majority of the FOI. However when the individual tracks do overlap,
+the covariance term seemingly makes up the majority of the FOI.
+
+Let's see how the covariance varies for the different combinations of
+individuals.
+
+```{r}
+# First let's see how the covariance term changes in response to s, the lag
+sapply(cell_covs_joint, rowMeans) %>% as_tibble() %>% add_column(lag = lags) %>% 
+  pivot_longer(cols = starts_with("v")) %>% 
+  ggplot()+geom_point(aes(lag,value,color = name))+
+  theme_classic(base_size = 14)+
+  labs(x = "Lag s", y = "Covariance")
+```
+
+We see there is some periodic behavior with respect to the lag $s$ for a
+couple of the covariance series, the two combinations of the individuals
+that are moving together. The covariance is positive and high for small
+lags but decreases sharply. For the other series---with independent
+movement---there is no clear trend.
+
+Let's take a look at the covariance term and how it's related to
+overlap.
+
+```{r}
+m1 <- kerneloverlap(sim_tracks_sppoints)
+m2 <- diag(6)
+m2[as.numeric(rownames(ind_combs))] <- sapply(cell_cov_int, sum)
+plot(m1,m2)
+```
+
+```{r}
+sapply(cell_covs_joint, rowMeans) %>% as_tibble() %>% add_column(lag = lags) %>% 
+  pivot_longer(cols = starts_with("v")) %>% 
+  ggplot()+geom_boxplot(aes(name,value))+
+  theme_classic(base_size = 14)+
+  labs(x = "Pair", y = "Covariance")
+```
+
+```{r}
+
 ```
 
 ## Upper left-hand corner -- uniform space use
