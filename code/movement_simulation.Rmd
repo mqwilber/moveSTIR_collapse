@@ -299,8 +299,7 @@ with(data = list(nind = 6, nsteps = 1000,
 ```
 
 ## Joint movement
-For joint movement we will simulate a constant social weight matrix with only 1s and 0s. This should create joint movement between some pairs of individuals, but random between other pairs.
-Actually this doesn't work, as one individual is affected by multiple. I need to have only one pair that is interacting. 
+For joint movement we will simulate a constant social weight matrix with only 1s and 0s. This should create joint movement between some pairs of individuals, but random between other pairs. For this there need to be at most one interacting individual for each individual.
 
 ```{r joint movement plot}
 x_BM_joint <- simulate_BM(nind,nsteps,sigma0)
@@ -312,8 +311,14 @@ w_t[1,2] <- 1
 w_t <- w_t*upper.tri(w_t)+t(w_t*upper.tri(w_t)) #make symmetric
 diag(w_t) <- 1
 w <- replicate(n = 1000,expr = w_t, simplify = FALSE) 
-sx_joint <- simulate_BM(nsteps = 1000,sigma0 = 0.01) |> convolve_soc(w = w) |> convolve_inl(phi = 0.01) |> get_est_locs(prop = 0.2, sigmau = sigmau, sigmas = sigmas)
-sy_joint <- simulate_BM(nsteps = 1000,sigma0 = 0.01) |> convolve_soc(w = w) |> convolve_inl(phi = 0.01) |> get_est_locs(prop = 0.2, sigmau = sigmau, sigmas = sigmas)
+sx_joint <- simulate_BM(nsteps = 1000,sigma0 = 0.01) |> 
+  convolve_soc(w = w) |> 
+  convolve_inl(phi = 0.01) |> 
+  get_est_locs(prop = 0.2, sigmau = sigmau, sigmas = sigmas)
+sy_joint <- simulate_BM(nsteps = 1000,sigma0 = 0.01) |> 
+  convolve_soc(w = w) |> 
+  convolve_inl(phi = 0.01) |> 
+  get_est_locs(prop = 0.2, sigmau = sigmau, sigmas = sigmas)
 
 pdatobs <- bind_rows(x = as_tibble(sx_joint),y = as_tibble(sy_joint), .id = "coord") %>% add_column(time = rep(seq(0,1,length.out = nrow(sx_joint)), 2)) %>% 
   pivot_longer(starts_with("V"), names_to = "ind") %>% 
@@ -336,13 +341,17 @@ with(data = list(nind = 6, nsteps = 1000,
        w_t <- w_t*upper.tri(w_t)+t(w_t*upper.tri(w_t)) #make symmetric
        diag(w_t) <- 1
        w <- replicate(n = 1000,expr = w_t, simplify = FALSE) 
-       sx <- simulate_BM(nind = nind, nsteps = nsteps, sigma0 = sigma0) |> convolve_soc(w = w) |> convolve_inl(phi = phi) |> get_est_locs(prop = prop, sigmau = sigmau, sigmas = sigmas)
-       sy <- simulate_BM(nind = nind, nsteps = nsteps, sigma0 = sigma0) |> convolve_soc(w = w) |> convolve_inl(phi = phi) |> get_est_locs(prop = prop, sigmau = sigmau, sigmas = sigmas)
-       pdatobs <- bind_rows(x = as_tibble(sx),y = as_tibble(sy), .id = "coord") %>% add_column(time = rep(seq(0,1,length.out = nrow(sx_joint)), 2)) %>% 
+       sx <- simulate_BM(nind = nind, nsteps = nsteps, sigma0 = sigma0) |> 
+         convolve_soc(w = w) |> convolve_inl(phi = phi) #|> 
+         # get_est_locs(prop = prop, sigmau = sigmau, sigmas = sigmas)
+       sy <- simulate_BM(nind = nind, nsteps = nsteps, sigma0 = sigma0) |> 
+         convolve_soc(w = w) |> convolve_inl(phi = phi) #|> 
+         # get_est_locs(prop = prop, sigmau = sigmau, sigmas = sigmas)
+       pdatobs <- bind_rows(x = as_tibble(sx),y = as_tibble(sy), .id = "coord") %>% add_column(time = rep(seq(0,1,length.out = nrow(sx)), 2)) %>% 
          pivot_longer(starts_with("V"), names_to = "ind") %>% 
          pivot_wider(names_from = coord, values_from = value) %>% 
          split(~ind)
-       sapply(seq_along(pdatobs), function(x) write.csv(pdatobs[[x]][,-2], file = paste0("../data/joint_mov_example_",x,".csv"), quote = F, row.names = F))
+       sapply(seq_along(pdatobs), function(x) write.csv(pdatobs[[x]][,-2], file = paste0("../data/joint_mov_example_mu_",x,".csv"), quote = F, row.names = F))
      }
 )
 ```
