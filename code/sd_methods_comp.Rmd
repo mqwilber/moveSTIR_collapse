@@ -1,0 +1,169 @@
+---
+title: "Comparison of methods of calculating pairwise covariance in location history"
+output:  bookdown::html_document2
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+```
+
+```{r}
+library(sp)
+library(adehabitatHR)
+library(tidyverse)
+library(cowplot)
+```
+```{r prevcode}
+# acquisition and deposition parameters
+beta <- 1
+lam <- 1
+nu <- 1
+sim_tracks <- lapply(list.files("../data", "joint(.*)e_[[:digit:]?].csv",full.names = TRUE), read.csv)
+sim_tracks_db <- do.call(rbind, sim_tracks)[,2:3] |> cbind(ind = rep(seq_along(sim_tracks), sapply(sim_tracks,nrow))) 
+sim_tracks_sppoints <- SpatialPointsDataFrame(coords = sim_tracks_db[,1:2], 
+                                              data = data.frame(id = sim_tracks_db$ind))
+kuds <- kernelUD(sim_tracks_sppoints, same4all = TRUE)
+ind_combs <- expand.grid(ind2 = seq_along(kuds), ind1 = seq_along(kuds))
+ind_combs <- ind_combs[ind_combs$ind1!=ind_combs$ind2,]
+UDprods <- apply(ind_combs, 1, \(x) sapply(kuds, slot, "data")[[x[1]]]*sapply(kuds, slot, "data")[[x[2]]], simplify = FALSE)
+point_grid_dists <- spDists(sim_tracks_sppoints, kuds[[1]])
+# Create a binary matrix and split it by individual
+loc_histories <-  apply(point_grid_dists, MARGIN = 1, \(x) x==min(x)) |> t() |>
+  split(factor(sim_tracks_db$ind)) |> 
+  lapply(matrix, ncol = ncol(point_grid_dists))
+```
+
+
+
+We are interested in determining the most appropriate way of calculating the covariance terms for the probabilistic moveSTIR, for the case of stationary distribution (lower-right corner) expressed as follows:
+
+$$
+\begin{align}
+C(x)&=\int \text{Cov}(\delta_i(x)\delta_j(x)|s)e^{-\nu s}ds\\
+&=\int\sigma(\delta_i(x))\sigma(\delta_j(x))\text{Cor}(\delta_i(x)\delta_j(x)|s)e^{-\nu s}ds\\
+&=\sigma(\delta_i(x))\sigma(\delta_j(x))\int\text{Cor}(\delta_i(x)\delta_j(x)|s)e^{-\nu s}ds
+\end{align}
+$$
+
+This is a key component of the FOI calculation, but there are four possible ways to calculate it:
+
+  1. The covariance
+  2. The product of the correlation and SDs, all within the integral. This is, calculating the site standard deviations for every lag $s$.
+  3. The product of the correlation within the integral, and the SDs estimated from data outside the integral
+  4. The product of the correlation, and the SDs from the UD values. The SDs in this case are calculated as $\sigma(\delta_i)=\sqrt{p_i(1-p_i)}$. 
+  
+Here I will use an example with six simulated trajectories performing random walks, where one pair of individuals is travelling together. 
+
+```{r, fig.cap="Differences in FOI estimated across individuals, for four different ways of calculating the covariance terms"}
+  # matrix of combinations. A t*t matrix of difference in time. This is used to
+  # find the row-col combinations corresponding to a given lag
+lag_mat <- round(outer(sim_tracks[[1]]$time, sim_tracks[[1]]$time, "-"),5)
+lags <- unique(lag_mat[lower.tri(lag_mat,diag = TRUE)])
+lags <- lags[-length(lags)] # remove final value that would have only one possible combination
+
+# For every lag s, find the rows in host 1 and host 2 corresponding to times t
+# and t-s, calculate the covariance
+cell_covs <- cell_cors <- cell_cors_sd <- cell_cors_sd_int <- list()
+
+for (r in 1:nrow(ind_combs)) {
+  i <- ind_combs[r,2]
+  j <- ind_combs[r,1]
+  covmat <- cormat <- sdmat <- matrix(0, nrow = length(lags), 
+                   ncol = ncol(loc_histories[[1]]))
+  for (s in seq_along(lags)) {
+    l <- lags[s]
+    # find position where those lags occur
+    indices <- which(lag_mat==l, arr.ind = T)
+    # subset host position matrices with indices
+    h1 <- loc_histories[[i]][indices[,1],]
+    h2 <- loc_histories[[j]][indices[,2],]
+    sdmat[s,] <- sqrt(colMeans(h1)*(1-colMeans(h1)))*sqrt(colMeans(h2)*(1-colMeans(h2)))
+    ovlpcells <- which((colSums(h1)*colSums(h2))>0)
+    if(length(ovlpcells)==0) next
+    if (length(ovlpcells)>0) {
+      h1sub <- h1[,ovlpcells]
+      h2sub <- h2[,ovlpcells]
+      covmat[s,ovlpcells] <- diag(as.matrix(cov(h1sub,h2sub)))# only the diagonal as we care only about same cells
+      cormat[s,ovlpcells] <- diag(as.matrix(cor(h1sub,h2sub)))
+    }
+  }
+  cellsdest <- sqrt(colMeans(loc_histories[[i]])*(1-colMeans(loc_histories[[i]])))*sqrt(colMeans(loc_histories[[j]])*(1-colMeans(loc_histories[[j]])))
+  cell_covs[[r]] <- colSums(covmat*exp(-nu*lags))
+  cell_cors_sd[[r]] <- cellsdest*colSums(cormat*exp(-nu*lags))
+  cell_cors_sd_int[[r]] <- colSums(sdmat*cormat*exp(-nu*lags))
+  cell_cors[[r]] <- colSums(cormat*exp(-nu*lags))
+}
+
+# sd estimated from probabilities, indep of actual data
+sd_prob <- lapply(kuds, slot, "data") |> sapply(\(x) sqrt(x/sum(x)*(1-x/sum(x))))
+prob_sd_prods <- mapply("*",sd_prob[ind_combs$ind2], sd_prob[ind_combs$ind1], SIMPLIFY = FALSE)
+probSDcor <- mapply("*", prob_sd_prods, cell_cors, SIMPLIFY = F)
+
+# Now we have the four objects, we can compare them all
+data.frame(ind_combs, p_cov = sapply(probSDcor,sum)-sapply(cell_covs,sum),
+p_corsdint = sapply(probSDcor,sum)-sapply(cell_cors_sd_int,sum),
+p_corsd = sapply(probSDcor,sum)-sapply(cell_cors_sd,sum),
+cov_corsd = sapply(cell_covs,sum)-sapply(cell_cors_sd,sum),
+cov_corsdint = sapply(cell_covs,sum)-sapply(cell_cors_sd_int,sum),
+cor_corsdint = sapply(cell_cors_sd,sum)-sapply(cell_cors_sd_int,sum)) %>% 
+  pivot_longer(!starts_with("ind"), names_to = "comparison") %>% 
+  # separate(comparison, into = c("meth1","meth2")) %>% 
+  ggplot()+geom_raster(aes(ind1,ind2, fill = value))+facet_wrap(~comparison)+theme_classic()+scale_fill_gradient2()
+```
+
+There is no practical difference between using the covariance term and calculating the correlation and standard deviation for every lag s, all within the integral. There are also only minor differences when you calculate the standard deviation separately for every lag and integrate across lags, with respect to calculating only the correlation and decay inside the integral (top row).
+There are some potentially important differences when you use the probabilistic definition of the standard deviation instead of calculating it from the data. In these cases the estimated value for the covariance term is smaller than the value using the covariance, the sd and correlation inside the integral, or the sd outside of the integral and the correlation. The differences are strongest for the individuals that are travelling together when comparing the probabilistic calculation of standard deviation against calculating it from the data.  The correlation term inside the integral should be the same for both cases, so this is just a difference in the calculation of sd. 
+
+```{r, fig.cap="Individual difference across SD estimations using the UD values and the visit data"}
+datasd <- sapply(loc_histories, \(x) apply(x, 2, sd))
+probsd <- do.call(cbind,sapply(lapply(kuds, slot,"data"), \(x) sqrt(x*(1-x))))
+as_tibble(datasd-probsd) %>% add_column(x = coordinates(kuds[[1]])[,1], y = coordinates(kuds[[1]])[,2])%>% pivot_longer(1:6, names_to = "individual", values_to = "diff") %>% 
+  ggplot()+geom_raster(aes(x,y,fill = diff))+facet_wrap(~individual)+scale_fill_gradient2()+coord_sf()+theme_classic()
+```
+We see clearly the difference between the standard deviation estimated from the data and from the utilization distribution values is mostly around the areas of actual use. In cells that were not visited but there is non-zero estimated probability of use we will have greater values for the probabilistic SD. These cells, however, should not contribute to differences in the FOI, since the correlation value at those cells is 0, so the overall product of the covariance terms should also be 0. 
+
+```{r, fig.cap="Differences in standard deviation products across the landscape. Standard deviation were calculated using the UD values and the data of visits to each cell"}
+datasd <- sapply(loc_histories, \(x) apply(x, 2, sd))
+probsd <- do.call(cbind,sapply(lapply(kuds, slot,"data"), \(x) sqrt(x*(1-x))))
+datasdprods <- datasd%o%datasd |> apply(MARGIN = c(2,4), diag)
+probsdprods <- probsd%o%probsd|> apply(MARGIN = c(2,4), diag)
+data.frame(diff = datasdprods-probsdprods,  x = coordinates(kuds[[1]])[,1], y = coordinates(kuds[[1]])[,2]) %>% 
+  pivot_longer(starts_with("diff")) %>% 
+  separate(name, into = c("d","ind1","ind2")) %>% 
+  filter(ind1!=ind2) %>% 
+  ggplot()+geom_raster(aes(x,y,fill = value))+facet_grid(ind2~ind1)+scale_fill_gradient2()+theme_classic()+coord_sf()
+```
+
+Here we see the difference in the pairwise product of the sds, where again there are many values around the actual visited cells. Most of these differences should be eliminated once you account for the correlation; if one or the two individuals did not visit a specific cell, the correlation in that cell would be 0 and the product of the SD and the correlation is also 0. Let's confirm this.
+
+```{r, echo=F, message=FALSE, fig.cap="Differences in pairwise FOI estimation across the landscape. The differences result from using the UD values or visitation data to estimate the covariance terms"}
+# join all cell correlations together
+df_corr <- data.frame(do.call(rbind, cell_cors), ind_combs) %>% 
+  mutate(ind1 = as.character(ind1), ind2 = as.character(ind2)) %>% 
+  pivot_longer(starts_with("X"), names_to = "cell", values_to = "corr") %>% 
+  add_column(x = rep(coordinates(kuds[[1]])[,1], 30), y = rep(coordinates(kuds[[1]])[,2], 30))
+
+df_sd <- data.frame(sd_data = datasdprods, sd_prob = probsdprods,  x = coordinates(kuds[[1]])[,1], y = coordinates(kuds[[1]])[,2]) %>% 
+  pivot_longer(starts_with("sd"), values_to = "sd") %>% 
+  mutate(name = gsub(".ud", "", name)) %>% 
+  separate(name, into = c("metric","source","ind1","ind2")) %>% 
+  filter(ind1!=ind2) %>% 
+  pivot_wider(names_from = source, values_from = sd, names_prefix = "sd")
+
+left_join(df_corr, df_sd) %>% filter(sdprob!=sddata) %>% mutate(foidiff = corr*(sdprob-sddata)) %>% 
+    ggplot()+geom_raster(aes(x,y,fill = foidiff))+facet_grid(ind2~ind1)+scale_fill_gradient2()+theme_classic()+coord_sf()
+
+```
+Most of the differences between SD calculations are dismissed when you incorporate the correlation. There are nonetheless still some specific cells where some nonnegligible differences remain. The strongest differences are for the individuals that travel together. It would seem the differences are mostly negative, so the standard deviation products are greater when using the data than when using the estimated probabilities.
+This is what this looks like in terms of the difference in FOI. 
+
+```{r fig.cap=""}
+left_join(df_corr, df_sd) %>% filter(ind1 == 1, ind2 == 2) %>% mutate(udp = UDprods[[1]]) %>% 
+  mutate(foiprob = udp+corr*sdprob, 
+         foidata = udp+corr*sddata) %>% 
+  pivot_longer(starts_with("foi"), names_to = "method", values_to = "FOI") %>% 
+  ggplot()+  geom_path(aes(x,y, linetype = factor(ind)), data = filter(sim_tracks_db, ind %in% 1:2)) +
+  geom_raster(aes(x,y,fill = FOI), alpha = 0.8)+facet_wrap(~method)+coord_sf()+theme_classic()+scale_fill_gradientn(colours = hcl.colors(10, "Reds", rev = TRUE))+labs(linetype = "Individual")
+  
+```
+
+So it looks like the FOI estimated using the standard deviation from the data of cell presence is higher than the one estimated from the expected probability of presence. 
