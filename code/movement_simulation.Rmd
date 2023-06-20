@@ -356,5 +356,68 @@ with(data = list(nind = 6, nsteps = 1000,
 )
 ```
 
+# Home range behavior
+To model home range behavior, i.e. not necessarily a random walk but a pattern that results in site fidelity we can use a biased Ohrnstein Uhlenbeck process, for example like the model used in Breed et al. (2017). The direction is biased towards a home range center, and the attraction effect is stronger the further you are from the center.
+
+$$
+x_{t+dt}|x_t\sim x_t+\omega(\mu-x_t)dt+\mathcal{N}(0, \sigma dt)
+$$
+
+This results in a 2D probability density function of the form
+
+$$
+x_{t+dt}|x_t\sim\mathcal{N}(\mathbf{\mu_i}+e^{\mathbf\omega_idt}(\mathbf{x_t-\mu_i}),\Sigma_i-e^{\mathbf\omega_idt}\Sigma_ie^{\mathbf\omega_i'dt})
+$$
+```{r}
+with(list(nind = 6, 
+          nsteps = 100,
+          sigmastep = 0.1,
+          omega = 0.05,
+          sigma0 = 1,
+          phi = 1.2,
+          dscalar = 1e4), {
+            xs = replicate(nind, numeric(nsteps))
+            ys = replicate(nind, numeric(nsteps))
+            hrcenters = matrix(rnorm(nind*2, sd = sigma0), ncol = 2)
+            # smoother matrix
+            H_inl <- outer(seq_len(nsteps),seq_len(nsteps), \(x,y) abs(x-y)/phi*besselK(abs(x-y)/phi, nu = 1))
+            diag(H_inl) <- 1
+            H_inl <- H_inl/rowSums(H_inl)
+            for (s in seq_len(nind)) {
+              x <- y <- numeric(nsteps)
+              x[1] <- mux <- hrcenters[s,1]
+              y[1] <- muy <- hrcenters[s,2]
+              xnoise = rnorm(nsteps, sd = sigmastep)
+              ynoise = rnorm(nsteps, sd = sigmastep)
+              # take successive steps
+              for(i in seq_len(nsteps-1)) {
+                x[i+1] = x[i]+omega*(mux-x[i])+xnoise[i]
+                y[i+1] = y[i]+omega*(muy-y[i])+ynoise[i]
+              }
+              xs[,s] = x
+              ys[,s] = y
+            }
+            # Smooth the trajectories
+            xs <- apply(xs, 2, "%*%", H_inl)
+            ys <- apply(ys, 2, "%*%", H_inl)
+            # Plot
+            plot(xs,ys,type = "n", asp=1, las = 1)
+            sapply(seq_len(nind), \(x) lines(xs[,x],ys[,x],col = hcl.colors(nind, "Set 2")[x]))
+            points(hrcenters, bg = hcl.colors(nind, "Set 2"), pch  = 24)
+            
+            ### Create telemetry object and fit a CTMM model
+            tel_data <- as.telemetry(data.frame(individual.local.identifier = rep(1:nind, each = nsteps),
+                                                timestamp = as.POSIXct(3600*seq_len(nsteps), origin = "2020-01-01 8:00"),
+                                                location.long = as.numeric(ys),
+                                                location.lat = as.numeric(xs)))
+            ctmmfits <- lapply(tel_data, ctmm.fit)
+            
+            ### Estimate the AKDE UDs
+            akdes <- akde(tel_data, ctmmfits)
+            plot(akdes)
+          })
+```
+
+
 
 
