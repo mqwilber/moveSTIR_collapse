@@ -7,7 +7,7 @@ output: html_document
 
 # Implementation for the moveSTIR paper
 
-Here I will use simulated tracks following the approach by Scharf et el. [@Scharf2018]. This is similar to the method used in the examples in the original moveSTIR paper, but it has an additional social smoothing kernel which allows to account for animals moving closer to each other, or moving together. I will use the simple, independent tracks first, and then make changes to test different case studies.
+Here I will use simulated tracks. The base movement model is an Ohrstein Uhlenbeck process, i.e. home ranging behavior around a central attractor. I combine this with the social smoothing kernel convolution approach described by Scharf et al. [@Scharf2018]. This is similar to the method used in the examples in the original moveSTIR paper, but it has an additional social smoothing kernel which allows to account for animals moving closer to each other, or moving together. I will use the simple, independent tracks first, and then make changes to test different case studies.
 
 
 ## Independent movement
@@ -15,29 +15,112 @@ Here I will use simulated tracks following the approach by Scharf et el. [@Schar
 First we will test the framework for a simulated scenario where movement is independent across individuals. While there could be overlap in the resulting utilization distributions and points where the tracks cross each other, there should be no significant temporal correlation in the location histories.
 ``` {r import-plot-tracks}
 library(sp)
+library(move)
 library(adehabitatHR)
+library(adehabitatLT)
 library(tidyverse)
 library(cowplot)
+library(ctmm)
 ```
 
-```{r import plot indep tracks}
-sim_tracks <- lapply(list.files("../data", "indep(.*).csv",full.names = TRUE), read.csv)
-# join together
-sim_tracks_db <- do.call(rbind, sim_tracks)[,2:3] |> cbind(ind = rep(seq_along(sim_tracks), sapply(sim_tracks,nrow))) 
-# Create a figure to illustrate the example. This figure will have the tracks of multiple individuals, then their respective UDs, as well as the UD product.
-ggplot(sim_tracks_db)+geom_path(aes(x,y,color = factor(ind)))+
-  theme_minimal()+
-  coord_sf()+
-  labs(color = "Individual")
-# plot(sim_tracks_db$x, sim_tracks_db$y, type = "n", asp = 1, axes = F, ann = F)
-# for (i in unique(sim_tracks_db$ind)) {
-#   lines(sim_tracks_db[sim_tracks_db$ind == i, ], col = hcl.colors(length(sim_tracks), palette = "Set 2")[i], lwd  = 1.2)
-# }
-# legend(x = "left",legend = 1:length(sim_tracks), col = hcl.colors(length(sim_tracks),palette = "Set 2"),border = F, lty = 1)
+```{r sim mov}
+set.seed(1)
+nind = 6
+p.tau = 50# tau^-1 accounts for the average home range crossing rate (time^-1). tau^-1 is the rate in 1/time at which an individual returns to its home range center following an excursion
+p.g = 0.1 # scalar that modulates the random noise. Sets the size of the home range, has units (Area/time)
+p.lambdas = matrix(rpois(nind*2, 1/p.g), ncol = 2)# home range centers
+p.x0 = p.lambdas+matrix(rnorm(nind*2), ncol = 2) # initial positions
+# p.phi = 0.01 # trajectory smoothing parameter
+nsteps = 1000
+
+
+xs = replicate(nind, numeric(nsteps))
+ys = replicate(nind, numeric(nsteps))
+
+for (s in seq_len(nind)) {
+  x <- y <- numeric(nsteps)
+  x[1] <- mux <- p.x0[s,1]
+  y[1] <- muy <- p.x0[s,2]
+  xnoise = rnorm(nsteps)
+  ynoise = rnorm(nsteps)
+  # take successive steps
+  for(i in seq_len(nsteps-1)) {
+    x[i+1] = x[i]-1/p.tau*(x[i]-p.lambdas[s,1])+sqrt(p.g)*xnoise[i]
+    y[i+1] = y[i]-1/p.tau*(y[i]-p.lambdas[s,2])+sqrt(p.g)*ynoise[i]
+  }
+  xs[,s] = x
+  ys[,s] = y
+}
 ```
-Let's say that for this simulation the units are kilometers, and a reasonable contact distance for parasite transmission is 10 meters.
 
+```{r plot tracks}
+# Plot
+# palette
+pal = hcl.colors(nind, "Set 2")
+plot(xs,ys,type = "n", asp=1, las = 1, cex.lab = 1.2, cex.axis = 1.2)
+sapply(seq_len(nind), \(x) lines(xs[,x],ys[,x],col = hcl.colors(nind, "Set 2")[x]))
+points(p.lambdas, bg = pal, pch  = 24)
+points(p.x0, bg = pal, pch = 21)
+legend("bottomright", legend = 1:nind, col = pal, lty = 1, cex = 0.8)
+```
 
+Let's say that for this simulation the units are kilometers, and a reasonable contact distance for parasite transmission is 10 meters. This defines the area of the cells that we will use to calculate the location history, standard deviation and correlation across individuals. We first need to limit the area of analysis. This is, we will only analyze the correlation in areas of overlap. We determine the areas of probable contact using the conditional distribution of encounters (Noonan et al. 2021). The encounter rate is calculated as
+
+$$
+\tilde\varepsilon_{ij}(t)=\gamma_{ij}\int dr_{ij}(t)\Phi(r_{ij}(t))p(r_{ij}(t))
+$$
+This is a product of the absolute distance between the individuals, a contact function and the probability density of the distance. This method is included in the `ctmm` package, for telemetry objects (in geographical coordinates). I could try to calculate it manually instead. 
+
+```{r CDE-ctmm}
+# create move objects
+moveobjs <- lapply(seq_len(nind), \(c) move(x = xs[,c],y = ys[,c],time = as.POSIXct(3600*seq(1:nsteps),origin = Sys.time()), animal = paste0("individual",c), proj = "+proj=tmerc"))
+
+# convert to telemetry
+telemetries <- lapply(moveobjs, as.telemetry)
+
+# ctmm fit
+GUESS <- lapply(telemetries, \(i) ctmm.guess(i, interactive = F))
+FITS <- lapply(seq_along(telemetries), \(i) ctmm.fit(telemetries[[i]], GUESS[[i]]))
+names(FITS) <- paste0("ind",seq_along(FITS))
+# AKDE
+UDS <- akde(telemetries, FITS)
+# pairwise CDE
+CDEs <- list()
+for (i in seq_along(UDS)) {
+  for (j in seq_along(UDS)) {
+    if(i >= j) next
+    u1 <- UDS[[i]]
+    u2 <- UDS[[j]]
+    CDEs[[paste(i,j,sep = "-")]] <- encounter(list(u1, u2))
+  }
+}
+
+plot(telemetries[1:2], col = pal[1:2], UD = CDEs[1], error = FALSE, pch=16) # specified error to avoid something wrong here with the error in the data
+```
+
+```{r}
+# calculate probability of encounter
+dists <- data.frame()
+for(i in seq_along(sim_tracks)) {
+  for (j in seq_along(sim_tracks)) {
+    if(i == j) next
+    p1 <- sim_tracks_db[sim_tracks_db$ind==i,1:2]
+    p2 <- sim_tracks_db[sim_tracks_db$ind==j,1:2]
+    d <- cbind(p1,p2)
+    dij = apply(d, 1, \(x) sqrt((x[1]-x[3])^2+(x[2]-x[4])^2))
+    print(sum(dij<=0.01))
+    # contact kernel is top-hat, so anything beyond 10 m is 0
+    dij[dij>=0.01] <- 0
+    # probability wihtin 10 m is 1/Area, 
+    cde <- dij*1/(0.01^2*pi)
+    dists <- rbind(dists,
+                   rbind(data.frame(ind=i,p1,cde),
+                         data.frame(ind=j,p2,cde))
+    )
+  }
+}
+as_tibble(dists) %>% ggplot()+geom_point(aes(x,y,color = cde))+coord_sf()
+```
 
 We then get the utilization distribution for every track. In this case I am using simple kernel density estimation, i.e. I'm not using any mechanistic movement model, but the same procedure would apply.
 
