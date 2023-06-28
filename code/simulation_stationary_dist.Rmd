@@ -7,13 +7,13 @@ output: html_document
 
 # Implementation for the moveSTIR paper
 
-Here I will use simulated tracks. The base movement model is an Ohrstein Uhlenbeck process, i.e. home ranging behavior around a central attractor. I combine this with the social smoothing kernel convolution approach described by Scharf et al. [@Scharf2018]. This is similar to the method used in the examples in the original moveSTIR paper, but it has an additional social smoothing kernel which allows to account for animals moving closer to each other, or moving together. I will use the simple, independent tracks first, and then make changes to test different case studies.
+Here I will use simulated tracks. The base movement model is an Ohrstein Uhlenbeck process (Martinez-Garcia et al. 2020), i.e. home ranging behavior around a central attractor. I combine this with the social smoothing kernel convolution approach described by Scharf et al. [@Scharf2018]. This is similar to the method used in the examples in the original moveSTIR paper, but it has an additional social smoothing kernel which allows to account for animals moving closer to each other, or moving together. I will use the simple, independent tracks first, and then make changes to test different case studies.
 
 
 ## Independent movement
 
 First we will test the framework for a simulated scenario where movement is independent across individuals. While there could be overlap in the resulting utilization distributions and points where the tracks cross each other, there should be no significant temporal correlation in the location histories.
-``` {r import-plot-tracks}
+``` {r libraries}
 library(sp)
 library(move)
 library(adehabitatHR)
@@ -32,7 +32,6 @@ p.lambdas = matrix(rpois(nind*2, 1/p.g), ncol = 2)# home range centers
 p.x0 = p.lambdas+matrix(rnorm(nind*2), ncol = 2) # initial positions
 # p.phi = 0.01 # trajectory smoothing parameter
 nsteps = 1000
-
 
 xs = replicate(nind, numeric(nsteps))
 ys = replicate(nind, numeric(nsteps))
@@ -64,12 +63,18 @@ points(p.x0, bg = pal, pch = 21)
 legend("bottomright", legend = 1:nind, col = pal, lty = 1, cex = 0.8)
 ```
 
-Let's say that for this simulation the units are kilometers, and a reasonable contact distance for parasite transmission is 10 meters. This defines the area of the cells that we will use to calculate the location history, standard deviation and correlation across individuals. We first need to limit the area of analysis. This is, we will only analyze the correlation in areas of overlap. We determine the areas of probable contact using the conditional distribution of encounters (Noonan et al. 2021). The encounter rate is calculated as
+To calculate the FOI between pairs of individuals we first need to determine their area of overlap. We determine the areas of probable contact using the conditional distribution of encounters (Noonan et al. 2021). The instantaneous encounter rate is calculated as
 
 $$
 \tilde\varepsilon_{ij}(t)=\gamma_{ij}\int dr_{ij}(t)\Phi(r_{ij}(t))p(r_{ij}(t))
 $$
-This is a product of the absolute distance between the individuals, a contact function and the probability density of the distance. This method is included in the `ctmm` package, for telemetry objects (in geographical coordinates). I could try to calculate it manually instead. 
+This is a product of the absolute distance between the individuals $r_{ij}(t)$, a contact function $\Phi$ and the probability density of the distance $p$. For stationary distributions and uncorrelated movement, this boils down to the normalized product of the individual probabilities from their respective utilization distributions:
+
+$$
+CDE_{ij}(r)=\frac{p_i(\mathbf r)p_j(\mathbf r)}{\iint d^2\mathbf{r'}p_i(\mathbf{r'})p_j(\mathbf{r'})}
+$$
+
+We build the UDs using autocorrelated kernel density estimation (Fleming et al. 2015), estimate the pairwise CDEs, and take the 95% polygon as the area in which to create the detection histories and calculate their correlation. The ctmm, akde and CDE methos are included in the `ctmm` package. 
 
 ```{r CDE-ctmm}
 # create move objects
@@ -94,48 +99,116 @@ for (i in seq_along(UDS)) {
     CDEs[[paste(i,j,sep = "-")]] <- encounter(list(u1, u2))
   }
 }
+# 95% polygons
+CDEpolys <- lapply(CDEs, SpatialPolygonsDataFrame.UD)
+```
 
+Here are some examples for pairwise CDEs.
+
+```{r plotUD}
+par(mfrow = c(2,3))
 plot(telemetries[1:2], col = pal[1:2], UD = CDEs[1], error = FALSE, pch=16) # specified error to avoid something wrong here with the error in the data
+plot(telemetries[c(1,3)], col = pal[c(1,3)], UD = CDEs[2], error = FALSE, pch=16)
+plot(telemetries[c(2,3)], col = pal[c(2,3)], UD = CDEs[6], error = FALSE, pch=16)
+plot(telemetries[c(1,6)], col = pal[c(1,6)], UD = CDEs[5], error = FALSE, pch=16)
+plot(telemetries[c(4,5)], col = pal[c(4,5)], UD = CDEs[13], error = FALSE, pch=16)
+plot(telemetries[c(5,6)], col = pal[c(5,6)], UD = CDEs[15], error = FALSE, pch=16)
 ```
 
-```{r}
-# calculate probability of encounter
-dists <- data.frame()
-for(i in seq_along(sim_tracks)) {
-  for (j in seq_along(sim_tracks)) {
-    if(i == j) next
-    p1 <- sim_tracks_db[sim_tracks_db$ind==i,1:2]
-    p2 <- sim_tracks_db[sim_tracks_db$ind==j,1:2]
-    d <- cbind(p1,p2)
-    dij = apply(d, 1, \(x) sqrt((x[1]-x[3])^2+(x[2]-x[4])^2))
-    print(sum(dij<=0.01))
-    # contact kernel is top-hat, so anything beyond 10 m is 0
-    dij[dij>=0.01] <- 0
-    # probability wihtin 10 m is 1/Area, 
-    cde <- dij*1/(0.01^2*pi)
-    dists <- rbind(dists,
-                   rbind(data.frame(ind=i,p1,cde),
-                         data.frame(ind=j,p2,cde))
-    )
-  }
-}
-as_tibble(dists) %>% ggplot()+geom_point(aes(x,y,color = cde))+coord_sf()
-```
-
-We then get the utilization distribution for every track. In this case I am using simple kernel density estimation, i.e. I'm not using any mechanistic movement model, but the same procedure would apply.
+An alternative approach is to use simple kernel density estimation, and take the intersection of the 95% kernels to create the overlap area. This does not account for higher probabilities of contact in areas of higher use, and the estimated area of overlap could be smaller, as shown below. From this example it seems that the edges of the polygon overlaps correspond (roughly) to the upper estimate of the 95% CDE polygon, not to the central estimate. 
 
 ```{r get-plot-kernels, fig.height=3}
 # create the spatialPoints object with id column
-sim_tracks_sppoints <- SpatialPointsDataFrame(sim_tracks_db[,1:2], data = data.frame(id = sim_tracks_db$ind))
-# get the UDs with a common grid
-kuds <- kernelUD(sim_tracks_sppoints, same4all = TRUE)
+sim_sppoint <- SpatialPointsDataFrame(coords = data.frame(x = as.numeric(xs), y = as.numeric(ys)), data = data.frame(id = rep(1:nind, each = nrow(xs))))
 
-# Get the cell area, for FOI calculation
-cell_area <- kuds[[1]]@grid@cellsize |> prod()
+# get the UDs
+kuds <- kernelUD(sim_sppoint)
+# Get the 95% home range polygon
+HRs <- lapply(kuds, getverticeshr)
+# Get the pairwise polygon intersections
 
-sapply(kuds, plot)
+# Plot an example of a CDE and the corresponding polygon overlap from the Kernel dens est. method
+plot(CDEs[[3]])
+raster::intersect(HRs[[1]],HRs[[4]])|>plot(col = "red", add=T)
 ```
-We multiply these UDs pairwise to get the probability $p_i(x)p_j(x)$. This is the first component of the equation. The figure below shows an example of the result; we get a matrix of the same size, but the highest values will be the areas of overlap between individuals.
+
+Once we have the area of overlap we can estimate the correlation across individuals. There are two ways to go about this: to use the cells of the CDE discretized raster, or to select random points within the polygon. In either case the process is to determine the detection history for pairs of individuals at a given location. This is a binary matrix that shows whether an individual was or was not inside a given cell $x$ at a time point $t$. 
+Let's do the grid approach first. We take the grid produced by the pairwise CDEs. The cells produced can be rather small and the computation takes some time. This can be accelerated somewhat by doing the calculation only for overlapping cells. For large grids with small cells it may also be faster to loop through the cells (currently the correlation is calculated for _all_ cell pairs and then I take the diagonal so that only the correlation across individuals for the same cell are kept).
+```{r corr-grid approach}
+# get the rasters for the CDEs
+CDErasters <- lapply(CDEs, raster, DF = "PDF")
+# matrix of possible lags
+lagmat <- outer(seq_len(nsteps), seq_len(nsteps), "-")
+lags <- round(unique(lagmat[lower.tri(lagmat,diag = TRUE)]))
+lags <- lags[-length(lags)]
+# list to store correlation values for every pair, every cell, and every lag
+gridcors <- list()
+
+# Loop over lags and cells for every pair of individuals. This took almost 3 h. 
+tictoc::tic("outer"); for (i in seq_along(CDErasters)) {
+  rast <- CDErasters[[i]]
+  indpair <- names(CDErasters)[i]
+  # raster resolution and center coords
+  yr <- yres(rast)
+  xr <- xres(rast)
+  gridcenters <- coordinates(rast)
+  # individual IDs from the name of the rasters
+  ind1 <- as.numeric(substr(indpair, 1,1))
+  ind2 <- as.numeric(substr(indpair, 3,3))
+  posindex1 <- abs(outer(gridcenters[,1],xs[,ind1],"-"))<=xr/2 & abs(outer(gridcenters[,2],ys[,ind1],"-"))<=yr/2
+  posindex2 <- abs(outer(gridcenters[,1],xs[,ind2],"-"))<=xr/2 & abs(outer(gridcenters[,2],ys[,ind2],"-"))<=yr/2
+  cormat <- matrix(0, nrow = length(lags), ncol = nrow(gridcenters))
+  
+  # loop over lags
+  tictoc::tic(msg = "lag"); for (s in seq_along(lags)) {
+    l <- lags[s]
+    matindices <- which(lagmat==l, arr.ind = TRUE)
+    h1 <- t(posindex1[,matindices[,1]])
+    h2 <- t(posindex2[,matindices[,2]])
+    ovlpcells <- which((colSums(h1)*colSums(h2))>0)
+    # loop over cells
+    if (length(ovlpcells)>0) {
+      cormat[s,ovlpcells] <- diag(as.matrix(cor(h1[,ovlpcells],h2[,ovlpcells])))
+      # for (cl in ovlpcells) cormat[s,cl] <- cor(h1[,cl],h2[,cl])
+    }
+  }; tictoc::toc()
+  gridcors[[indpair]] <- cormat
+}; tictoc::toc()
+
+# The gridcors can be very large if the cells are small, but we need only keep the integral product
+corvals <- sapply(gridcors, \(x) colSums(x*exp(-lags)))
+saveRDS(gridcors, "../data/example_correlations.rds")
+rm(gridcors)
+
+# Plot the regular gridded approach
+for (i in seq_along(CDErasters)) {
+  # par(mfrow = c(1,2))
+  corval <- corvals[[i]]
+  indpair <- names(CDErasters)[i]
+
+  # corvals <- ptcors[[i]][1,]
+  ind1 <- as.numeric(substr(indpair, 1,1))
+  ind2 <- as.numeric(substr(indpair, 3,3))
+  corvalsscaled <- (corval+1)/2
+  corcols <- rgb(colorRamp(hcl.colors(10, "Blue-Red"))(corvalsscaled), maxColorValue = 255)
+  
+  plot(xs[,c(ind1,ind2)],ys[,c(ind1,ind2)],type = "n", asp = 1, las = 1, main = "Gridded approach")
+  image(SpatialPixelsDataFrame(coordinates(CDErasters[[i]]), data = data.frame(cor = corval)), add=T,col = hcl.colors(11,"Blue-Red", rev = TRUE), zlim = c(-1,1))
+  lines(xs[,ind1],ys[,ind1],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind1])
+  lines(xs[,ind2],ys[,ind2],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind2])
+  
+  # corvals <- ptgridcors[[i]]
+  # plot(xs[,c(ind1,ind2)],ys[,c(ind1,ind2)],type = "n", asp = 1, las = 1, main = "Random point estimation")
+  # image(SpatialPixelsDataFrame(SpatialPoints(makegrid(hrovlps[[i]], cellsize = cellside)), data = data.frame(value = corvals)), add=T,col = hcl.colors(11,"Blue-Red", rev = TRUE), zlim = c(-1,1))
+  # lines(xs[,ind1],ys[,ind1],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind1])
+  # lines(xs[,ind2],ys[,ind2],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind2])
+  # legend("bottomleft", fill = hcl.colors(11, "Blue-Red"),legend = seq(1,-1,length.out = 11))
+}
+```
+
+
+---
+We multiply the UDs pairwise to get the probability $p_i(x)p_j(x)$. This is the first component of the equation. The figure below shows an example of the result; we get a matrix of the same size, but the highest values will be the areas of overlap between individuals.
 
 ```{r UD-prod, fig.height=3}
 # Calculate the per-cell product of expected values
