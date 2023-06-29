@@ -16,9 +16,9 @@ First we will test the framework for a simulated scenario where movement is inde
 ``` {r libraries}
 library(sp)
 library(move)
+library(tidyverse)
 library(adehabitatHR)
 library(adehabitatLT)
-library(tidyverse)
 library(cowplot)
 library(ctmm)
 ```
@@ -134,6 +134,7 @@ raster::intersect(HRs[[1]],HRs[[4]])|>plot(col = "red", add=T)
 
 Once we have the area of overlap we can estimate the correlation across individuals. There are two ways to go about this: to use the cells of the CDE discretized raster, or to select random points within the polygon. In either case the process is to determine the detection history for pairs of individuals at a given location. This is a binary matrix that shows whether an individual was or was not inside a given cell $x$ at a time point $t$. 
 Let's do the grid approach first. We take the grid produced by the pairwise CDEs. The cells produced can be rather small and the computation takes some time. This can be accelerated somewhat by doing the calculation only for overlapping cells. For large grids with small cells it may also be faster to loop through the cells (currently the correlation is calculated for _all_ cell pairs and then I take the diagonal so that only the correlation across individuals for the same cell are kept).
+
 ```{r corr-grid approach}
 # get the rasters for the CDEs
 CDErasters <- lapply(CDEs, raster, DF = "PDF")
@@ -180,29 +181,78 @@ corvals <- sapply(gridcors, \(x) colSums(x*exp(-lags)))
 saveRDS(gridcors, "../data/example_correlations.rds")
 rm(gridcors)
 
-# Plot the regular gridded approach
+# import back
+gridcors <- readRDS("../data/example_correlations.rds")
+```
+
+The other alternative is to sample randomly only inside the area where encounters are likely. We take the 95% polygon of the CDE, sample grid cells inside it and estimate the correlation for every pair in a cell around each sampled point. The grid cell size should be the same as the one for the CDE grid. For this to make sense we would need a higher density of points than with the regular grid, so the number of sampled points should be a function of the total area of overlap. With this example--6 individuals, 1000 steps--and at a density of 1 point per cell it took less than 10 minutes.
+
+```{r randompt-approach}
+# select random points within the overlap polygons
+CDE_ovlpareas <- sapply(CDEpolys,raster::area)[3,]
+CDE_cellsizes <- sapply(CDErasters, \(x) prod(res(x)))
+CDEpolys_up <- lapply(CDEpolys, \(x) polygons(x)[3]) # sample only the wider 95% estimate area
+pts_percell <- 3
+CDE_n_samplepts <- pts_percell*CDE_ovlpareas/CDE_cellsizes
+samplepts <- lapply(seq_along(CDEpolys_up), \(x) spsample(CDEpolys_up[[x]], n = CDE_n_samplepts[x], type = "random")) |> lapply(as.data.frame)
+names(samplepts) <- names(CDEpolys_up)
+ptcors <- list()
+lagmat <- outer(seq_len(nsteps), seq_len(nsteps), "-")
+lags <- round(unique(lagmat[lower.tri(lagmat,diag = TRUE)]))
+lags <- lags[-length(lags)]
+# Calculate the correlations for all lags at each point
+tictoc::tic(); for (i in seq_along(samplepts)) {
+  sppts <- samplepts[[i]]
+  indpair <- names(samplepts)[i]
+  ind1 <- as.numeric(substr(indpair, 1,1))
+  ind2 <- as.numeric(substr(indpair, 3,3))
+  xr <- xres(CDErasters[[i]])
+  yr <- yres(CDErasters[[i]])
+  posindex1 <- abs(outer(coordinates(sppts)[,1],xs[,ind1],"-"))<=xr/2 & abs(outer(coordinates(sppts)[,2],ys[,ind1],"-"))<=yr/2
+  posindex2 <- abs(outer(coordinates(sppts)[,1],xs[,ind2],"-"))<=xr/2 & abs(outer(coordinates(sppts)[,2],ys[,ind2],"-"))<=yr/2
+  cormat <- matrix(0,nrow = length(lags), ncol = nrow(sppts))
+  tictoc::tic("lag"); for (s in seq_along(lags)) {
+    l <- lags[s]
+    matindices <- which(lagmat==l, arr.ind = TRUE)
+    h1 <- t(posindex1[,matindices[,1]])
+    h2 <- t(posindex2[,matindices[,2]])
+    ovlpcells <- which((colSums(h1)*colSums(h2))>0)
+    if (length(ovlpcells)>0) {
+      cormat[s,ovlpcells] <- diag(as.matrix(cor(h1[,ovlpcells],h2[,ovlpcells])))
+    }
+  }; tictoc::toc()
+  ptcors[[indpair]] <- cormat
+}; tictoc::toc()
+```
+
+
+```{r plot approaches}
+par(mfrow = c(1,2))
 for (i in seq_along(CDErasters)) {
   # par(mfrow = c(1,2))
-  corval <- corvals[[i]]
+  c1 <- colSums(gridcors[[i]]*exp(-lags))
   indpair <- names(CDErasters)[i]
 
   # corvals <- ptcors[[i]][1,]
   ind1 <- as.numeric(substr(indpair, 1,1))
   ind2 <- as.numeric(substr(indpair, 3,3))
-  corvalsscaled <- (corval+1)/2
-  corcols <- rgb(colorRamp(hcl.colors(10, "Blue-Red"))(corvalsscaled), maxColorValue = 255)
+  corvalsscaled <- (c1-min(c1))/(2*max(abs(range(c1))))
+  corcols <- rgb(colorRamp(hcl.colors(11, "Blue-Red"))(corvalsscaled), maxColorValue = 255)
   
-  plot(xs[,c(ind1,ind2)],ys[,c(ind1,ind2)],type = "n", asp = 1, las = 1, main = "Gridded approach")
-  image(SpatialPixelsDataFrame(coordinates(CDErasters[[i]]), data = data.frame(cor = corval)), add=T,col = hcl.colors(11,"Blue-Red", rev = TRUE), zlim = c(-1,1))
+  plot(xs[,c(ind1,ind2)],ys[,c(ind1,ind2)], type = "n", asp = 1, las = 1, main = "Gridded approach")
+  image(SpatialPixelsDataFrame(coordinates(CDErasters[[i]]), data = data.frame(cor = c1)), add=T,col = hcl.colors(11,"Blue-Red", rev = TRUE), zlim = c(-1,1))
   lines(xs[,ind1],ys[,ind1],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind1])
   lines(xs[,ind2],ys[,ind2],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind2])
   
-  # corvals <- ptgridcors[[i]]
-  # plot(xs[,c(ind1,ind2)],ys[,c(ind1,ind2)],type = "n", asp = 1, las = 1, main = "Random point estimation")
+  c2 <- colSums(ptcors[[i]]*exp(-lags))
+  corvalsscaled <- (c2-min(c2))/(2*max(abs(range(c2))))
+  corcols <- rgb(colorRamp(hcl.colors(11, "Blue-Red", rev = T))(corvalsscaled), maxColorValue = 255)
+  plot(xs[,c(ind1,ind2)],ys[,c(ind1,ind2)],type = "n", asp = 1, las = 1, main = "Random point estimation")
   # image(SpatialPixelsDataFrame(SpatialPoints(makegrid(hrovlps[[i]], cellsize = cellside)), data = data.frame(value = corvals)), add=T,col = hcl.colors(11,"Blue-Red", rev = TRUE), zlim = c(-1,1))
-  # lines(xs[,ind1],ys[,ind1],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind1])
-  # lines(xs[,ind2],ys[,ind2],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind2])
-  # legend("bottomleft", fill = hcl.colors(11, "Blue-Red"),legend = seq(1,-1,length.out = 11))
+  lines(xs[,ind1],ys[,ind1],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind1])
+  lines(xs[,ind2],ys[,ind2],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind2])
+  points(samplepts[[i]], col = corcols, pch = 16)
+  # legend("bottomleft", fill = hcl.colors(5, "Blue-Red"),legend = seq(max(abs(range(c2))),-max(abs(range(c2))),length.out = 5))
 }
 ```
 
