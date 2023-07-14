@@ -400,21 +400,42 @@ with(list(nind = 6,
             # Smooth the trajectories
             xs <- apply(xs, 2, "%*%", H_inl)
             ys <- apply(ys, 2, "%*%", H_inl)
+            
+            # scale position and displacement
+            xs <- xs*dscalar
+            ys <- ys*dscalar
             # Plot
             plot(xs,ys,type = "n", asp=1, las = 1)
             sapply(seq_len(nind), \(x) lines(xs[,x],ys[,x],col = hcl.colors(nind, "Set 2")[x]))
             points(hrcenters, bg = hcl.colors(nind, "Set 2"), pch  = 24)
             
-            ### Create telemetry object and fit a CTMM model
-            tel_data <- as.telemetry(data.frame(individual.local.identifier = rep(1:nind, each = nsteps),
-                                                timestamp = as.POSIXct(3600*seq_len(nsteps), origin = "2020-01-01 8:00"),
-                                                location.long = as.numeric(ys),
-                                                location.lat = as.numeric(xs)))
-            ctmmfits <- lapply(tel_data, ctmm.fit)
+            #### ---- CDE, manual approach ----
+            # the CDE is p_i(r)p_j(r)/(intintd^2r'p_i(r')p_j(r'))
+            # Derive the home ranges
             
-            ### Estimate the AKDE UDs
-            akdes <- akde(tel_data, ctmmfits)
-            plot(akdes)
+            
+            #### ---- CTMM approach ----
+            ### Create telemetry object and fit a CTMM model
+            # tel_data <- as.telemetry(data.frame(individual.local.identifier = rep(1:nind, each = nsteps),
+            #                                     timestamp = as.POSIXct(3600*seq_len(nsteps), origin = "2020-01-01 8:00"),
+            #                                     location.long = as.numeric(ys),
+            #                                     location.lat = as.numeric(xs)))
+            # ctmmfits <- lapply(tel_data, ctmm.fit)
+            # 
+            # ## Estimate the AKDE UDs
+            # akdes <- akde(tel_data, ctmmfits)
+            # plot(akdes)
+            # 
+            # ## Get the overlap area
+            # cdes <- list()
+            # for (i in 1:nind) {
+            #   for(j in 1:nind) {
+            #     if (i==j) next
+            #     cde <- encounter(list(akdes[[i]], akdes[[j]]))
+            #     plot(cde)
+            #     cdes[[paste(i,j)]] <- cde
+            #   }
+            # }
           })
 ```
 
