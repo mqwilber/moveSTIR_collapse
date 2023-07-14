@@ -5,21 +5,17 @@ date: "2023-06-16"
 output: html_document
 ---
 
-# Implementation for the moveSTIR paper
+## Example
 
-Here I will use simulated tracks. The base movement model is an Ohrstein Uhlenbeck process (Martinez-Garcia et al. 2020), i.e. home ranging behavior around a central attractor. I combine this with the social smoothing kernel convolution approach described by Scharf et al. [@Scharf2018]. This is similar to the method used in the examples in the original moveSTIR paper, but it has an additional social smoothing kernel which allows to account for animals moving closer to each other, or moving together. I will use the simple, independent tracks first, and then make changes to test different case studies.
+Here we show an example of how to  implement the probabilistic moveSTIR framework, using simulated movement tracks. The base movement model is an Ohrstein Uhlenbeck process (Martinez-Garcia et al. 2020) which represents the movement of animals with an established home range behavior around a central attractor. I combine this with the social smoothing kernel convolution approach described by Scharf et al. (2018), which allows to account for animals moving closer to each other, or travelling together. I will simulate a set of individuals, some pairs will be moving independently from each other, others move together constantly while others get close to each other temporarily and then drift apart. 
+When movement is independent across individuals there could be spatial overlap in the resulting utilization distributions and points where the tracks cross each other, but there should be no significant temporal correlation in the location histories. In contrast, animals the move in association with each other will have temporal correlation in their movements, which will influence their pairwise FOIs.  
 
-
-## Independent movement
-
-First we will test the framework for a simulated scenario where movement is independent across individuals. While there could be overlap in the resulting utilization distributions and points where the tracks cross each other, there should be no significant temporal correlation in the location histories.
-``` {r libraries}
+``` {r libraries, message = FALSE}
 library(sp)
 library(move)
 library(tidyverse)
 library(adehabitatHR)
 library(adehabitatLT)
-library(cowplot)
 library(ctmm)
 ```
 
@@ -27,11 +23,11 @@ library(ctmm)
 set.seed(1)
 nind = 6
 p.tau = 50# tau^-1 accounts for the average home range crossing rate (time^-1). tau^-1 is the rate in 1/time at which an individual returns to its home range center following an excursion
-p.g = 0.1 # scalar that modulates the random noise. Sets the size of the home range, has units (Area/time)
-p.lambdas = matrix(rpois(nind*2, 1/p.g), ncol = 2)# home range centers
-p.x0 = p.lambdas+matrix(rnorm(nind*2), ncol = 2) # initial positions
+p.g = 1 # scalar that modulates the random noise. Sets the size of the home range, has units (Area/time)
+p.lambdas = matrix(rpois(nind*2, 100*p.g)-100*p.g, ncol = 2)# home range centers
+p.x0 = p.lambdas # initial positions
 # p.phi = 0.01 # trajectory smoothing parameter
-nsteps = 1000
+nsteps = 24*60
 
 xs = replicate(nind, numeric(nsteps))
 ys = replicate(nind, numeric(nsteps))
@@ -52,18 +48,71 @@ for (s in seq_len(nind)) {
 }
 ```
 
-```{r plot tracks}
+## Social smoothing
+
+Once we have the tracks from the OU process, we apply a social filter. The social smoothing kernel proposed in Scharf et al. (2018) is
+$$
+h_{ij}^{(soc)}\equiv1_{\{\tau=\tau_{soc}\}}\frac{w_{ij}(\tau_{soc})}{|w_i.(\tau_{soc})|}\\
+|w_i.(\tau_{soc})|\equiv\sum_{j=1}^pw_{ij}(\tau_{soc})
+$$
+The position is obtained as:
+
+$$
+\mu_1^{(soc)}(\tau_{soc})\equiv\sum_{j=1}^p\int_\mathcal{T} h_{ij}^{(soc)}(\tau_{soc},\tau)\mu_j(\tau)d\tau
+$$
+
+Simply, the x or y position is the weighted average of the positions of the individual and the other individuals, with the weights the social network edge values at that moment. I will create a convolution kernel where one pair of individuals moves together, one gets close and then drifts away, and the other pairs are independent from each other. 
+
+```{r social convolution}
+# Social network edge strengths. This can be time dependent, e.g. a list of length nsteps where each element is a matrix of edge weights
+wstable <- 1
+wdyn <- sin(pi*seq_len(nsteps)/nsteps) # sequence that increases and decrases, between 0 and 1. Can be changed.
+W <- replicate(nsteps, diag(nrow = nind, ncol = nind))
+W[1,2,] <- wstable # pair that will travel together
+W[3,4,] <- wdyn # pair that will get close and then drift apart
+# make symmetric
+W <- apply(W, 3, \(x) x*upper.tri(x, diag = T)+t(x*upper.tri(x)), simplify = FALSE)
+
+# convolution kernel hij(tau) is the weights matrix, divided by the row sums
+h_soc <- lapply(W, \(x) x/rowSums(x))
+# create empty matrices with the same dimensions as the position matrices
+xsoc <- matrix(nrow = nrow(xs), ncol = ncol(xs))
+ysoc <- matrix(nrow = nrow(ys), ncol = ncol(ys))
+# fill the array using dot product of the step*ind x and y matrices, multiplied by the rows of h_soc
+for (t in 1:nsteps) {
+    xsoc[t,] <- h_soc[[t]]%*%xs[t,]
+    ysoc[t,] <- h_soc[[t]]%*%ys[t,]
+}
+```
+
+```{r plot tracks, fig.cap="Simulated tracks created using a Urstein-Ohlenbeck process modifed with a social smoothing convolution process"}
 # Plot
 # palette
 pal = hcl.colors(nind, "Set 2")
-plot(xs,ys,type = "n", asp=1, las = 1, cex.lab = 1.2, cex.axis = 1.2)
+par(mfrow = c(1,2))
+plot(c(xs,xsoc),c(ys,ysoc), las = 1, asp = 1, type = 'n', cex.lab = 1.2, cex.axis = 1.2, xlab = "x", ylab = "y", main = "OU process")
 sapply(seq_len(nind), \(x) lines(xs[,x],ys[,x],col = hcl.colors(nind, "Set 2")[x]))
 points(p.lambdas, bg = pal, pch  = 24)
-points(p.x0, bg = pal, pch = 21)
-legend("bottomright", legend = 1:nind, col = pal, lty = 1, cex = 0.8)
+plot(c(xs,xsoc),c(ys,ysoc), las = 1, asp = 1, type = 'n', cex.lab = 1.2, cex.axis = 1.2, xlab = "x", ylab = "y", main = "OU with social convolution")
+sapply(seq_len(nind), \(x) lines(xsoc[,x],ysoc[,x],col = hcl.colors(nind, "Set 2")[x]))
+points(p.lambdas, bg = pal, pch  = 24)
+
+# points(p.x0, bg = pal, pch = 21)
+legend("bottomright", legend = 1:nind, col = pal, lty = 1, cex = 0.5)
 ```
 
-To calculate the FOI between pairs of individuals we first need to determine their area of overlap. We determine the areas of probable contact using the conditional distribution of encounters (Noonan et al. 2021). The instantaneous encounter rate is calculated as
+
+```{r plot tracks, fig.cap="x and y positions of a pair of individuals with dynamic social interaction"}
+par(mfrow = c(3,1))
+plot(xsoc[,3], type = 'l', col = pal[3], ylab = "x",xlab='')
+lines(xsoc[,4], col = pal[4])
+
+plot(ysoc[,3], type = 'l', col = pal[3], ylab = "y",xlab = "")
+lines(ysoc[,4], col = pal[4])
+plot(sqrt((ysoc[,3]-ysoc[,4])^2+(xsoc[,3]-xsoc[,4])^2), type = 'l', ylab = "Distance",xlab = "Time (h)")
+```
+
+To calculate the FOI between pairs of individuals we first determine their area of overlap. We determine the areas of probable contact using the conditional distribution of encounters (Noonan et al. 2021). The instantaneous encounter rate is calculated as
 
 $$
 \tilde\varepsilon_{ij}(t)=\gamma_{ij}\int dr_{ij}(t)\Phi(r_{ij}(t))p(r_{ij}(t))
@@ -74,11 +123,12 @@ $$
 CDE_{ij}(r)=\frac{p_i(\mathbf r)p_j(\mathbf r)}{\iint d^2\mathbf{r'}p_i(\mathbf{r'})p_j(\mathbf{r'})}
 $$
 
-We build the UDs using autocorrelated kernel density estimation (Fleming et al. 2015), estimate the pairwise CDEs, and take the 95% polygon as the area in which to create the detection histories and calculate their correlation. The ctmm, akde and CDE methos are included in the `ctmm` package. 
+This is interesting for our purposes because the numerator--the product of the utilization distributions--is the same thing as the first term in our FOI calculation. Given an estimated CDE we could obtain the UD product multiplying by the denominator.
+We build the UDs using autocorrelated kernel density estimation (Fleming et al. 2015), estimate the pairwise CDEs, and take the 95% polygon as the area in which to create the detection histories and calculate their correlation. The ctmm, akde and CDE methods are included in the `ctmm` package. 
 
-```{r CDE-ctmm}
+```{r CDE-ctmm, message=FALSE}
 # create move objects
-moveobjs <- lapply(seq_len(nind), \(c) move(x = xs[,c],y = ys[,c],time = as.POSIXct(3600*seq(1:nsteps),origin = Sys.time()), animal = paste0("individual",c), proj = "+proj=tmerc"))
+moveobjs <- lapply(seq_len(nind), \(c) move(x = xsoc[,c],y = ysoc[,c],time = as.POSIXct(3600*seq_len(nsteps),origin = Sys.time()), animal = paste0("ind",c), proj = "+proj=tmerc"))
 
 # convert to telemetry
 telemetries <- lapply(moveobjs, as.telemetry)
@@ -99,247 +149,495 @@ for (i in seq_along(UDS)) {
     CDEs[[paste(i,j,sep = "-")]] <- encounter(list(u1, u2))
   }
 }
-# 95% polygons
-CDEpolys <- lapply(CDEs, SpatialPolygonsDataFrame.UD)
+
 ```
 
-Here are some examples for pairwise CDEs.
+Here are some examples for CDEs, with the corresponding locations of the individuals.
 
 ```{r plotUD}
 par(mfrow = c(2,3))
-plot(telemetries[1:2], col = pal[1:2], UD = CDEs[1], error = FALSE, pch=16) # specified error to avoid something wrong here with the error in the data
-plot(telemetries[c(1,3)], col = pal[c(1,3)], UD = CDEs[2], error = FALSE, pch=16)
-plot(telemetries[c(2,3)], col = pal[c(2,3)], UD = CDEs[6], error = FALSE, pch=16)
-plot(telemetries[c(1,6)], col = pal[c(1,6)], UD = CDEs[5], error = FALSE, pch=16)
-plot(telemetries[c(4,5)], col = pal[c(4,5)], UD = CDEs[13], error = FALSE, pch=16)
-plot(telemetries[c(5,6)], col = pal[c(5,6)], UD = CDEs[15], error = FALSE, pch=16)
+plot(telemetries[1:2], col = pal[1:2], UD = CDEs[1], error = FALSE, pch = 16, main = names(CDEs)[1]) # specified error to avoid the default error
+plot(telemetries[c(1,3)], col = pal[c(1,3)], UD = CDEs[2], error = FALSE, pch=16, main = names(CDEs)[2])
+plot(telemetries[c(2,4)], col = pal[c(2,4)], UD = CDEs[7], error = FALSE, pch=16, main = names(CDEs)[7])
+plot(telemetries[c(3,4)], col = pal[c(3,4)], UD = CDEs[10], error = FALSE, pch=16, main = names(CDEs)[10])
+plot(telemetries[c(4,5)], col = pal[c(4,5)], UD = CDEs[13], error = FALSE, pch=16, main = names(CDEs)[13])
+plot(telemetries[c(5,6)], col = pal[c(5,6)], UD = CDEs[15], error = FALSE, pch=16, main = names(CDEs)[15])
 ```
 
-An alternative approach is to use simple kernel density estimation, and take the intersection of the 95% kernels to create the overlap area. This does not account for higher probabilities of contact in areas of higher use, and the estimated area of overlap could be smaller, as shown below. From this example it seems that the edges of the polygon overlaps correspond (roughly) to the upper estimate of the 95% CDE polygon, not to the central estimate. 
 
-```{r get-plot-kernels, fig.height=3}
-# create the spatialPoints object with id column
-sim_sppoint <- SpatialPointsDataFrame(coords = data.frame(x = as.numeric(xs), y = as.numeric(ys)), data = data.frame(id = rep(1:nind, each = nrow(xs))))
-
-# get the UDs
-kuds <- kernelUD(sim_sppoint)
-# Get the 95% home range polygon
-HRs <- lapply(kuds, getverticeshr)
-# Get the pairwise polygon intersections
-
-# Plot an example of a CDE and the corresponding polygon overlap from the Kernel dens est. method
-plot(CDEs[[3]])
-raster::intersect(HRs[[1]],HRs[[4]])|>plot(col = "red", add=T)
-```
-
-Once we have the area of overlap we can estimate the correlation across individuals. There are two ways to go about this: to use the cells of the CDE discretized raster, or to select random points within the polygon. In either case the process is to determine the detection history for pairs of individuals at a given location. This is a binary matrix that shows whether an individual was or was not inside a given cell $x$ at a time point $t$. 
-Let's do the grid approach first. We take the grid produced by the pairwise CDEs. The cells produced can be rather small and the computation takes some time. This can be accelerated somewhat by doing the calculation only for overlapping cells. For large grids with small cells it may also be faster to loop through the cells (currently the correlation is calculated for _all_ cell pairs and then I take the diagonal so that only the correlation across individuals for the same cell are kept).
+Once we have the area of overlap we estimate the correlation across individuals. There are two ways to go about this: to use the cells of the CDE discretized raster, or to select random points within a polygon, for example the 95% CDE polygon. In either case the process is to determine the detection history for pairs of individuals in a given area. This is a binary matrix that shows whether an individual was or was not inside the area $x$ at a time point $t$. 
+Let's do the grid approach first. We take the grid produced by the pairwise CDEs. To get the correlation across detection histories, we use here the correlation theorem, which states that the correlation across two time series is given by the product of the Fourier transform of one series and the complex conjugate of the other. This accelerates calculations significantly. I also included a step to only calculate the correlation for cells that both individuals visited.
 
 ```{r corr-grid approach}
 # get the rasters for the CDEs
 CDErasters <- lapply(CDEs, raster, DF = "PDF")
 # matrix of possible lags
-lagmat <- outer(seq_len(nsteps), seq_len(nsteps), "-")
-lags <- round(unique(lagmat[lower.tri(lagmat,diag = TRUE)]))
-lags <- lags[-length(lags)]
+# lagmat <- outer(seq_len(nsteps), seq_len(nsteps), "-")
+# lags <- round(unique(lagmat[lower.tri(lagmat,diag = TRUE)]))
+# lags <- lags[-length(lags)]
 # list to store correlation values for every pair, every cell, and every lag
 gridcors <- list()
 
-# Loop over lags and cells for every pair of individuals. This took almost 3 h. 
-tictoc::tic("outer"); for (i in seq_along(CDErasters)) {
+# tictoc::tic("outer"); 
+for (i in seq_along(CDErasters)) {
   rast <- CDErasters[[i]]
-  indpair <- names(CDErasters)[i]
+  # keep only cells where the CDE is not 0. (For memory saving)
+  indx <- Which(rast>0, cells = TRUE)
   # raster resolution and center coords
   yr <- yres(rast)
   xr <- xres(rast)
-  gridcenters <- coordinates(rast)
+  gridcenters <- coordinates(rast)[indx,]
   # individual IDs from the name of the rasters
+  indpair <- names(CDErasters)[i]
   ind1 <- as.numeric(substr(indpair, 1,1))
   ind2 <- as.numeric(substr(indpair, 3,3))
-  posindex1 <- abs(outer(gridcenters[,1],xs[,ind1],"-"))<=xr/2 & abs(outer(gridcenters[,2],ys[,ind1],"-"))<=yr/2
-  posindex2 <- abs(outer(gridcenters[,1],xs[,ind2],"-"))<=xr/2 & abs(outer(gridcenters[,2],ys[,ind2],"-"))<=yr/2
-  cormat <- matrix(0, nrow = length(lags), ncol = nrow(gridcenters))
-  
+  # get position histories (i.e. which cell was each individual in at every time point)
+  posindex1 <- abs(outer(xsoc[,ind1], gridcenters[,1],"-"))<=xr/2 & 
+    abs(outer(ysoc[,ind1], gridcenters[,2],"-"))<=yr/2
+  posindex2 <- abs(outer(xsoc[,ind2], gridcenters[,1],"-"))<=xr/2 & 
+    abs(outer(ysoc[,ind2], gridcenters[,2],"-"))<=yr/2
+  # keep only cells that both visited at some point
+  ovlpcells <- which((colSums(posindex1)*colSums(posindex2))>0)
+  if(length(ovlpcells)==0) {
+    gridcors[[paste(ind1,ind2,sep = "-")]] <- NA
+    gridcors[[paste(ind2,ind1,sep = "-")]] <- NA
+    next
+  }
+  indx <- indx[ovlpcells]
+  posindex1 <- posindex1[,ovlpcells]
+  posindex2 <- posindex2[,ovlpcells]
+
+  # padrows <- nextn(n = 2*nrow(posindex1), factors = 2)-nrow(posindex1)
+  # posindex1_pad <- rbind(posindex1, matrix(0, ncol = ncol(posindex1), nrow = padrows))
+  # posindex2_pad <- rbind(posindex1, matrix(0, ncol = ncol(posindex2), nrow = padrows))
+  cormat_ab <- matrix(0,nrow = nrow(posindex1), ncol = ncol(posindex1))
+  cormat_ba <- matrix(0,nrow = nrow(posindex1), ncol = ncol(posindex1))
+  # tic("inner"); 
+  for (j in 1:ncol(posindex1)) { 
+    a <- posindex1[,j]
+    b <- posindex2[,j]
+    cormat_ab[,j] <- (convolve(a,b, type = "open")/sqrt(sum(a^2)*sum(b^2)))[length(a):(2*length(a)-1)]
+    cormat_ba[,j] <- (convolve(b,a, type = "open")/sqrt(sum(a^2)*sum(b^2)))[length(b):(2*length(b)-1)]
+    # cormat[,j] <- fft(fft(posindex1_pad[,j])*Conj(fft(posindex2_pad[,j])), inverse = T)/nrow(posindex1_pad)
+  }#; toc()
+  # tic("fft");cormat <- mvfft(mvfft(posindex1_pad)*Conj(mvfft(posindex2_pad)), inverse = T)/nrow(posindex1_pad) ;toc()
+  dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = indx)
   # loop over lags
-  tictoc::tic(msg = "lag"); for (s in seq_along(lags)) {
-    l <- lags[s]
-    matindices <- which(lagmat==l, arr.ind = TRUE)
-    h1 <- t(posindex1[,matindices[,1]])
-    h2 <- t(posindex2[,matindices[,2]])
-    ovlpcells <- which((colSums(h1)*colSums(h2))>0)
-    # loop over cells
-    if (length(ovlpcells)>0) {
-      cormat[s,ovlpcells] <- diag(as.matrix(cor(h1[,ovlpcells],h2[,ovlpcells])))
-      # for (cl in ovlpcells) cormat[s,cl] <- cor(h1[,cl],h2[,cl])
-    }
-  }; tictoc::toc()
-  gridcors[[indpair]] <- cormat
-}; tictoc::toc()
+  # tictoc::tic(msg = "loop"); for (s in seq_along(lags)) {
+  #   l <- lags[s]
+  #   matindices <- which(lagmat==l, arr.ind = TRUE)
+  #   h1 <- t(posindex1[,matindices[,1]])
+  #   h2 <- t(posindex2[,matindices[,2]])
+  #   ovlpcells <- which((colSums(h1)*colSums(h2))>0)
+  #   # loop over cells
+  #   if (length(ovlpcells)>0) {
+  #     cormat[s,ovlpcells] <- diag(as.matrix(cor(h1[,ovlpcells],h2[,ovlpcells])))
+  #     # for (cl in ovlpcells) cormat[s,cl] <- cor(h1[,cl],h2[,cl])
+  #   }
+  # }; tictoc::toc()
+  gridcors[[paste(ind1,ind2,sep = "-")]] <- cormat_ab
+  gridcors[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
+}#; tictoc::toc()
 
 # The gridcors can be very large if the cells are small, but we need only keep the integral product
-corvals <- sapply(gridcors, \(x) colSums(x*exp(-lags)))
-saveRDS(gridcors, "../data/example_correlations.rds")
-rm(gridcors)
-
-# import back
-gridcors <- readRDS("../data/example_correlations.rds")
+# corvals <- sapply(gridcors, \(x) colSums(x*exp(-lags)))
+saveRDS(gridcors, "../data/grid_correlations.rds")
+# rm(gridcors)
+# 
+# # import back
+# gridcors <- readRDS("../data/grid_correlations.rds")
 ```
 
-The other alternative is to sample randomly only inside the area where encounters are likely. We take the 95% polygon of the CDE, sample grid cells inside it and estimate the correlation for every pair in a cell around each sampled point. The grid cell size should be the same as the one for the CDE grid. For this to make sense we would need a higher density of points than with the regular grid, so the number of sampled points should be a function of the total area of overlap. With this example--6 individuals, 1000 steps--and at a density of 1 point per cell it took less than 10 minutes.
+The other alternative is to sample randomly only inside the area where encounters are likely. We take the 95% polygon of the CDE, sample random points inside it and estimate the correlation for every pair in an area around each sampled point. This approach allows to establish the contact distance based on the epidemiological dynamics, independently of the grid cell size. We can choose to use a circular sampling area or a square/rectangle.  
 
-```{r randompt-approach}
-# select random points within the overlap polygons
-CDE_ovlpareas <- sapply(CDEpolys,raster::area)[3,]
-CDE_cellsizes <- sapply(CDErasters, \(x) prod(res(x)))
-CDEpolys_up <- lapply(CDEpolys, \(x) polygons(x)[3]) # sample only the wider 95% estimate area
-pts_percell <- 3
-CDE_n_samplepts <- pts_percell*CDE_ovlpareas/CDE_cellsizes
-samplepts <- lapply(seq_along(CDEpolys_up), \(x) spsample(CDEpolys_up[[x]], n = CDE_n_samplepts[x], type = "random")) |> lapply(as.data.frame)
-names(samplepts) <- names(CDEpolys_up)
+```{r randompt-approach, message=FALSE}
+# Get the 95% polygons from the CDEs
+CDEpolys <- lapply(CDEs, SpatialPolygonsDataFrame.UD) |> lapply(polygons) |> lapply(disaggregate)|>lapply("[",2)
+# get the area of the polygons
+CDE_ovlpareas <- sapply(CDEpolys,raster::area)
+
+# set a threshold contact distance, calculate the number of cells with the
+# corresponding area that would fit within the 95% CDE. Here we use square cells
+cdist <- 0.01
+samparea <- (cdist*2)^2
+# thinning factor, to reduce the number of total points
+tf <- 1/3
+CDE_n_samplepts <- floor(CDE_ovlpareas/samparea*tf)
+
+samplepts <- lapply(seq_along(CDEpolys), \(x) spsample(CDEpolys[[x]], n = CDE_n_samplepts[x], type = "random")) |> lapply(as.data.frame)
+names(samplepts) <- names(CDEpolys)
 ptcors <- list()
-lagmat <- outer(seq_len(nsteps), seq_len(nsteps), "-")
-lags <- round(unique(lagmat[lower.tri(lagmat,diag = TRUE)]))
-lags <- lags[-length(lags)]
-# Calculate the correlations for all lags at each point
-tictoc::tic(); for (i in seq_along(samplepts)) {
+
+# Calculate the detections and correlations at every point
+tic(); for (i in seq_along(samplepts)) {
   sppts <- samplepts[[i]]
   indpair <- names(samplepts)[i]
   ind1 <- as.numeric(substr(indpair, 1,1))
   ind2 <- as.numeric(substr(indpair, 3,3))
-  xr <- xres(CDErasters[[i]])
-  yr <- yres(CDErasters[[i]])
-  posindex1 <- abs(outer(coordinates(sppts)[,1],xs[,ind1],"-"))<=xr/2 & abs(outer(coordinates(sppts)[,2],ys[,ind1],"-"))<=yr/2
-  posindex2 <- abs(outer(coordinates(sppts)[,1],xs[,ind2],"-"))<=xr/2 & abs(outer(coordinates(sppts)[,2],ys[,ind2],"-"))<=yr/2
-  cormat <- matrix(0,nrow = length(lags), ncol = nrow(sppts))
-  tictoc::tic("lag"); for (s in seq_along(lags)) {
-    l <- lags[s]
-    matindices <- which(lagmat==l, arr.ind = TRUE)
-    h1 <- t(posindex1[,matindices[,1]])
-    h2 <- t(posindex2[,matindices[,2]])
-    ovlpcells <- which((colSums(h1)*colSums(h2))>0)
-    if (length(ovlpcells)>0) {
-      cormat[s,ovlpcells] <- diag(as.matrix(cor(h1[,ovlpcells],h2[,ovlpcells])))
-    }
-  }; tictoc::toc()
-  ptcors[[indpair]] <- cormat
-}; tictoc::toc()
+  
+  # is point within threshold distance of center of cell (square sampling area)
+  posindex1 <- abs(outer(xsoc[,ind1],coordinates(sppts)[,1],"-"))<=cdist & abs(outer(ysoc[,ind1],coordinates(sppts)[,2],"-"))<=cdist
+  posindex2 <- abs(outer(xsoc[,ind2],coordinates(sppts)[,1],"-"))<=cdist & abs(outer(ysoc[,ind2],coordinates(sppts)[,2],"-"))<=cdist
+  cormat_ab <- cormat_ba <- matrix(0,nrow = nrow(posindex1), ncol = ncol(posindex1))
+  ovlpcells <- which((colSums(posindex1)*colSums(posindex2))>0)
+  if(length(ovlpcells)==0) {
+    ptcors[[paste(ind1,ind2,sep = "-")]] <- NA
+    ptcors[[paste(ind2,ind1,sep = "-")]] <- NA
+    next
+  }
+  tic("inner");for (j in ovlpcells) { 
+    a <- posindex1[,j]
+    b <- posindex2[,j]
+    cormat_ab[,j] <- (convolve(a,b, type = "open")/sqrt(sum(a^2)*sum(b^2)))[length(a):(2*length(a)-1)]
+    cormat_ba[,j] <- (convolve(b,a, type = "open")/sqrt(sum(a^2)*sum(b^2)))[length(b):(2*length(b)-1)]
+  };toc()
+  cormat_ab <- as.matrix(cormat_ab[,ovlpcells], ncol = length(ovlpcells))
+  cormat_ba <- as.matrix(cormat_ba[,ovlpcells], ncol = length(ovlpcells))
+  dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = ovlpcells)
+  ptcors[[paste(ind1,ind2,sep = "-")]] <- cormat_ab
+  ptcors[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
+}; toc()
+
+saveRDS(ptcors, "../data/randompoint_correlations.rds")
+# rm(ptcors)
 ```
 
 
 ```{r plot approaches}
-par(mfrow = c(1,2))
-for (i in seq_along(CDErasters)) {
-  # par(mfrow = c(1,2))
-  c1 <- colSums(gridcors[[i]]*exp(-lags))
-  indpair <- names(CDErasters)[i]
-
-  # corvals <- ptcors[[i]][1,]
+if(!exists("ptcors")) ptcors <- readRDS("../data/randompoint_correlations.rds")
+if(!exists("gridcors")) gridcors <- readRDS("../data/grid_correlations.rds")
+par(mfrow = c(1,3))
+# parasite decay parameter. Values closer to 0 (slower decay) result in higher
+# impact of correlation
+nu = 1/96
+lags <- seq_len(nsteps)-1
+samplepts2 <- rep(samplepts, each = 2)
+CDErasters2 <- rep(CDErasters, each = 2)
+for (i in seq_along(CDErasters2)) {
+  indpair <- names(CDErasters2)[i]
+  
   ind1 <- as.numeric(substr(indpair, 1,1))
   ind2 <- as.numeric(substr(indpair, 3,3))
-  corvalsscaled <- (c1-min(c1))/(2*max(abs(range(c1))))
-  corcols <- rgb(colorRamp(hcl.colors(11, "Blue-Red"))(corvalsscaled), maxColorValue = 255)
-  
-  plot(xs[,c(ind1,ind2)],ys[,c(ind1,ind2)], type = "n", asp = 1, las = 1, main = "Gridded approach")
-  image(SpatialPixelsDataFrame(coordinates(CDErasters[[i]]), data = data.frame(cor = c1)), add=T,col = hcl.colors(11,"Blue-Red", rev = TRUE), zlim = c(-1,1))
-  lines(xs[,ind1],ys[,ind1],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind1])
-  lines(xs[,ind2],ys[,ind2],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind2])
-  
-  c2 <- colSums(ptcors[[i]]*exp(-lags))
-  corvalsscaled <- (c2-min(c2))/(2*max(abs(range(c2))))
-  corcols <- rgb(colorRamp(hcl.colors(11, "Blue-Red", rev = T))(corvalsscaled), maxColorValue = 255)
-  plot(xs[,c(ind1,ind2)],ys[,c(ind1,ind2)],type = "n", asp = 1, las = 1, main = "Random point estimation")
-  # image(SpatialPixelsDataFrame(SpatialPoints(makegrid(hrovlps[[i]], cellsize = cellside)), data = data.frame(value = corvals)), add=T,col = hcl.colors(11,"Blue-Red", rev = TRUE), zlim = c(-1,1))
-  lines(xs[,ind1],ys[,ind1],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind1])
-  lines(xs[,ind2],ys[,ind2],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind2])
-  points(samplepts[[i]], col = corcols, pch = 16)
-  # legend("bottomleft", fill = hcl.colors(5, "Blue-Red"),legend = seq(max(abs(range(c2))),-max(abs(range(c2))),length.out = 5))
-}
-```
-
-
----
-We multiply the UDs pairwise to get the probability $p_i(x)p_j(x)$. This is the first component of the equation. The figure below shows an example of the result; we get a matrix of the same size, but the highest values will be the areas of overlap between individuals.
-
-```{r UD-prod, fig.height=3}
-# Calculate the per-cell product of expected values
-udprod <- function(k1, k2) {k1@data*k2@data}
-
-# Plot one example
-plot(SpatialPixelsDataFrame(coordinates(kuds[[1]]), 
-                            data = data.frame(udprod(kuds[[1]],kuds[[2]]))))
-# Get all the products in a list
-ind_combs <- expand.grid(ind2 = seq_along(kuds), ind1 = seq_along(kuds))
-ind_combs <- ind_combs[ind_combs$ind1!=ind_combs$ind2,]
-UDprods <- apply(ind_combs, 1, \(x) udprod(kuds[[x[2]]],kuds[[x[1]]]), simplify = FALSE)
-```
-For the remaining components, i.e. the standard deviation and the correlation, we need the location history for every individual. The location history is a $T$ by $X$ binary matrix, with $T$ the number of discrete time steps and $X$ the number of sites, that shows in which cell the individual was at every time point. We do this finding which grid cell center is closest for every spatial point.
-
-```{r loc-hist}
-# Next we need to determine the location histories. The location history is a matrix with time in rows, locations (grid cells) in columns. Matrix values represent whether the individual was (1) or was not (0) at that location at that time. So, we need to assign a cell to every location.
-
-# Get the distance between the grid cell centers and every point in the tracking history. This creates a numeric matrix with points in rows, and grid cell centers in columns. 
-point_grid_dists <- spDists(sim_tracks_sppoints, kuds[[1]])
-
-# Create a binary matrix and split it by individual
-loc_histories <-  apply(point_grid_dists, MARGIN = 1, \(x) x==min(x)) |> t() |>
-  split(factor(sim_tracks_db$ind)) |> 
-  lapply(matrix, ncol = ncol(point_grid_dists))
-
-#### Important, the grid cells are not in order!!!
-
-# Create a function to do this more formally (In prgress)
-# get_lochist <- function(s, k) {
-#   pt_grid_dist <- spDists(s,k)
-#   l <- apply(pt_grid_dist, 1, \(x) x == min(x))
-#   return(l)
-# }
-```
-The location histories are iteratively resampled, to select times in the history of $i$ and match them with times in the history of $j$ $s$ time units before. Once we have these subsets of the location histories, we calculate the covariance across matching matrix columns for two different individuals. Another way is to divide the covariance, expressing it as the product of the per-cell standard deviation as $\sigma=\sqrt{\hat p(1-\hat p)}$, where $\hat p$ is the estimated probability for a binomial process, and the correlation across the same cells for two individuals. It would seem there is no gain in speed in calculating the correlation as opposed to the covariance.
-
-```{r covariance}
-# We need to integrate the product of the covariance between the presence of i at x at time t, and the presence of j at x at time u = t-s, across all lags s. This is then multiplied by e^(-mu*s)
-get_cov <- function(lh) {
-  # matrix of combinations. A t*t matrix of difference in time. This is used to
-  # find the row-col combinations corresponding to a given lag
-  lag_mat <- round(outer(sim_tracks[[1]]$time, sim_tracks[[1]]$time, "-"),5)
-  lags <- unique(lag_mat[lower.tri(lag_mat,diag = TRUE)])
-  lags <- lags[-length(lags)] # remove final value that would have only one possible combination
-  
-  # For every lag s, find the rows in host 1 and host 2 corresponding to times t
-  # and t-s, calculate the covariance
-  cell_covs <- replicate(n = nrow(ind_combs), 
-                         expr = matrix(0, nrow = length(lags), 
-                                       ncol = ncol(loc_histories[[1]])),
-                         simplify = FALSE)
-  
-  for (r in 1:nrow(ind_combs)) {
-    i <- ind_combs[r,2]
-    j <- ind_combs[r,1]
-    covmat <- cell_covs[[r]]
-    for (s in seq_along(lags)) {
-      l <- lags[s]
-      # find position where those lags occur
-      indices <- which(lag_mat==l, arr.ind = T)
-      # subset host position matrices with indices
-      h1 <- lh[[i]][indices[,1],]
-      h2 <- lh[[j]][indices[,2],]
-      ovlpcells <- which((colSums(h1)*colSums(h2))>0)
-      if(length(ovlpcells)==0) next
-      if (length(ovlpcells)>0) {
-        h1sub <- h1[,ovlpcells]
-        h2sub <- h2[,ovlpcells]
-        covmat[s,ovlpcells] <- diag(as.matrix(cov(h1sub,h2sub)))# only the diagonal as we care only about same cells
-      }
-    }
-    cell_covs[[r]] <- covmat
+  plot(xsoc[,c(ind1,ind2)],ysoc[,c(ind1,ind2)], type = "n", asp = 1, las = 1, main = "Tracks")
+  lines(xsoc[,ind1],ysoc[,ind1], col = pal[ind1])
+  lines(xsoc[,ind2],ysoc[,ind2], col = pal[ind2])
+  if(is.na(gridcors[[i]])) {
+    plot(xsoc[,c(ind1,ind2)],ysoc[,c(ind1,ind2)], type = "n", asp = 1, las = 1, main = "Gridded approach")
+  } else {
+    c1 <- Re(colSums(gridcors[[i]]*exp(-nu*lags)))
+    
+    # get raster and substitute values
+    rast <- CDErasters2[[i]]
+    values(rast) <- 0
+    cells <- as.numeric(names(c1))
+    values(rast)[cells] <- c1
+    
+    # corvalsscaled <- (c1-min(c1))/(2*max(abs(range(c1))))
+    # corvalsscaled <- (c1+1)/2
+    # corcols <- rgb(colorRamp(hcl.colors(11, "Blue-Red"))(corvalsscaled), maxColorValue = 255)
+    
+    plot(xsoc[,c(ind1,ind2)],ysoc[,c(ind1,ind2)], type = "n", asp = 1, las = 1, main = "Gridded approach")
+    plot(rast, add = T)
   }
-  return(cell_covs)
+  
+  # image(SpatialPixelsDataFrame(coordinates(CDErasters[[i]]), data = data.frame(cor = c1)), add=T,col = hcl.colors(11,"Blue-Red", rev = TRUE), zlim = c(-1,1))
+  # points(xsoc[,ind1],ysoc[,ind1],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind1])
+  # points(xsoc[,ind2],ysoc[,ind2],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind2])
+  if(is.na(ptcors[[i]])) {
+    plot(xsoc[,c(ind1,ind2)],ysoc[,c(ind1,ind2)],type = "n", asp = 1, las = 1, main = "Random point estimation")
+  } else {
+    c2 <- Re(colSums(ptcors[[i]]*exp(-nu*lags)))
+    corvals <- numeric(length = nrow(samplepts2[[i]]))
+    cells <- as.numeric(names(c2))
+    corvals[cells] <- c2
+    corvalsscaled <- (corvals-min(corvals))/(3*max(abs(range(corvals))))
+    # corvalsscaled <- (c2+1)/2
+    corcols <- rgb(colorRamp(hcl.colors(11, "Blue-Red", rev = T))(corvalsscaled), maxColorValue = 255)
+    plot(xsoc[,c(ind1,ind2)],ysoc[,c(ind1,ind2)],type = "n", asp = 1, las = 1, main = "Random point estimation")
+    # image(SpatialPixelsDataFrame(SpatialPoints(makegrid(hrovlps[[i]], cellsize = cellside)), data = data.frame(value = corvals)), add=T,col = hcl.colors(11,"Blue-Red", rev = TRUE), zlim = c(-1,1))
+    # lines(xs[,ind1],ys[,ind1],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind1])
+    # lines(xs[,ind2],ys[,ind2],pch = 16, col = hcl.colors(nind, "Set 2",alpha = 0.5)[ind2])
+    points(samplepts2[[i]], col = corcols, pch = 16)
+    legend("bottomright", fill = hcl.colors(5, "Blue-Red"),legend = seq(max(abs(range(corvals))),-max(abs(range(corvals))),length.out = 5))
+  }
+}
+```
+
+To compare both approaches, we integrate the values of the random point sampling inside each cell of the CDE grid. This may not be a fair comparison, since the contact area is much larger for the gridded approach than for the point approach. 
+```{r integrate point estimates}
+gridptcomp <- list()
+for (i in seq_along(ptcors)) {
+  if(!is.array(ptcors[[i]])) {
+    gridptcomp[[i]] <- NA
+  } else {
+    corvals <- colSums(Re(ptcors[[i]])*exp(-nu*lags))
+    cells <- as.numeric(names(corvals))
+    ptvals <- numeric(length = nrow(samplepts2[[i]]))
+    ptvals[cells] <- corvals
+    # get the cell that every point is in
+    ptcells <- cellFromXY(CDErasters2[[i]], samplepts2[[i]])
+    # data frame with the sample point coordinates, the correlation values, the
+    # corresponding cell and its values
+    cellmeancor <- tapply(ptvals, INDEX = ptcells, mean) # mean correlation for all sampled points within a cell
+    cells <- as.numeric(names(cellmeancor))
+    gridcor = Re(gridcors[[i]][cells]) # This real value should come much sooner.
+
+    gridptcomp[[i]] <- data.frame(gridcell = cells, gridcor = gridcor, ptcor = cellmeancor)
+  }
 }
 
-cell_covs <- get_cov(loc_histories)
-# multiply by the decay, and sum across 
-cell_cov_int <- lapply(cell_covs, "*", exp(-nu*lags)) |> lapply(colSums)
+# Plot the relationship between estimates
+plot(gridptcomp[[19]][,2],gridptcomp[[19]][,3], 
+     xlab = "Grid cumulative correlation",
+     ylab = "Point cumulative correlation",
+     las=1)
 ```
+
+It would seem most cells in the grid have values close to 0. For these cells, the random sampling would be able to capture more nuance, although generally the values are lower with the point sampling approach. This makes sense given the smaller sampling area.
+
+## UD product, standard deviation product
+
+We multiply the UDs pairwise to get the probability $p_i(x)p_j(x)$. This is the first component of the equation, and corresponds to the numerator in the CDE calculation. We calculate the standard deviation components also from the UD probabilities. The per-cell standard deviation is $\sigma=\sqrt{\hat p(1-\hat p)}$, where $\hat p$ is the estimated probability for a binomial process (i.e. the UD PDF).
+
+```{r UD-prod}
+# transform UDs to raster class objects
+UDrasts <- lapply(UDS, raster, DF = "PDF")
+# get total extent of UDs combined
+globextent <- extent(do.call(merge,UDrasts))
+# extend all rasters to have the same extent
+UDrasts <- lapply(UDrasts, extend, y = globextent)
+UDprods <- UDsds <- list()
+for (i in seq_along(CDErasters)) {
+  indpair <- names(CDErasters)[i]
+  ind1 <- as.numeric(substr(indpair, 1,1))
+  ind2 <- as.numeric(substr(indpair, 3,3))
+  r1 <- UDrasts[[ind1]]
+  r2 <- UDrasts[[ind2]]
+  UDprods[[paste(ind1,ind2,sep = "-")]] <- r1*r2
+  # # Alternatively this can be calculated from the CDE as
+  # CDEs[[i]]$PDF*CDEs[[i]]$weight
+  UDsds[[paste(ind1,ind2,sep = "-")]] <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))
+}
+# duplicate rasters
+UDsds <- rep(UDsds, each = 2)
+UDprods <- rep(UDprods, each = 2)
+
+```
+
+## FOI estimation
+
+For each cell, we multiply the product of the standard deviation by the cumulative correlation term calculated previously. The result is added to the product of the UDs scaled by the epidemiological parameters to obtain the FOI.
+
+```{r foi}
+foirasts <- list()
+# maybe best to create the global raster first, that way we would have a set of common cells for the remainder.
+for (i in seq_along(ptcors)) {
+  if (is.array(ptcors[[i]])) {
+    # scale and integrate correlation at sampled points
+    corvals <- colSums(Re(ptcors[[i]])*exp(-nu*lags))
+    # get the indices of the points with values
+    ptsswithvalues <- as.numeric(colnames(ptcors[[i]]))
+    # find the corresponding cells in the global raster
+    corcells <- cellFromXY(globrast, samplepts2[[i]][ptsswithvalues,])
+    # mean correlation for all sampled points within a cell
+    cellmeancor <- tapply(corvals, INDEX = corcells, mean) 
+    # create global
+    rcor <- globrast
+    values(rcor) <- 0
+    rcor[as.numeric(names(cellmeancor))] <- cellmeancor
+    
+    foi <- beta/nu*UDprods[[i]]+UDsds[[i]]*rcor
+
+  } else {
+    foi <- beta/nu*UDprods[[i]]
+  }
+        # fill NAs with 0
+    foi[is.na(foi)] <- 0
+    foirasts[[i]] <- foi
+    plot(foi, las = 1, main = names(ptcors)[i])
+}
+names(foirasts) <- names(ptcors)
+```
+
+## FOI calculations
+
+With the landscape pairwise FOI we can estimate the total FOI for that pair of individuals, the total FOI that an individual experiences from all other individuals, either at a specific location or across the whole landscape, as well as the total FOI across the landscape.
+
+```{r total pairwise FOI}
+pairfoi <- sapply(foirasts, cellStats, sum)
+foi_pair_df <- data.frame(do.call(rbind, strsplit(names(foirasts), split = "-")),
+           foi = pairfoi,
+           covfoi = sapply(seq_along(foirasts), \(x) cellStats((foirasts[[x]]-beta*lam/nu*UDprods[[x]])/foirasts[[x]]*100,mean)))
+
+p1 <- ggplot(foi_pair_df)+geom_raster(aes(X1,X2,fill = foi))+
+  coord_equal()+
+  labs(x = "Depositing individual",
+       y = "Acquiring individual", 
+       fill = "FOI")+
+  theme_minimal(base_size = 12)+
+  scale_x_discrete(breaks = 1:nind, position = "top",expand = c(0,0))+
+  scale_y_discrete(breaks = nind:1, expand = c(0,0))+
+  scale_fill_gradientn(colors = hcl.colors(11, "Reds 2",rev = T))+
+  theme(aspect.ratio = 1, panel.grid = element_blank())
+
+p2 <- ggplot(foi_pair_df)+geom_raster(aes(X1,X2,fill = covfoi))+
+  coord_equal()+
+  labs(x = "Depositing individual",
+       y = "Acquiring individual", 
+       fill = "Covariance (%)")+
+  theme_minimal(base_size = 12)+
+  scale_x_discrete(breaks = 1:nind, position = "top",expand = c(0,0))+
+  scale_y_discrete(breaks = nind:1, expand = c(0,0))+
+  scale_fill_gradientn(colors = hcl.colors(11, "Reds 2",rev = T))+
+  theme(aspect.ratio = 1, panel.grid = element_blank())
+
+plot_grid(p1,p2, align = 'v')
+```
+The FOI is much higher for the individuals that are interacting, which is to be expected given the higher overlap produced by the interaction. How much of this is actually contributed from the correlation/covariance terms, as opposed to the spatial overlap? The covariance term contributes less than 1% of the FOI (cell average), and only for the pair that travels together. This contribution is variable, it could be higher with a larger contact area or lower parasite decay rate, whereas the contribution from spatial overlap is stationary. 
+
+```{r decay rate, fig.cap="Contribution of covariance to the force of infection"}
+nuvals <- 1/seq(24*2,24*30,12)
+maxcovs <- meancovs <- numeric(length(nuvals))
+for (j in seq_along(nuvals)) {
+  nu2 <- nuvals[j]
+  foirasts2 <- list()
+  # maybe best to create the global raster first, that way we would have a set of common cells for the remainder.
+  for (i in seq_along(ptcors)) {
+    if (is.array(ptcors[[i]])) {
+      # scale and integrate correlation at sampled points
+      corvals <- colSums(Re(ptcors[[i]])*exp(-nu2*lags))
+      # get the indices of the points with values
+      ptsswithvalues <- as.numeric(colnames(ptcors[[i]]))
+      # find the corresponding cells in the global raster
+      corcells <- cellFromXY(globrast, samplepts2[[i]][ptsswithvalues,])
+      # mean correlation for all sampled points within a cell
+      cellmeancor <- tapply(corvals, INDEX = corcells, mean) 
+      # create global
+      rcor <- globrast
+      values(rcor) <- 0
+      rcor[as.numeric(names(cellmeancor))] <- cellmeancor
+      
+      foi <- beta/nu2*UDprods[[i]]+UDsds[[i]]*rcor
+      
+    } else {
+      foi <- beta/nu2*UDprods[[i]]
+    }
+    # fill NAs with 0
+    foi[is.na(foi)] <- 0
+    foirasts2[[i]] <- foi
+  }
+  names(foirasts2) <- names(ptcors)
+  
+  foi_pair_df <- data.frame(do.call(rbind, strsplit(names(foirasts2), split = "-")),
+                            covfoi = sapply(seq_along(foirasts2), \(x) cellStats((foirasts2[[x]]-beta*lam/nu*UDprods[[x]])/foirasts2[[x]],mean)))
+  
+  maxcovs[j] <- foi_pair_df$covfoi[which.max(abs(foi_pair_df$covfoi))]
+  meancovs[j] <- mean(foi_pair_df$covfoi)
+}
+data.frame(nu = nuvals, cov = maxcovs, meancov = meancovs) %>% ggplot()+geom_line(aes(1/nu/24, 100*cov))+
+  theme_classic(base_size = 14)+
+  labs(x = "Days to decay", y = "Contribution (%)")+
+  geom_hline(yintercept = 0, linetype = 2)
+```
+
+Next we explore how the contact distance affects the estimations. With a longer contact distance, the likelihood of two individuals being in the same cell increases, so there should be more positive correlations and an overall greater contribution of the correlation term.
+
+```{r contact fx}
+# set a threshold contact distance, calculate the number of cells with the
+# corresponding area that would fit within the 95% CDE. Here we use square cells
+cdists <- seq(0.01,1,0.05)
+cdist <- 0.01
+samparea <- (cdist*2)^2
+# thinning factor, to reduce the number of total points
+tf <- 1/3
+CDE_n_samplepts <- floor(CDE_ovlpareas/samparea*tf)
+
+samplepts <- lapply(seq_along(CDEpolys), \(x) spsample(CDEpolys[[x]], n = CDE_n_samplepts[x], type = "random")) |> lapply(as.data.frame)
+names(samplepts) <- names(CDEpolys)
+ptcors <- list()
+
+# Calculate the detections and correlations at every point
+for (i in seq_along(samplepts)) {
+  sppts <- samplepts[[i]]
+  indpair <- names(samplepts)[i]
+  ind1 <- as.numeric(substr(indpair, 1,1))
+  ind2 <- as.numeric(substr(indpair, 3,3))
+  
+  # is point within threshold distance of center of cell (square sampling area)
+  posindex1 <- abs(outer(xsoc[,ind1],coordinates(sppts)[,1],"-"))<=cdist & abs(outer(ysoc[,ind1],coordinates(sppts)[,2],"-"))<=cdist
+  posindex2 <- abs(outer(xsoc[,ind2],coordinates(sppts)[,1],"-"))<=cdist & abs(outer(ysoc[,ind2],coordinates(sppts)[,2],"-"))<=cdist
+  cormat_ab <- cormat_ba <- matrix(0,nrow = nrow(posindex1), ncol = ncol(posindex1))
+  ovlpcells <- which((colSums(posindex1)*colSums(posindex2))>0)
+  if(length(ovlpcells)==0) {
+    ptcors[[paste(ind1,ind2,sep = "-")]] <- NA
+    ptcors[[paste(ind2,ind1,sep = "-")]] <- NA
+    next
+  }
+  for (j in ovlpcells) { 
+    a <- posindex1[,j]
+    b <- posindex2[,j]
+    cormat_ab[,j] <- (convolve(a,b, type = "open")/sqrt(sum(a^2)*sum(b^2)))[length(a):(2*length(a)-1)]
+    cormat_ba[,j] <- (convolve(b,a, type = "open")/sqrt(sum(a^2)*sum(b^2)))[length(b):(2*length(b)-1)]
+  };toc()
+  cormat_ab <- as.matrix(cormat_ab[,ovlpcells], ncol = length(ovlpcells))
+  cormat_ba <- as.matrix(cormat_ba[,ovlpcells], ncol = length(ovlpcells))
+  dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = ovlpcells)
+  ptcors[[paste(ind1,ind2,sep = "-")]] <- cormat_ab
+  ptcors[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
+}
+# integration
+gridptcomp <- list()
+for (i in seq_along(ptcors)) {
+  if(!is.array(ptcors[[i]])) {
+    gridptcomp[[i]] <- NA
+  } else {
+    corvals <- colSums(Re(ptcors[[i]])*exp(-nu*lags))
+    cells <- as.numeric(names(corvals))
+    ptvals <- numeric(length = nrow(samplepts2[[i]]))
+    ptvals[cells] <- corvals
+    # get the cell that every point is in
+    ptcells <- cellFromXY(CDErasters2[[i]], samplepts2[[i]])
+    # data frame with the sample point coordinates, the correlation values, the
+    # corresponding cell and its values
+    cellmeancor <- tapply(ptvals, INDEX = ptcells, mean) # mean correlation for all sampled points within a cell
+    cells <- as.numeric(names(cellmeancor))
+    gridcor = Re(gridcors[[i]][cells]) # This real value should come much sooner.
+
+    gridptcomp[[i]] <- data.frame(gridcell = cells, gridcor = gridcor, ptcor = cellmeancor)
+  }
+}
+
+# foi
+foirasts <- list()
+# maybe best to create the global raster first, that way we would have a set of common cells for the remainder.
+for (i in seq_along(ptcors)) {
+  if (is.array(ptcors[[i]])) {
+    # scale and integrate correlation at sampled points
+    corvals <- colSums(Re(ptcors[[i]])*exp(-nu*lags))
+    # get the indices of the points with values
+    ptsswithvalues <- as.numeric(colnames(ptcors[[i]]))
+    # find the corresponding cells in the global raster
+    corcells <- cellFromXY(globrast, samplepts2[[i]][ptsswithvalues,])
+    # mean correlation for all sampled points within a cell
+    cellmeancor <- tapply(corvals, INDEX = corcells, mean) 
+    # create global
+    rcor <- globrast
+    values(rcor) <- 0
+    rcor[as.numeric(names(cellmeancor))] <- cellmeancor
+    
+    foi <- beta/nu*UDprods[[i]]+UDsds[[i]]*rcor
+
+  } else {
+    foi <- beta/nu*UDprods[[i]]
+  }
+        # fill NAs with 0
+    foi[is.na(foi)] <- 0
+    foirasts[[i]] <- foi
+    plot(foi, las = 1, main = names(ptcors)[i])
+}
+names(foirasts) <- names(ptcors)
+```
+
 We obtain a matrix with cells in rows, and combinations of individuals in columns. For every column we need to add the product of the UDs at that cell, and then scale by the epidemiological parameters to obtain the cell FOI.
 
 ```{r foi}
@@ -355,24 +653,9 @@ calculate_cell_foi <- function(ud, ci) {
 cell_foi_indep <- calculate_cell_foi(UDprods, cell_cov_int)
 ```
 
-We obtain a matrix where each column is a combination of two individuals, and every row is a cell in the landscape. The matrix values are the estimated FOI experienced by individual 1 from individual 2. By adding across the columns we can estimate the total FOI for that pair of individuals. From this matrix we can also calculate the total FOI that an individual experiences from all other individuals, either at a specific location or across the whole landscape.
 
-```{r tracks-gg}
-sim_tracks_db %>% ggplot()+geom_path(aes(x,y,color = factor(ind)), size=1)+theme_void(base_size = 14)+coord_sf()+labs(color="Individual")+theme(legend.position = "left") -> gg.tracks
-```
-```{r pairwise-foi}
-# total FOI from for every pair of individuals
-data.frame(ind_combs, foi = colSums(cell_foi_indep)) |>
-  ggplot()+
-  geom_raster(aes(factor(ind1),factor(ind2, levels = 6:1),fill=foi))+
-  theme_minimal(base_size = 14)+
-  labs(fill = "FOI", y = "Acquiring individual", x = "Depositing individual")+
-  scale_x_discrete(breaks = 1:6, position = "top",expand = c(0,0))+
-  scale_y_discrete(breaks = 1:6, expand = c(0,0))+
-  theme(aspect.ratio = 1, panel.grid = element_blank()) -> gg.pairfoi
 
-cowplot::plot_grid(gg.tracks,gg.pairfoi)
-```
+
 
 We can see that individual 1 has hardly any overlap, and its FOI values are the lowest. The product of the UDs is symmetrical, but the difference in order of arrival at a given site creates differences due to the covariance term.
 
@@ -387,15 +670,7 @@ tapply(colSums(cell_foi_indep), ind_combs$ind2, sum)
 plot(SpatialPixelsDataFrame(coordinates(kuds[[1]]), 
                             data = data.frame(rowSums(cell_foi_indep))))
 ```
-```{r st-dev}
-# # We can calculate the sd from the estimated p_i. Can we?
-# stdevs_est <- lapply(kuds, \(x) sqrt(as.matrix(x)*(1-as.matrix(x))))
 
-# calculate standard deviation from the data. For a Bernoulli process, the sd is sqrt(p(1-p)), where p is the column mean for the binary location history matrix.
-getcellSD <- function(h) sqrt(colMeans(h)*(1-colMeans(h)))
-# apply(h, 2, \(x) sqrt(mean(x)*(1-mean(x))))
-stdevs <- lapply(loc_histories, getcellSD)
-```
 ```{r}
 sapply(cell_covs, rowMeans) %>% as_tibble() %>% add_column(lag = lags) %>% 
   pivot_longer(cols = starts_with("v")) %>% 
@@ -470,7 +745,7 @@ There is a clear difference in FOI between the two individuals who are moving to
 
 What happens if we do not incorporate the covariance term? This is, what if we assumed independent movement, and only used the product of the UDs, how much error would we be incurring?
 
-```{r, fig.height=3}
+```{r}
 tibble(ind_combs, foi_full = colSums(cell_foi_joint), foi_ud = beta*lam*sapply(UDprods,sum)) %>% mutate(udprop = (foi_full-foi_ud)/foi_full) %>% 
   ggplot()+geom_raster(aes(ind1,ind2, fill = udprop))+
   # scale_fill_gradient2(midpoint = 1)+
