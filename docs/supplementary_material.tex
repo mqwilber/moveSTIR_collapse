@@ -1,0 +1,114 @@
+\documentclass[letterpaper]{article}
+
+% authors and affiliations
+\title{Supplementary Material: PMoveSTIR---A general framework to incorporate movement and space use information in epidemiological models}
+\usepackage{authblk}
+\author{Juan S. Vargas Soto \and Mark Q. Wilber}
+\affil{School of Natural Resources, University of Tennessee, Knoxville, TN}
+\date{}
+
+
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[left=1 in, right=1 in, top=1 in, bottom=1 in]{geometry}
+% \usepackage{hyperref}
+\usepackage{bbold}
+\usepackage{rotating}
+\usepackage{bbm}
+\usepackage{array}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}m{#1}}
+% \usepackage{kbordermatrix}
+\usepackage{footnote}
+\makesavenoteenv{tabular}
+\makesavenoteenv{table}
+% \renewcommand{\theequation}{{S}\arabic{equation}}
+
+\makeatletter
+% \addto\captionsenglish{%
+%   \renewcommand{\fnum@figure}{Figure S\thefigure}%
+%   \renewcommand{\fnum@table}{Table S\thetable}%
+% }
+\makeatother
+
+% Bibliography
+\usepackage[round, colon]{natbib} % Bibliography - APA
+\bibliographystyle{abbrvnat}
+%\bibpunct{(}{)}{;}{a}{}{,}
+
+% Line numbers
+\usepackage{lineno}
+%\def\linenumberfont{\normalfont\footnotesize\ttfamily}
+%\setlength\linenumbersep{0.2 in}
+
+\usepackage{setspace}
+
+\newcommand{\ignore}[1]{}
+
+\begin{document}
+
+\section*{PMoveSTIR in continuous space}
+
+In the main text, we derive PMoveSTIR assuming that hosts are moving and contacting each other within some area $A_x$, which we can conceptually think about as a grid cell.  While this simplifies the conceptual mathematical notation, it is more general to consider the case of continuous space where we define contact as potentially happening when present or past host $j$ is (was) within some distance $r$ of host $i$ at its present location \citep{Wilber2022}.  The output we want from this alternative version of PMoveSTIR is the function $\hat{h}(x, t)$, which is the force of infection \emph{per unit area} at point $x$ on the landscape (e.g., $\hat{h}(x, t)$ might have units day$^{-1}\text{m}^{-2}$).
+
+Let's start with the example where a host $i$ is occupying some circular area $A_{x, \rho}$ where $x$ is the center of the area and $\rho$ is the radius of the area.  A contact can occur when host $j$ (past or present) is in the area $A_{x, \rho + r}$ where $r$ is our epidemilogically relevant contact distance and $r >> \rho$.  The force of infection felt by host $i$ from host $j$ as time $t$ in area $A_{x, \rho}$ is given by
+
+\begin{equation}
+    h_{i \leftarrow j}(t, A_{x, \rho}) = \int_{-\infty}^{t} \beta' \lambda \delta'_{x_i(t)}(A_{x, \rho}) \delta'_{x_j(u)}(A_{x, \rho + r}) e^{-\nu(t - u)} du.
+    \label{eq:prob_foi}
+\end{equation} 
+where, consistent with the main text, $\delta'_{x_i(t)}(A_{x, \rho})$ is a random variable that determines whether or not host $i$ is located in area $A_{x, \rho}$ at time $t$ and $\delta'_{x_j(u)}(A_{x, \rho + r})$ is a random variable that determines whether or not host $j$ is in area $A_{x, \rho + r}$ at time $u$.  Finally, $\beta' = \frac{\tilde{\beta}}{A_{x, \rho + r}}$ which indicates our assumption that encounters are equally likely within an area $A_{x, \rho + r}$.
+
+As we did in the main text, we can envision simulating many different movement trajectories for host $i$ and $j$ and take the expectation of $h_{i \leftarrow j}(t, A_{x, \rho})$.  We obtain
+
+
+\begin{equation}
+    h^*_{i \leftarrow j}(t, A_{x, \rho}) = \int_{-\infty}^{t} \beta' \lambda E[\delta'_{x_i(t)}(A_{x, \rho}) \delta'_{x_j(u)}(A_{x, \rho + r})] e^{-\nu(t - u)} du.
+    \label{eq:prob_foi}
+\end{equation} 
+
+Assuming hosts are moving independently, we can write
+
+\begin{equation}
+    h^*_{i \leftarrow j}(t, A_{x, \rho}) = \beta' \lambda \int_{-\infty}^{t} [p_i(A_{x, \rho}, t) p_j(A_{x, \rho + r}, u)] e^{-\nu(t - u)} du
+\end{equation}
+where $p_i(A_{x, \rho}, t)$ is the probability of host $i$ being in area $A_{x, \rho}$ at time $t$ and $p_j(A_{x, \rho + r}, u)$ is the probability of host $j$ being in area $A_{x, \rho + r}$ at time $u$.
+
+Dividing both sides by $A_{x, \rho}$ and taking the limit as $\rho \rightarrow 0$ (such that $A_{x, \rho} \rightarrow 0$), we obtain
+
+\begin{equation}
+    \hat{h}^*_{i \leftarrow j}(t, x) = \beta' \lambda \int_{-\infty}^{t} [f_i(x, t) p_j(A_{x, r}, u)] e^{-\nu(t - u)} du = \beta' \lambda \int_{-\infty}^{t} [f_i(x, t) \int_{s \in A_{x, r}} f_j(s, u) ds] e^{-\nu(t - u)} du
+\end{equation}
+where $f_i(x, t)$ and $f_j(x, t)$ are the probability density functions of space use for host $i$ and host $j$, respectively.  Note that the units on $f_i(x, t)$ or $f_j(x, t)$ are per area, such that the force of infection $\hat{h}^*_{i \leftarrow j}(t, x)$ has units per time per area as opposed to $h^*_{i \leftarrow j}(t, A_{x, \rho})$ which has units per time. Conceptually, for $h^*_{i \leftarrow j}(t, A_{x, \rho})$ we have already integrated over area in quantity $h^*_{i \leftarrow j}(t, A_{x, \rho})$ so we cancel out the per area units.  
+
+Assuming a stationary process we can write
+
+\begin{equation}
+    \hat{h}^*_{i \leftarrow j}(t, x) =  \frac{\beta' \lambda}{\nu} [f_i(x) \int_{s \in A_{x, r}} f_j(s) ds]
+\end{equation}
+
+Furthermore, if we assume that the space use of host $j$ is relatively uniform within the contact area $A_{x, r}$ we can simplify to
+
+\begin{equation}
+    \hat{h}^*_{i \leftarrow j}(t, x) =  \frac{\beta' \lambda}{\nu} [f_i(x) f_j(x) \pi r^2]
+\end{equation}
+
+Remembering that $\beta' = \tilde{\beta} / A_{x, r} = \tilde{\beta} / \pi r^2$, we get 
+
+\begin{equation}
+    \hat{h}^*_{i \leftarrow j}(t, x) =  \frac{\tilde{\beta} \lambda}{\nu} [f_i(x) f_j(x)]
+\end{equation}
+
+Integrating $\hat{h}^*_{i \leftarrow j}(t, x)$ over some area of interest centered at $x$ would yield  $h^*_{i \leftarrow j}(t, A_{x, d}) = \frac{\tilde{\beta} \lambda}{\nu} \int_{A_{x, d}} [f_i(s) f_j(s) ds] $. This is reminiscent of the equation 17 in [Martinez-Garcia 2020] where a limiting case of the mean encounter rate of two individuals moving according to an Ornstein-Uhlenbeck movement process is proportional to the inner product of their probability density functions of space use. 
+
+
+
+% Revisiting correlation...as area decreases, the importance of the correlation term goes to zero? That doesn't seem intuitively correct on one hand, but it does on the other hand...
+%[Note, might be useful to mention that $\beta'$ is a function of $r$ and $\rho$]. 
+
+
+
+\bibliography{references}
+
+\end{document}
