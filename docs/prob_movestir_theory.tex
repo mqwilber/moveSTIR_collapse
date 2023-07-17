@@ -75,7 +75,7 @@ We develop the general analytic framework and the different special cases, explo
 \section*{Methods}
 \subsection*{Derivation of the probabilistic MoveSTIR framework}
 
-A fundamental quantity in disease ecology and epidemiology is the force of infection (FOI) exerted by one host on another host. FOI is an essential ingredient for building disease models.  The force of infection exerted from one host to another can vary in time and space and quantifying this variability can highlight spatio-temporal hotspots of infection where risk is highest.  Our goal in this section is to develop a theoretical framework that builds on a previously developed movement-driven modeling of spatio-temporal infection risk (MoveSTIR).  In contrast to MoveSTIR, which focused primarily on \emph{observed} host movements (from GPS data, proximity collars, etc.) to construct empirically-driven transmission kernels and generate spatio-temporal predictions of infection risk, this framework will consider probabilistic host movements and contacts to construct transmission kernels and predict spatio-temporal infection risk. This is an important generalization of MoveSTIR because it provides an inferential foundation to begin linking spatial and social covariates driving host movement to infection risk.  Ultimately, this could improve out of sample predictions of contact and transmission in novel spatial and social environments.  We refer to the modeling approach we develop here as Probabilistic MoveSTIR.     
+A fundamental quantity in disease ecology and epidemiology is the force of infection (FOI) exerted by one host on another host. FOI is an essential ingredient for building disease models.  The force of infection exerted from one host to another can vary in time and space and quantifying this variability can highlight spatio-temporal hotspots of infection where risk is highest.  We develop a theoretical framework that builds on a previously developed movement-driven modeling of spatio-temporal infection risk (MoveSTIR).  In contrast to MoveSTIR, which focused primarily on \emph{observed} host movements (from GPS data, proximity collars, etc.) to construct empirically-driven transmission kernels and generate spatio-temporal predictions of infection risk, this framework will consider probabilistic host movements and contacts to construct transmission kernels and predict spatio-temporal infection risk. This is an important generalization of MoveSTIR because it provides an inferential foundation to begin linking spatial and social covariates driving host movement to infection risk.  Ultimately, this could improve out of sample predictions of contact and transmission in novel spatial and social environments.  We refer to the modeling approach we develop here as Probabilistic MoveSTIR.     
 
 We start by considering two individuals, $i$ and $j$ moving across a landscape.  We want to ask: on average across space and time what is the force of infection host $i$ feels from host $j$?   Conceptually, we begin with a gridded landscape as a starting point, though we show in the SI that our approach can be applied beyond a gridded landscape.  Moreover, we focus on pairwise interactions in this study and will consider higher order interactions in a future study.   
 
@@ -106,7 +106,7 @@ where $\delta'_{x_i(\tau)}(x)$ and $\delta'_{x_j(\tau)}(x)$ are random variables
     \label{eq:expected_foi}
 \end{equation}
 
-Interpreting this expectation, what we are conceptually doing is asking: if we simulated some unknown movement process thousands of times, what is the probability that host $i$ is in location $x$ at time $t$ and host $j$ was in location $x$ at a previous time $u$. 
+Interpreting this expectation, what we are conceptually doing is asking: if we simulated some movement process thousands of times, what is the probability that host $i$ is in location $x$ at time $t$ and host $j$ was in location $x$ at a previous time $u$. 
 
 We can re-write this equation in two equivalent ways, both of which will be useful moving forward.  First, if $Y$ and $Z$ are two random variables, then $E[YZ] = E[Y]E[Z] + Cov(Y, Z)$.  We can therefore write
 
@@ -173,7 +173,6 @@ Equation \ref{eq:stationary_cor} highlights that the key quantity we need to und
 Given the scaling effect of parasite decay---capured in the term $e^{-\nu s}$---the effect of the correlation on the FOI is highest for short time lags and decreases with longer lags. In practice this means that, beyond a certain threshold time, correlation  only has a minor and possibly negligible effect. This will of course depend on the biology of the parasite, for parasites that can persist long times in the environment (anthrax and chronic wasting disease, for example) correlation may play a role even at long time lags.
 
 Given an assumption of stationarity, the correlation term must be strictly related to social interactions.  Any use of $x$ because of environmental resources is picked up by $p_i(x)$ or $p_j(x)$, and the correlation term is specifically capturing whether hosts are using location $x$ synchronously (positive correlation) or asynchronously (negative correlation) more than we would expect by chance.  This is useful because it clearly highlights how social processes (whether direct or indirect) can alter the predictions of contact relative to the overlap of utilization distributions (Anni's stuff); synchronous habitat use would increase the FOI, while asynchronous use would decrease it. However, it is important to note that the additive terms in equation \ref{eq:stationary_cor} are not a perfect separation of spatial and social drivers of contact. If social factors are driving co-location they will also be present in determining $p_i(x)$ and $p_j(x)$. Thus, the marginal utilization distributions contain the effects of both spatial and social factors, but the correlation term is strictly related to social factors.  If the correlation is zero, then hosts are moving independently and $p_i(x)$ and $p_j(x)$ only reflect spatial factors.
-
 
 \subsubsection*{The upper left-hand corner: Uniform space and heterogeneous time}
 
@@ -266,7 +265,9 @@ Another interesting scenario is when two individuals are close to each other mos
 
 \subsubsection*{Interacting trajectories}
  
+\section*{Discussion}
 
+% Potts and Borger 2023, Journal of Animal Ecology
 
 \bibliography{references}
 

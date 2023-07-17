@@ -1,0 +1,15 @@
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz
+*.xdv
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+docs/figures/conceptual_figure_pmovestir.pdf
+docs/prob_movestir_theory.pdf
+
+*.DS_Store
+*.Rhistory
