@@ -168,7 +168,7 @@ Once we have the area of overlap we estimate the correlation across individuals.
 
 ### Correlation, grid approach
 
-For the grid approach, we simply take the grid produced by the pairwise CDEs. 
+For the grid approach, we simply take the grid produced by the pairwise CDEs. The problem with this is that there could be a mismatch between this scale and the threshold distance for epidemiological contact. This distance is usually small, in the order of a meters.
 
 ```{r corr-grid approach}
 # get the rasters for the CDEs. We choose the probability mass function here,
@@ -178,7 +178,6 @@ CDErasters <- lapply(CDEs, raster, DF = "PMF")
 # list to store correlation values for every pair, every cell, and every lag
 gridcors <- list()
 
-tictoc::tic("outer");
 for (i in seq_along(CDErasters)) {
   rast <- CDErasters[[i]]
   # keep only cells where the CDE is not 0. (For memory saving)
@@ -211,24 +210,22 @@ for (i in seq_along(CDErasters)) {
  
   cormat_ab <- matrix(0,nrow = nrow(posindex1), ncol = ncol(posindex1))
   cormat_ba <- matrix(0,nrow = nrow(posindex1), ncol = ncol(posindex1))
-  # tic("inner"); 
   for (j in 1:ncol(posindex1)) { 
     a <- as.numeric(posindex1[,j])
     b <- as.numeric(posindex2[,j])
     maxlag <- nsteps-1
     xcorr <- ccf(a,b,lag.max = maxlag, plot = F)
     xcorr_vals <- as.numeric(xcorr$acf)
-    cormat_ab[,j] <- xcorr_vals[1:nsteps]
-    cormat_ba[,j] <- rev(xcorr_vals[nsteps:length(xcorr_vals)])
+    cormat_ab[,j] <- rev(xcorr_vals[1:nsteps])
+    cormat_ba[,j] <- xcorr_vals[nsteps:length(xcorr_vals)]
   }
   dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = indx)
-
   gridcors[[paste(ind1,ind2,sep = "-")]] <- cormat_ab
   gridcors[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
-}; toc()
+}
 
-# The gridcors can be very large if the cells are small, but we need only keep the integral product
-# corvals <- sapply(gridcors, \(x) colSums(x*exp(-lags)))
+# The gridcors can be very large if the cells are small, but we need only keep
+# the integral product corvals <- sapply(gridcors, \(x) colSums(x*exp(-lags)))
 saveRDS(gridcors, "../data/grid_correlations.rds")
 # rm(gridcors)
 # 
@@ -236,11 +233,14 @@ saveRDS(gridcors, "../data/grid_correlations.rds")
 # gridcors <- readRDS("../data/grid_correlations.rds")
 ```
 
-The other alternative is to sample randomly only inside the area where encounters are likely. We take the 95% polygon of the CDE, sample random points inside it and estimate the correlation for every pair in an area around each sampled point. This approach allows to establish the contact distance based on the epidemiological dynamics, independently of the grid cell size. We can choose to use a circular sampling area or a square/rectangle.  
+### Correlation, random sampling approach
+
+The other alternative is to sample randomly only inside the area where encounters are likely. We take the 95% polygon of the CDE, sample random points inside it and estimate the correlation for every pair in an area around each sampled point. This approach allows to establish the contact distance based on the epidemiological dynamics, independently of the grid cell size. Here I use a square sampling area, but the same could be done with a circle. 
 
 ```{r randompt-approach, message=FALSE}
 # Get the 95% polygons from the CDEs
-CDEpolys <- lapply(CDEs, SpatialPolygonsDataFrame.UD) |> lapply(polygons) |> lapply(disaggregate)|>lapply("[",2)
+CDEpolys <- lapply(CDEs, SpatialPolygonsDataFrame.UD) |> lapply(polygons) |> 
+  lapply(disaggregate)|>lapply("[",2)
 # get the area of the polygons
 CDE_ovlpareas <- sapply(CDEpolys,raster::area)
 
@@ -257,7 +257,7 @@ names(samplepts) <- names(CDEpolys)
 ptcors <- list()
 
 # Calculate the detections and correlations at every point
-tic(); for (i in seq_along(samplepts)) {
+for (i in seq_along(samplepts)) {
   sppts <- samplepts[[i]]
   indpair <- names(samplepts)[i]
   ind1 <- as.numeric(substr(indpair, 1,1))
@@ -271,20 +271,24 @@ tic(); for (i in seq_along(samplepts)) {
   if(length(ovlpcells)==0) {
     ptcors[[paste(ind1,ind2,sep = "-")]] <- NA
     ptcors[[paste(ind2,ind1,sep = "-")]] <- NA
+    message("There are no overlap cells between ", ind1, " and ", ind2,", moving on to next pair")
     next
   }
-  tic("inner");for (j in ovlpcells) { 
-    a <- posindex1[,j]
-    b <- posindex2[,j]
-    cormat_ab[,j] <- (convolve(a,b, type = "open")/sqrt(sum(a^2)*sum(b^2)))[length(a):(2*length(a)-1)]
-    cormat_ba[,j] <- (convolve(b,a, type = "open")/sqrt(sum(a^2)*sum(b^2)))[length(b):(2*length(b)-1)]
-  };toc()
+ for (j in ovlpcells) { 
+    a <- as.numeric(posindex1[,j])
+    b <- as.numeric(posindex2[,j])
+    maxlag <- nsteps-1
+    xcorr <- ccf(a,b,lag.max = maxlag, plot = F)
+    xcorr_vals <- as.numeric(xcorr$acf)
+    cormat_ab[,j] <- rev(xcorr_vals[1:nsteps])
+    cormat_ba[,j] <- xcorr_vals[nsteps:length(xcorr_vals)]
+  }
   cormat_ab <- as.matrix(cormat_ab[,ovlpcells], ncol = length(ovlpcells))
   cormat_ba <- as.matrix(cormat_ba[,ovlpcells], ncol = length(ovlpcells))
   dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = ovlpcells)
   ptcors[[paste(ind1,ind2,sep = "-")]] <- cormat_ab
   ptcors[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
-}; toc()
+}
 
 saveRDS(ptcors, "../data/randompoint_correlations.rds")
 # rm(ptcors)
