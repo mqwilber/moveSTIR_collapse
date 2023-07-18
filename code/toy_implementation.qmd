@@ -94,7 +94,7 @@ xcors_lags <- sapply(xcors, "[[", "lag")
 Calculate the cell covariance: scale the correlation values by the decay rate and multiply by the sd product.
 
 ```{r cell_corr}
-nu <- 1
+nu <- lam <- beta <- 1
 corrint_ij <- colSums((xcors_vals*exp(-nu*abs(xcors_lags)))[1:20,])
 corrint_ji <- colSums((xcors_vals*exp(-nu*abs(xcors_lags)))[20:39,])
 corrint_ij <- replace(corrint_ij, is.nan(corrint_ij), 0)
@@ -107,23 +107,25 @@ corrint_ji <- replace(corrint_ji, is.nan(corrint_ji), 0)
 #       zlim = c(-max(abs(range(corrint_ji))),max(abs(range(corrint_ji)))))
 ```
 
-We then add the product of the UDs to the covariance term to obtain the FOI. For simplicity we assume $\beta=\lambda=1$.
+We then add the product of the UDs to the covariance term to obtain the FOI. For simplicity we assume $\beta=\lambda=1$. In the following case, when we have larger cells, the area is different from 1 so the transmission rate needs to be scaled by the area. This is due to a reduced probability of transmission when you search a larger area.
 
 ```{r foi}
-foi_ij <- udprod/nu+sdprod*corrint_ij
-foi_ji <- udprod/nu+sdprod*corrint_ji
+foi_ij <- beta*lam*(udprod/nu+sdprod*corrint_ij)
+foi_ji <- beta*lam*(udprod/nu+sdprod*corrint_ji)
 
 # par(mfrow = c(1,2))
 # image(matrix((foi_ij-min(foi_ij))/diff(range(foi_ij)), ncol = 6), las = 1, asp = 1, main = "FOI, i->j")
 # image(matrix((foi_ji-min(foi_ji))/diff(range(foi_ji)), ncol = 6), las = 1, asp = 1, main = "FOI, j->i")
 ```
 
-Hare are the estimated force of infection values for $i$ from $j$, and *vice versa*.
+Hare are the estimated total force of infection values for $i$ from $j$, and *vice versa*.
 
 ```{r total foi}
-print(sum(foi_ij[foi_ij>=0]))
-print(sum(foi_ji[foi_ji>=0]))
+cat("FOI, i->j", sum(foi_ij[foi_ij>=0]))
+cat("\nFOI, j->i:", sum(foi_ji[foi_ji>=0]))
 ```
+
+### Larger cells
 
 Now we want to see what happens when we increase the scale, when we take larger grid cells to estimate use and correlation. First we define the new grid, each new cell will contain four of the smaller cells.
 
@@ -147,13 +149,14 @@ est_probs2[as.numeric(names(table(pos2l)))] <- table(pos2l)/nsteps
 udprodl <- est_probs1*est_probs2
 sdprodl <- sqrt(est_probs1*(1-est_probs1))*sqrt(est_probs2*(1-est_probs2))
 
-
 par(mfrow = c(2,2))
 image(1:3, 1:3, matrix(udprodl, ncol = 3), asp = 1, las = 1, main = "UD prod")
 image(1:3, 1:3, matrix(sdprodl, ncol = 3), asp = 1, las = 1, main = "StDev prod")
 image(1:6, 1:6, matrix(udprod, ncol = 6), asp = 1, las = 1, main = "UD prod")
 image(1:6, 1:6, matrix(sdprod, ncol = 6), asp = 1, las = 1, main = "StDev prod")
 ```
+
+In the case of larger cells, there is a greater area overall where there are non-zero probabilities of contact. In contrast, with the small cells most of the landscape has zero probability of contact between individuals.
 
 ```{r}
 xcors <- lapply(1:ncol(dethist1l), \(i) ccf(dethist1l[,i], dethist2l[,i], plot = F, lag.max = 20-1)) 
@@ -167,46 +170,99 @@ corrint_ijl <- replace(corrint_ijl, is.nan(corrint_ijl), 0)
 corrint_jil <- replace(corrint_jil, is.nan(corrint_jil), 0)
 
 par(mfrow = c(2,2))
-image(matrix(corrint_ijl, ncol = 3), las = 1, asp = 1, main = "Integral, i->j", col = hcl.colors(7, "Blue-Red", rev=T),
-      zlim = c(-max(abs(range(corrint_ijl))),max(abs(range(corrint_ijl)))))
-image(matrix(corrint_jil, ncol = 3), las = 1, asp = 1, main = "Integral, j->i", col = hcl.colors(7, "Blue-Red", rev = T),
-      zlim = c(-max(abs(range(corrint_jil))),max(abs(range(corrint_jil)))))
-image(matrix(corrint_ij, ncol = 6), las = 1, asp = 1, main = "Integral, i->j", col = hcl.colors(7, "Blue-Red", rev=T),
-      zlim = c(-max(abs(range(corrint_ij))),max(abs(range(corrint_ij)))))
-image(matrix(corrint_ji, ncol = 6), las = 1, asp = 1, main = "Integral, j->i", col = hcl.colors(7, "Blue-Red", rev = T),
-      zlim = c(-max(abs(range(corrint_ji))),max(abs(range(corrint_ji)))))
+image(matrix(corrint_ijl, ncol = 3), las = 1, asp = 1, main = "Integral, i->j", col = hcl.colors(7, "Blue-Red", rev=T),zlim = c(-max(abs(range(corrint_ijl))),max(abs(range(corrint_ijl)))))
+image(matrix(corrint_jil, ncol = 3), las = 1, asp = 1, main = "Integral, j->i", col = hcl.colors(7, "Blue-Red", rev = T), zlim = c(-max(abs(range(corrint_jil))),max(abs(range(corrint_jil)))))
+image(matrix(corrint_ij, ncol = 6), las = 1, asp = 1, main = "Integral, i->j", col = hcl.colors(7, "Blue-Red", rev=T),zlim = c(-max(abs(range(corrint_ij))),max(abs(range(corrint_ij)))))
+image(matrix(corrint_ji, ncol = 6), las = 1, asp = 1, main = "Integral, j->i", col = hcl.colors(7, "Blue-Red", rev = T),zlim = c(-max(abs(range(corrint_ji))),max(abs(range(corrint_ji)))))
 ```
 
-```{r}
+Similarly, most of the cells have a correlation of zero when the cells are small, but only about half with the larger cells. It also appears more likely that there will be positive and negative values when the cells are large.
 
-foi_ijl <- udprodl/nu+sdprodl*corrint_ijl
-foi_jil <- udprodl/nu+sdprodl*corrint_jil
+When we calculate the FOI, the acquisition rate $\beta$ must be scaled by the area. With the small cells it makes no difference since we set the area to 1, but the larger cells have an area of 4. If $\beta$ can be interpreted as an area search efficiency, it needs to be divided by the total area that is being searched.
+
+```{r}
+foi_ijl <- beta/4*lam*(udprodl/nu+sdprodl*corrint_ijl)
+foi_jil <- beta/4*lam*(udprodl/nu+sdprodl*corrint_jil)
 
 par(mfrow = c(2,2))
-image(matrix(foi_ijl, ncol = 3), las = 1, asp = 1, main = "Large cell FOI, i->j", zlim = c(0,0.01))
-image(matrix(foi_jil, ncol = 3), las = 1, asp = 1, main = "Large cell FOI, j->i", zlim = c(0,0.01))
-image(matrix(foi_ij, ncol = 6), las = 1, asp = 1, main = "Small cell FOI, i->j")
-image(matrix(foi_ji, ncol = 6), las = 1, asp = 1, main = "Small FOI, j->i")
+image(matrix(foi_ijl, ncol = 3), las = 1, asp = 1, main = "Large cell FOI, i->j", zlim = c(0,0.1))
+image(matrix(foi_jil, ncol = 3), las = 1, asp = 1, main = "Large cell FOI, j->i", zlim = c(0,0.1))
+image(matrix(foi_ij, ncol = 6), las = 1, asp = 1, main = "Small cell FOI, i->j", zlim = c(0,0.1))
+image(matrix(foi_ji, ncol = 6), las = 1, asp = 1, main = "Small FOI, j->i", zlim = c(0,0.1))
 ```
+
+The FOI values (showing only positive values here) are higher and more localized with the smaller cells. The overall FOI is nonetheless within the same order of magnitude, and qualitatively similar.
 
 ```{r}
-cat("Large cells FOI (i->j):",sum(foi_ijl[foi_ijl>=0]))
-cat("\nLarge cells FOI (j->i):",sum(foi_jil[foi_jil>=0]))
-cat("\nSmall cells FOI (i->j):",sum(foi_ij[foi_ij>=0]))
-cat("\nSmall cells FOI (j->i):",sum(foi_ji[foi_ji>=0]))
+cat("Large cells FOI (i->j):",sum(foi_ijl[foi_ijl>=0]),
+    "\nLarge cells FOI (j->i):",sum(foi_jil[foi_jil>=0]),
+    "\nSmall cells FOI (i->j):",sum(foi_ij[foi_ij>=0]),
+    "\nSmall cells FOI (j->i):",sum(foi_ji[foi_ji>=0]))
 ```
 
-The FOI estimated for the smaller cells is usually smaller than with the larger cells. With larger cells we are increasing the probability of encounter, as well as the covariance. These values, however, may not be representative of the epidemiological dynamics. The correct way of dealing with this, I think is to use a grid based on a contact distance that represents the host-parasite system accurately. We could use a larger grid, but then when we sample the probabilities of encounter they may be higher artificially.
+With larger cells we are increasing the probability of encounter, as well as the covariance. On the other hand, with larger cells the transmission process is scaled down by the area of the cell. In this simulated case the difference between both scenarios is not too large, but it could become an issue if there is too great a mismatch across scales. The values of contact probability, may not be representative of the epidemiological dynamics. The correct way of dealing with this, I think is to use a grid based on a contact distance that represents the host-parasite system accurately. We could use a larger grid, but then when we sample the probabilities of encounter they may be higher artificially.
 
 For the simulated tracks, and for real data, we need to force a grid using the threshold distance for the kernel density estimation. This approach may generate very large objects in memory.
 
-To help avoid this memory issue, we could calculate the correlation at a local scale, but take the probability values from a coarser--and therefore smaller--grid. So do we get similar values if we calculate the correlation at a small scale, and sample the probability values from the larger grid and scale them by the area?
+To help avoid this memory issue, we could calculate the correlation at a local scale, but take the probability values from a coarser--and therefore smaller--grid. So do we get similar values if we calculate the correlation at a small scale, and sample the probability values from the larger grid and scale them by the area? In this case we don't need to scale the transmission process, since it is occurring at the unit scale, but the product of the probabilities and standard deviations does have to be scaled.
 
 ```{r}
-cat("FOI combination i->j", sum(udprodl[cellind]/4^2+sdprodl[cellind]/4^2*corrint_ij))
-cat("\nFOI combination j->i", sum(udprodl[cellind]/4^2+sdprodl[cellind]/4^2*corrint_ji))
-cat("\nSmall cells FOI (i->j):",sum(foi_ij[foi_ij>=0]))
-cat("\nSmall cells FOI (j->i):",sum(foi_ji[foi_ji>=0]))
+cat("FOI combination i->j", sum(beta*lam*(udprodl[cellind]/4^2+sdprodl[cellind]/4^2*corrint_ij)),
+    "\nFOI combination j->i", sum(beta*lam*(udprodl[cellind]/4^2+sdprodl[cellind]/4^2*corrint_ji)),
+    "\nSmall cells FOI (i->j):",sum(foi_ij[foi_ij>=0]),
+    "\nSmall cells FOI (j->i):",sum(foi_ji[foi_ji>=0]))
 ```
 
 Here, I am taking the correlation values for the small cells, and sampling the probability estimated for the larger grid at each cell. The small cells within each larger cell would all have the probability value of the larger cell, divided by four. Thus the product of the UDs, and the product of the SDs, must be divided by 4\^2. In this case we obtain smaller total FOI estimates. This approach could lead to error, because it is essentially dividing the probability of encounter equally among cells, even though the encounters may be unlikely to occur in some of those cells.
+
+One last example with an even coarser (2x2) grid.
+
+```{r}
+ncells3 <- 4
+cellind2 <- c(1,1,1,2,2,2,1,1,1,2,2,2,1,1,1,2,2,2,3,3,3,4,4,4,3,3,3,4,4,4,3,3,3,4,4,4)
+pos1l2 <- cellind2[pos1]
+pos2l2 <- cellind2[pos2]
+dethist1l2 <- dethist2l2 <- matrix(0, nrow = nsteps, ncol = ncells3)
+for (i in seq_len(nsteps)) {
+  p1 <- pos1l2[i]
+  p2 <- pos2l2[i]
+  dethist1l2[i,p1] <- 1
+  dethist2l2[i,p2] <- 1
+}
+
+est_probs1 <- est_probs2 <- rep(0,ncells3)
+est_probs1[as.numeric(names(table(pos1l2)))] <- table(pos1l2)/nsteps
+est_probs2[as.numeric(names(table(pos2l2)))] <- table(pos2l2)/nsteps
+
+udprodl2 <- est_probs1*est_probs2
+sdprodl2 <- sqrt(est_probs1*(1-est_probs1))*sqrt(est_probs2*(1-est_probs2))
+
+xcors <- lapply(1:ncol(dethist1l2), \(i) ccf(dethist1l2[,i], dethist2l2[,i], plot = F, lag.max = 20-1)) 
+xcors_vals <- sapply(xcors, "[[", "acf")
+xcors_lags <- sapply(xcors, "[[", "lag")
+
+nu <- 1
+corrint_ijl2 <- colSums((xcors_vals*exp(-nu*abs(xcors_lags)))[1:20,])
+corrint_jil2 <- colSums((xcors_vals*exp(-nu*abs(xcors_lags)))[20:39,])
+corrint_ijl2 <- replace(corrint_ijl2, is.nan(corrint_ijl2), 0)
+corrint_jil2 <- replace(corrint_jil2, is.nan(corrint_jil2), 0)
+
+foi_ijl2 <- beta/9*lam*(udprodl2/nu+sdprodl2*corrint_ijl2)
+foi_jil2 <- beta/9*lam*(udprodl2/nu+sdprodl2*corrint_jil2)
+
+par(mfrow = c(2,3))
+image(matrix(foi_ij, ncol = 6), las = 1, asp = 1, main = "Small cell FOI, i->j", zlim = c(0,0.1))
+image(matrix(foi_ijl, ncol = 3), las = 1, asp = 1, main = "2x2 cell FOI, i->j", zlim = c(0,0.1))
+image(matrix(foi_ijl2, ncol = 2), las = 1, asp = 1, main = "3x3 cell FOI, i->j", zlim = c(0,0.1))
+image(matrix(foi_ji, ncol = 6), las = 1, asp = 1, main = "Small FOI, j->i", zlim = c(0,0.1))
+image(matrix(foi_jil, ncol = 3), las = 1, asp = 1, main = "2x2 cell FOI, j->i", zlim = c(0,0.1))
+image(matrix(foi_jil2, ncol = 2), las = 1, asp = 1, main = "3x3 cell FOI, j->i", zlim = c(0,0.1))
+
+cat("1x1 cells FOI (i->j):",sum(foi_ij[foi_ij>=0]),
+    "\n2x2 cells FOI (i->j):",sum(foi_ijl[foi_ijl>=0]),
+    "\n3x3 cells FOI (i->j):",sum(foi_ijl2[foi_ijl2>=0]),
+    "\n1x1 cells FOI (j->i):",sum(foi_ji[foi_ji>=0]),
+    "\n2x2 cells FOI (j->i):",sum(foi_jil[foi_jil>=0]),
+    "\n3x3 cells FOI (j->i):",sum(foi_jil2[foi_jil2>=0]))
+
+```
