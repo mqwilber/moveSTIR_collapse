@@ -7,7 +7,7 @@ output: html_document
 
 ## Example
 
-Here we show an example of how to  implement the probabilistic moveSTIR framework, using simulated movement tracks. The base movement model is an Ohrstein Uhlenbeck process (Martinez-Garcia et al. 2020) which represents the movement of animals with an established home range behavior around a central attractor. I combine this with the social smoothing kernel convolution approach described by Scharf et al. (2018), which allows to account for animals moving closer to each other, or travelling together. I will simulate a set of individuals, some pairs will be moving independently from each other, others move together constantly while others get close to each other temporarily and then drift apart. 
+Here we show an example of how to  implement the probabilistic moveSTIR framework, using simulated movement tracks. The base movement model is an Ohrstein Uhlenbeck process (Martinez-Garcia et al. 2020) which represents the movement of animals with an established home range behavior around a central attractor. We combine this with the social smoothing kernel convolution approach described by Scharf et al. (2018), which allows to account for animals moving closer to each other, or travelling together. I will simulate a set of individuals, some pairs will be moving independently from each other, others move together constantly while others get close to each other temporarily and then drift apart. 
 When movement is independent across individuals there could be spatial overlap in the resulting utilization distributions and points where the tracks cross each other, but there should be no significant temporal correlation in the location histories. In contrast, animals the move in association with each other will have temporal correlation in their movements, which will influence their pairwise FOIs.  
 
 ``` {r libraries, message = FALSE}
@@ -112,7 +112,7 @@ lines(ysoc[,4], col = pal[4])
 plot(sqrt((ysoc[,3]-ysoc[,4])^2+(xsoc[,3]-xsoc[,4])^2), type = 'l', ylab = "Distance",xlab = "Time (h)")
 ```
 
-To calculate the FOI between pairs of individuals we first determine their area of overlap. We determine the areas of probable contact using the conditional distribution of encounters (Noonan et al. 2021). The instantaneous encounter rate is calculated as
+To calculate the FOI between pairs of individuals we first determine where they may come into contact, directly or indirectly. We determine the areas of probable contact using the conditional distribution of encounters. The instantaneous encounter rate is calculated as (Noonan et al. 2021)
 
 $$
 \tilde\varepsilon_{ij}(t)=\gamma_{ij}\int dr_{ij}(t)\Phi(r_{ij}(t))p(r_{ij}(t))
@@ -123,7 +123,7 @@ $$
 CDE_{ij}(r)=\frac{p_i(\mathbf r)p_j(\mathbf r)}{\iint d^2\mathbf{r'}p_i(\mathbf{r'})p_j(\mathbf{r'})}
 $$
 
-This is interesting for our purposes because the numerator--the product of the utilization distributions--is the same thing as the first term in our FOI calculation. Given an estimated CDE we could obtain the UD product multiplying by the denominator.
+This is interesting for our purposes because the numerator--the product of the utilization distributions--is the same thing as the first term in our FOI calculation. Given an estimated CDE we could obtain the UD product multiplying by the denominator. We could also obtain it simply by multiplying the UDs together, provided they are on a common discrete grid. For this product we need the probability mass function, i.e. the total probability of being in a given *area*. Kernel density estimation functions output the probability *density*, so we need to scale this multiplying by the grid cell area first. 
 We build the UDs using autocorrelated kernel density estimation (Fleming et al. 2015), estimate the pairwise CDEs, and take the 95% polygon as the area in which to create the detection histories and calculate their correlation. The ctmm, akde and CDE methods are included in the `ctmm` package. 
 
 ```{r CDE-ctmm, message=FALSE}
@@ -149,7 +149,6 @@ for (i in seq_along(UDS)) {
     CDEs[[paste(i,j,sep = "-")]] <- encounter(list(u1, u2))
   }
 }
-
 ```
 
 Here are some examples for CDEs, with the corresponding locations of the individuals.
@@ -166,19 +165,20 @@ plot(telemetries[c(5,6)], col = pal[c(5,6)], UD = CDEs[15], error = FALSE, pch=1
 
 
 Once we have the area of overlap we estimate the correlation across individuals. There are two ways to go about this: to use the cells of the CDE discretized raster, or to select random points within a polygon, for example the 95% CDE polygon. In either case the process is to determine the detection history for pairs of individuals in a given area. This is a binary matrix that shows whether an individual was or was not inside the area $x$ at a time point $t$. 
-Let's do the grid approach first. We take the grid produced by the pairwise CDEs. To get the correlation across detection histories, we use here the correlation theorem, which states that the correlation across two time series is given by the product of the Fourier transform of one series and the complex conjugate of the other. This accelerates calculations significantly. I also included a step to only calculate the correlation for cells that both individuals visited.
+
+### Correlation, grid approach
+
+For the grid approach, we simply take the grid produced by the pairwise CDEs. 
 
 ```{r corr-grid approach}
-# get the rasters for the CDEs
-CDErasters <- lapply(CDEs, raster, DF = "PDF")
-# matrix of possible lags
-# lagmat <- outer(seq_len(nsteps), seq_len(nsteps), "-")
-# lags <- round(unique(lagmat[lower.tri(lagmat,diag = TRUE)]))
-# lags <- lags[-length(lags)]
+# get the rasters for the CDEs. We choose the probability mass function here,
+# otherwise we have to scale by the grid area
+CDErasters <- lapply(CDEs, raster, DF = "PMF")
+
 # list to store correlation values for every pair, every cell, and every lag
 gridcors <- list()
 
-# tictoc::tic("outer"); 
+tictoc::tic("outer");
 for (i in seq_along(CDErasters)) {
   rast <- CDErasters[[i]]
   # keep only cells where the CDE is not 0. (For memory saving)
@@ -201,43 +201,31 @@ for (i in seq_along(CDErasters)) {
   if(length(ovlpcells)==0) {
     gridcors[[paste(ind1,ind2,sep = "-")]] <- NA
     gridcors[[paste(ind2,ind1,sep = "-")]] <- NA
+    message("There are no overlap cells between", ind1, "and", ind2,", moving on to next pair")
     next
   }
+  # keeping only cells with actual overlap of data, for memory saving
   indx <- indx[ovlpcells]
-  posindex1 <- posindex1[,ovlpcells]
+  posindex1 <- posindex1[,ovlpcells] 
   posindex2 <- posindex2[,ovlpcells]
-
-  # padrows <- nextn(n = 2*nrow(posindex1), factors = 2)-nrow(posindex1)
-  # posindex1_pad <- rbind(posindex1, matrix(0, ncol = ncol(posindex1), nrow = padrows))
-  # posindex2_pad <- rbind(posindex1, matrix(0, ncol = ncol(posindex2), nrow = padrows))
+ 
   cormat_ab <- matrix(0,nrow = nrow(posindex1), ncol = ncol(posindex1))
   cormat_ba <- matrix(0,nrow = nrow(posindex1), ncol = ncol(posindex1))
   # tic("inner"); 
   for (j in 1:ncol(posindex1)) { 
-    a <- posindex1[,j]
-    b <- posindex2[,j]
-    cormat_ab[,j] <- (convolve(a,b, type = "open")/sqrt(sum(a^2)*sum(b^2)))[length(a):(2*length(a)-1)]
-    cormat_ba[,j] <- (convolve(b,a, type = "open")/sqrt(sum(a^2)*sum(b^2)))[length(b):(2*length(b)-1)]
-    # cormat[,j] <- fft(fft(posindex1_pad[,j])*Conj(fft(posindex2_pad[,j])), inverse = T)/nrow(posindex1_pad)
-  }#; toc()
-  # tic("fft");cormat <- mvfft(mvfft(posindex1_pad)*Conj(mvfft(posindex2_pad)), inverse = T)/nrow(posindex1_pad) ;toc()
+    a <- as.numeric(posindex1[,j])
+    b <- as.numeric(posindex2[,j])
+    maxlag <- nsteps-1
+    xcorr <- ccf(a,b,lag.max = maxlag, plot = F)
+    xcorr_vals <- as.numeric(xcorr$acf)
+    cormat_ab[,j] <- xcorr_vals[1:nsteps]
+    cormat_ba[,j] <- rev(xcorr_vals[nsteps:length(xcorr_vals)])
+  }
   dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = indx)
-  # loop over lags
-  # tictoc::tic(msg = "loop"); for (s in seq_along(lags)) {
-  #   l <- lags[s]
-  #   matindices <- which(lagmat==l, arr.ind = TRUE)
-  #   h1 <- t(posindex1[,matindices[,1]])
-  #   h2 <- t(posindex2[,matindices[,2]])
-  #   ovlpcells <- which((colSums(h1)*colSums(h2))>0)
-  #   # loop over cells
-  #   if (length(ovlpcells)>0) {
-  #     cormat[s,ovlpcells] <- diag(as.matrix(cor(h1[,ovlpcells],h2[,ovlpcells])))
-  #     # for (cl in ovlpcells) cormat[s,cl] <- cor(h1[,cl],h2[,cl])
-  #   }
-  # }; tictoc::toc()
+
   gridcors[[paste(ind1,ind2,sep = "-")]] <- cormat_ab
   gridcors[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
-}#; tictoc::toc()
+}; toc()
 
 # The gridcors can be very large if the cells are small, but we need only keep the integral product
 # corvals <- sapply(gridcors, \(x) colSums(x*exp(-lags)))
