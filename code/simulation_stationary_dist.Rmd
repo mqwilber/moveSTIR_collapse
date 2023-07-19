@@ -163,10 +163,12 @@ plot(telemetries[c(4,5)], col = pal[c(4,5)], UD = CDEs[13], error = FALSE, pch=1
 plot(telemetries[c(5,6)], col = pal[c(5,6)], UD = CDEs[15], error = FALSE, pch=16, main = names(CDEs)[15])
 ```
 
-
+<!-- I probably don't need to get the CDEs, I can calculate the product of the UDs separately, and use that to get the area to sample in -->
 Once we have the area of overlap we estimate the correlation across individuals. There are two ways to go about this: to use the cells of the CDE discretized raster, or to select random points within a polygon, for example the 95% CDE polygon. In either case the process is to determine the detection history for pairs of individuals in a given area. This is a binary matrix that shows whether an individual was or was not inside the area $x$ at a time point $t$. 
 
-### Correlation, grid approach
+## Correlation
+
+### Grid approach
 
 For the grid approach, we simply take the grid produced by the pairwise CDEs. The problem with this is that there could be a mismatch between this scale and the threshold distance for epidemiological contact. This distance is usually small, in the order of a meters.
 
@@ -224,8 +226,6 @@ for (i in seq_along(CDErasters)) {
   gridcors[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
 }
 
-# The gridcors can be very large if the cells are small, but we need only keep
-# the integral product corvals <- sapply(gridcors, \(x) colSums(x*exp(-lags)))
 saveRDS(gridcors, "../data/grid_correlations.rds")
 # rm(gridcors)
 # 
@@ -233,7 +233,8 @@ saveRDS(gridcors, "../data/grid_correlations.rds")
 # gridcors <- readRDS("../data/grid_correlations.rds")
 ```
 
-### Correlation, random sampling approach
+
+### Random point approach
 
 The other alternative is to sample randomly inside the area where encounters are likely. We take the 95% polygon of the CDE, sample random points inside it and estimate the correlation for every pair in an area around each sampled point. This approach allows to establish the contact distance based on the epidemiological dynamics, independently of the grid cell size. Here I use a square sampling area, but the same could be done with a circle. 
 
@@ -344,6 +345,7 @@ for (i in seq_along(CDErasters2)) {
 }
 ```
 
+Animals that move together at the same time have the highest correlation terms, due to a high correlation at lag 0. This is true for pairs 1-2 and, to a lesser extent, 3-4. Other pairs that overlap substantially in space, like , have correlations close to 0. 
 
 To compare both approaches, we integrate the values of the random point sampling inside each cell of the CDE grid. This may not be a fair comparison, since the contact area is much larger for the gridded approach than for the point approach. 
 ```{r integrate point estimates}
@@ -352,7 +354,7 @@ for (i in seq_along(ptcors)) {
   if(!is.array(ptcors[[i]])) {
     gridptcomp[[i]] <- NA
   } else {
-    corvals <- colSums(Re(ptcors[[i]])*exp(-nu*lags))
+    corvals <- colSums(ptcors[[i]]*exp(-nu*lags))
     cells <- as.numeric(names(corvals))
     ptvals <- numeric(length = nrow(samplepts2[[i]]))
     ptvals[cells] <- corvals
@@ -368,14 +370,11 @@ for (i in seq_along(ptcors)) {
   }
 }
 
-# Plot the relationship between estimates
-plot(gridptcomp[[19]][,2],gridptcomp[[19]][,3], 
-     xlab = "Grid cumulative correlation",
-     ylab = "Point cumulative correlation",
-     las=1)
 ```
 
 It would seem most cells in the grid have values close to 0. For these cells, the random sampling would be able to capture more nuance, although generally the values are lower with the point sampling approach. This makes sense given the smaller sampling area.
+
+
 
 ## UD product, standard deviation product
 
@@ -412,49 +411,49 @@ UDprods <- rep(UDprods, each = 2)
 
 ### Grid approach
 
-For each cell, we multiply the product of the standard deviation by the cumulative correlation term calculated previously. The result is added to the product of the UDs scaled by the epidemiological parameters to obtain the FOI.
+For each cell, we multiply the product of the standard deviation by the cumulative correlation term. The result is added to the product of the UDs scaled by the epidemiological parameters to obtain the FOI. The UDs and SDs are stored as the mean value across the cell, so they need to be multiplied by the area. 
 
-```{r foi}
+```{r grid foi calc}
 foirasts <- list()
-# maybe best to create the global raster first, that way we would have a set of common cells for the remainder.
-for (i in seq_along(ptcors)) {
-  if (is.array(ptcors[[i]])) {
-    # scale and integrate correlation at sampled points
-    corvals <- colSums(ptcors[[i]])*exp(-nu*lags)
-    # get the indices of the points with values
-    ptsswithvalues <- as.numeric(colnames(ptcors[[i]]))
-    # find the corresponding cells in the global raster
-    corcells <- cellFromXY(globrast, samplepts2[[i]][ptsswithvalues,])
-    
-   
-    # mean correlation for all sampled points within a cell
-    cellmeancor <- tapply(corvals, INDEX = corcells, mean) 
-    # create global
-    rcor <- globrast
-    values(rcor) <- 0
-    rcor[as.numeric(names(cellmeancor))] <- cellmeancor
-    
-    foi <- beta/nu*UDprods[[i]]+UDsds[[i]]*rcor
-
+for (i in seq_along(gridcors)) {
+  if (is.array(gridcors[[i]])) {
+    # scale and integrate correlation at every cell
+    corcells <- as.numeric(colnames(gridcors[[i]]))
+    corvals <- numeric(length(CDErasters2[[i]]))
+    corvals[corcells] <- colSums(gridcors[[i]]*exp(-nu*lags))
+    corrast <- CDErasters2[[i]]
+    values(corrast) <- corvals
+    corrast <- extend(corrast, globextent, value=0)
+    # this raster is smaller, I need to make it match with the cells for SD and
+    # UD prods
+    foi <- beta/cellarea*lam*(1/nu*UDprods[[i]]*cellarea+UDsds[[i]]*cellarea*corrast)
   } else {
-    foi <- beta/nu*UDprods[[i]]
+    foi <- beta/cellarea*lam*(1/nu*UDprods[[i]]*cellarea)
   }
         # fill NAs with 0
-    foi[is.na(foi)] <- 0
+    foi[is.na(foi) | foi<0] <- 0
     foirasts[[i]] <- foi
     plot(foi, las = 1, main = names(ptcors)[i])
 }
-names(foirasts) <- names(ptcors)
+names(foirasts) <- names(gridcors)
 ```
+### Smaller cells
+
+A simple way to avoid scale mismatches is to set the scale of the discretized utilization distributions based on the threshold distance of the transmission process. 
+
+```{r}
+
+```
+
 
 ### Random point approach
 In the random sampling approach, we calculate the FOI at the scale that we estimated the correlation by sampling the UD and SD products in the underlying cells. The UD products are calculated as probability density functions for each cell, so we need to multiply the products by the sampling area.
 
-```{r ud sampling}
+```{r pt foi calc}
 ptfois <- list()
 for (i in seq_along(samplepts2)) {
-  udpdf <- values(UDprods[[i]])[cellFromXY(UDprods[[i]], samplepts2[[i]])]
-  sdprod <- values(UDsds[[i]])[cellFromXY(UDsds[[i]], samplepts2[[i]])]
+  udpdf <- extract(UDprods[[i]], samplepts2[[i]])
+  sdprod <- extract(UDsds[[i]], samplepts2[[i]])
   corvals <- numeric(length = nrow(samplepts2[[i]]))
   if(is.array(ptcors[[i]])) {
     c2 <- colSums(ptcors[[i]]*exp(-nu*lags))
