@@ -486,42 +486,30 @@ for (i in seq_along(UDepiprods)) {
   # the time of the correlation calculation
   pos1 <- cellFromXY(r1, xy = cbind(xsoc[,ind1],ysoc[,ind1]))
   pos2 <- cellFromXY(r1, xy = cbind(xsoc[,ind2],ysoc[,ind2]))
-  # # keep only cells where the probability is not 0. (For memory saving)
-  # indx <- Which(r1>0, cells = TRUE)
-  # # raster resolution and center coords
-  # yr <- yres(r1)
-  # xr <- xres(r1)
-  # gridcenters <- coordinates(r1)[indx,]
-  # posindex1 <- abs(outer(xsoc[,ind1], gridcenters[,1],"-"))<=xr/2 &
-  #   abs(outer(ysoc[,ind1], gridcenters[,2],"-"))<=yr/2
-  # posindex2 <- abs(outer(xsoc[,ind2], gridcenters[,1],"-"))<=xr/2 &
-  #   abs(outer(ysoc[,ind2], gridcenters[,2],"-"))<=yr/2
+
   # keep only cells that both visited at some point
   ovlpcells <- pos1[pos1 %in% pos2]
   if(length(ovlpcells)==0) {
     # Still fill in an item in the list, but write just NA. 
     gridcors[[paste(ind1,ind2,sep = "-")]] <- gridcors[[paste(ind2,ind1,sep = "-")]] <- NA
-    message("There are no overlap cells between", ind1, "and", ind2,", moving on to next pair")
+    message("There are no overlap cells between ", ind1, " and ", ind2,", moving on to next pair")
     next
   }
-  # # keeping only cells with actual overlap of data, for memory saving
-  # indx <- indx[ovlpcells]
-  # posindex1 <- posindex1[,ovlpcells] 
-  # posindex2 <- posindex2[,ovlpcells]
-  # 
-  cormat_ab <- cormat_ba <- matrix(0,nrow = nsteps-1, ncol = length(ovlpcells))
-  for (j in ovlpcells) {
-    maxlag <- nsteps-1
-    a <- b <- numeric(maxlag)
-    a[match(j, pos1)] <- b[match(j, pos2)]<- 1
+
+  maxlag <- nsteps-1
+  cormat_ab <- cormat_ba <- matrix(0,nrow = nsteps, ncol = length(ovlpcells))
+  for (j in seq_along(ovlpcells)) {
+    cell <- ovlpcells[j]
+    a <- b <- numeric(nsteps)
+    a[match(cell, pos1)] <- b[match(cell, pos2)]<- 1
     xcorr <- ccf(a,b,lag.max = maxlag, plot = F)
     xcorr_vals <- as.numeric(xcorr$acf)
     cormat_ab[,j] <- rev(xcorr_vals[1:nsteps])
     cormat_ba[,j] <- xcorr_vals[nsteps:length(xcorr_vals)]
   }
   dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = ovlpcells)
-  gridcors[[paste(ind1,ind2,sep = "-")]] <- cormat_ab
-  gridcors[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
+  gridcors2[[paste(ind1,ind2,sep = "-")]] <- cormat_ab
+  gridcors2[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
 }
 ```
 
