@@ -102,19 +102,9 @@ points(p.lambdas, bg = pal, pch  = 24)
 legend("bottomright", legend = 1:nind, col = pal, lty = 1, cex = 0.5)
 ```
 
+The first term we need to calculate in the pMoveSTIR equation is the product between the probabilities of use of the same location by both individuals. This represents the spatial overlap, and is related to the probability of encounter (as described by Noonan et al. 2021).
 
-To calculate the FOI between pairs of individuals we first determine where they may come into contact, directly or indirectly. We determine the areas of probable contact using the conditional distribution of encounters. The instantaneous encounter rate is calculated as (Noonan et al. 2021)
-
-$$
-\tilde\varepsilon_{ij}(t)=\gamma_{ij}\int dr_{ij}(t)\Phi(r_{ij}(t))p(r_{ij}(t))
-$$
-This is a product of the absolute distance between the individuals $r_{ij}(t)$, a contact function $\Phi$ and the probability density of the distance $p$. For stationary distributions and uncorrelated movement, this boils down to the normalized product of the individual probabilities from their respective utilization distributions:
-
-$$
-CDE_{ij}(r)=\frac{p_i(\mathbf r)p_j(\mathbf r)}{\iint d^2\mathbf{r'}p_i(\mathbf{r'})p_j(\mathbf{r'})}
-$$
-
-This is interesting for our purposes because the numerator--the product of the utilization distributions--is the same thing as the first term in our FOI calculation. Given an estimated CDE we could obtain the UD product multiplying by the denominator. We could also obtain it simply by multiplying the UDs together, provided they are on a common discrete grid. For this product we need the probability mass function, i.e. the total probability of being in a given *area*. Kernel density estimation functions output the probability *density*, so we need to scale this multiplying by the grid cell area first. 
+We could also obtain it simply by multiplying the UDs together, provided they are on a common discrete grid. For this product we need the probability mass function, i.e. the total probability of being in a given *area*. Kernel density estimation functions output the probability *density*, so we need to scale this multiplying by the grid cell area first. 
 We build the UDs using autocorrelated kernel density estimation (Fleming et al. 2015), estimate the pairwise CDEs, and take the 95% polygon as the area in which to create the detection histories and calculate their correlation. The ctmm, akde and CDE methods are included in the `ctmm` package. 
 
 ```{r CDE-ctmm, message=FALSE}
