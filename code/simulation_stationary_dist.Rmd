@@ -13,8 +13,6 @@ When movement is independent across individuals there could be spatial overlap i
 library(sp)
 library(move)
 library(tidyverse)
-library(adehabitatHR)
-library(adehabitatLT)
 library(ctmm)
 ```
 
@@ -158,44 +156,41 @@ Here are some examples for UD and SD products, with the corresponding locations 
 
 ```{r plotUD}
 par(mfrow = c(3,2))
-plot(UDprods[[1]])
+plot(UDprods[[1]], main = paste("UD product", names(UDprods)[1]))
 points(xsoc[,1],ysoc[,1], pch = '.', col = pal[1])
 points(xsoc[,2],ysoc[,2], pch = '.', col = pal[2])
-plot(UDsds[[1]])
+plot(UDsds[[1]], main = paste("SD product", names(UDprods)[1]))
 points(xsoc[,1],ysoc[,1], pch = '.', col = pal[1])
 points(xsoc[,2],ysoc[,2], pch = '.', col = pal[2])
-plot(UDprods[[19]])
+plot(UDprods[[19]], main = paste("UD product", names(UDprods)[19]))
 points(xsoc[,3],ysoc[,3], pch = '.', col = pal[3])
 points(xsoc[,4],ysoc[,4], pch = '.', col = pal[4])
-plot(UDsds[[19]])
+plot(UDsds[[19]], main = paste("SD product", names(UDprods)[19]))
 points(xsoc[,3],ysoc[,3], pch = '.', col = pal[3])
 points(xsoc[,4],ysoc[,4], pch = '.', col = pal[4])
-plot(UDprods[[25]])
+plot(UDprods[[25]], main = paste("UD product", names(UDprods)[25]))
 points(xsoc[,4],ysoc[,4], pch = '.', col = pal[4])
 points(xsoc[,5],ysoc[,5], pch = '.', col = pal[5])
-plot(UDsds[[25]])
+plot(UDsds[[25]], main = paste("SD product", names(UDprods)[25]))
 points(xsoc[,4],ysoc[,4], pch = '.', col = pal[4])
 points(xsoc[,5],ysoc[,5], pch = '.', col = pal[5])
 ```
 
 ## Correlation
 
-Once we have the area of overlap we estimate the correlation across individuals. There are two ways to go about this: to use the cells of the discretized raster, or to select random points within the area of overlap. In either case the process is to determine the detection history for pairs of individuals in a given area. This is a binary matrix that shows whether an individual was or was not inside the area $x$ at a time point $t$. 
+Once we have the area of overlap we estimate the local temporal correlation across individuals. The correlation represents temporal similarity in space use, if animals are at the same location at the same time correlation will be positive, whereas if they visit the same locations but never at the same time correlation will be negative. Here we are estimating the cross-correlation, i.e. the correlation for different possible lags.
+There are two ways to go about this calculation: to use the cells of the discretized raster, or to select random points within the area of overlap. In either case the process is to determine the detection history for pairs of individuals in a given area. This is a binary matrix that shows whether an individual was or was not inside the area $x$ at a time point $t$. 
 
 ### Grid approach
 
 For the grid approach, we simply take the grid produced by the kernel density estimation. The problem with this is that there could be a mismatch between this scale and the threshold distance for epidemiological contact. This distance is usually small, in the order of a meters.
 
 ```{r corr-grid approach}
-# get the rasters for the CDEs. We choose the probability mass function here,
-# otherwise we have to scale by the grid area
-CDErasters <- lapply(CDEs, raster, DF = "PMF")
-
 # list to store correlation values for every pair, every cell, and every lag
 gridcors <- list()
 
-for (i in seq_along(CDErasters)) {
-  rast <- CDErasters[[i]]
+for (i in seq_along(UDprods)) {
+  rast <- UDprods[[i]]
   # keep only cells where the CDE is not 0. (For memory saving)
   indx <- Which(rast>0, cells = TRUE)
   # raster resolution and center coords
@@ -216,7 +211,7 @@ for (i in seq_along(CDErasters)) {
   if(length(ovlpcells)==0) {
     gridcors[[paste(ind1,ind2,sep = "-")]] <- NA
     gridcors[[paste(ind2,ind1,sep = "-")]] <- NA
-    message("There are no overlap cells between", ind1, "and", ind2,", moving on to next pair")
+    message("There are no overlap cells between ", ind1, " and ", ind2,", moving on to next pair")
     next
   }
   # keeping only cells with actual overlap of data, for memory saving
@@ -240,7 +235,7 @@ for (i in seq_along(CDErasters)) {
   gridcors[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
 }
 
-saveRDS(gridcors, "../data/grid_correlations.rds")
+saveRDS(gridcors, "../data/default_grid_correlations.rds")
 # rm(gridcors)
 # 
 # # import back
@@ -250,10 +245,11 @@ saveRDS(gridcors, "../data/grid_correlations.rds")
 
 ### Random point approach
 
-The other alternative is to sample randomly inside the area where encounters are likely. We take the 95% polygon of the CDE, sample random points inside it and estimate the correlation for every pair in an area around each sampled point. This approach allows to establish the contact distance based on the epidemiological dynamics, independently of the grid cell size. Here I use a square sampling area, but the same could be done with a circle. 
+The other alternative is to sample randomly inside the area where encounters are likely, and estimate the correlation for every pair in an area around each sampled point. This approach allows to establish the contact distance based on the epidemiological dynamics, independently of the grid cell size. Here we use a square sampling area, but the same could be done with a circle. We sample within the 95% polygon of the utilization distribution product surface. 
 
 ```{r randompt-approach, message=FALSE}
-# Get the 95% polygons from the CDEs
+# Get the 95% polygons from the UD product rasters
+contour(UDprods[[1]],)
 CDEpolys <- lapply(CDEs, SpatialPolygonsDataFrame.UD) |> lapply(polygons) |> 
   lapply(disaggregate)|>lapply("[",2)
 # get the area of the polygons
@@ -582,13 +578,13 @@ names(foirasts2) <- names(gridcors2)
 
 ## FOI calculations
 
-With the landscape pairwise FOI we can estimate the total FOI for that pair of individuals, the total FOI that an individual experiences from all other individuals, either at a specific location or across the whole landscape, as well as the total FOI across the landscape.
+With the landscape pairwise FOI we can estimate the total FOI for every pair of individuals, the total FOI that an individual experiences from all other individuals, either at a specific location or across the whole landscape, as well as the total FOI across the landscape.
 
 ```{r total pairwise FOI}
-pairfoi <- sapply(foirasts, cellStats, sum)
-foi_pair_df <- data.frame(do.call(rbind, strsplit(names(foirasts), split = "-")),
+pairfoi <- sapply(foirasts2, cellStats, sum)
+foi_pair_df <- data.frame(do.call(rbind, strsplit(names(foirasts2), split = "-")),
            foi = pairfoi,
-           covfoi = sapply(seq_along(foirasts), \(x) cellStats((foirasts[[x]]-beta*lam/nu*UDprods[[x]])/foirasts[[x]]*100,mean)))
+           covfoi = sapply(seq_along(foirasts2), \(x) cellStats((foirasts2[[x]]-beta/cellarea2*lam*UDepiprods[[x]]/nu)/foirasts2[[x]]*100,mean)))
 
 p1 <- ggplot(foi_pair_df)+geom_raster(aes(X1,X2,fill = foi))+
   coord_equal()+
