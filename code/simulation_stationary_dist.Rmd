@@ -122,9 +122,9 @@ UDS <- akde(telemetries, FITS)
 ```
 
 
-## UD product, standard deviation product
+## UD and standard deviation product
 
-We multiply the UDs pairwise to get the probability $p_i(x)p_j(x)$. This is the first component of the equation. We calculate the standard deviation components also from the UD probabilities. The per-cell standard deviation is $\sigma=\sqrt{\hat p(1-\hat p)}$, where $\hat p$ is the estimated probability for a binomial process (i.e. the UD PMF). Ideally, the probability of contact should be calculated at a scale relevant for epidemiological contact, which for large mammals is in the order of meters. We can, however, use the values estimated at a larger scale, provided we scale the density function to the same area as the correlation calculation.
+Once we have the individual UDs, we multiply them pairwise to get the probability $p_i(x)p_j(x)$. We calculate the standard deviation components also from the UDs. The per-cell standard deviation is $\sigma=\sqrt{\hat p(1-\hat p)}$, where $\hat p$ is the estimated probability for a binomial process (i.e. the UD PMF). Ideally, the probability of contact should be calculated at a scale relevant for epidemiological contact, which for large mammals is in the order of meters. We can, however, use the values estimated at a larger scale, provided we scale the density function to the same area as the correlation calculation. We obtain rasters where each cell has the value of the product divided by the cell area. 
 
 ```{r UD-prod}
 # transform UDs to raster class objects
@@ -134,12 +134,16 @@ cellarea <- prod(res(UDrasts[[1]]))
 globextent <- extent(do.call(merge,UDrasts))
 # extend all rasters to have the same extent
 UDrasts <- lapply(UDrasts, extend, y = globextent)
+# matrix of individual combinations
+combs <- combn(length(UDS), 2)
 # Create lists to store objects
 UDprods <- UDsds <- list()
-for (i in seq_along(CDErasters)) {
+# Calculate product of probs, and sds, store as pairwise rasters with both
+# combinations.
+for (i in seq_len(ncol(combs))) {
   indpair <- names(CDErasters)[i]
-  ind1 <- as.numeric(substr(indpair, 1,1))
-  ind2 <- as.numeric(substr(indpair, 3,3))
+  ind1 <- combs[1,i]
+  ind2 <- combs[2,i]
   r1 <- UDrasts[[ind1]]
   r2 <- UDrasts[[ind2]]
   # product of probabilities, divided by area
