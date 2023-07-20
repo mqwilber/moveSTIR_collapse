@@ -398,13 +398,10 @@ for (i in seq_along(CDErasters)) {
   r2 <- UDrasts[[ind2]]
   # product of probabilities, divided by area
   udprob <- r1*r2
-  UDprods[[paste(ind1,ind2,sep = "-")]] <- udprob/cellarea
+  UDprods[[paste(ind1,ind2,sep = "-")]] <- UDprods[[paste(ind2,ind1,sep = "-")]] <- udprob/cellarea
   sdprob <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))
-  UDsds[[paste(ind1,ind2,sep = "-")]] <- sdprob/cellarea
+  UDsds[[paste(ind1,ind2,sep = "-")]] <- UDsds[[paste(ind2,ind1,sep = "-")]] <- sdprob/cellarea
 }
-# duplicate rasters
-UDsds <- rep(UDsds, each = 2)
-UDprods <- rep(UDprods, each = 2)
 ```
 
 ## FOI estimation
@@ -437,83 +434,6 @@ for (i in seq_along(gridcors)) {
 }
 names(foirasts) <- names(gridcors)
 ```
-### Smaller cells
-
-A simple way to avoid scale mismatches is to set the scale of the discretized utilization distributions based on the threshold distance of the transmission process. That way all the calculations are performed at the same scale, which is the one relevant for transmission. 
-
-```{r}
-# create UDs with specified grid resolution
-UDS_epi <- akde(telemetries, FITS, grid = list(dr = c(2*cdist, 2*cdist)))
-
-### UD and SD products ###
-UDepirasts <- lapply(UDS_epi, raster, DF = "PMF")
-cellarea2 <- prod(res(UDepirasts[[1]]))
-
-# extend all rasters to have the same extent. Could be done inside loop
-UDepirasts <- lapply(UDepirasts, extend, y = extent(do.call(merge,UDepirasts)))
-# Create lists to store objects
-UDepiprods <- UDepisds <- list()
-combs <- combn(length(UDS_epi), 2)
-for (i in seq_len(ncol(combs))) {
-  ind1 <- combs[1,i]
-  ind2 <- combs[2,i]
-  r1 <- UDepirasts[[ind1]]
-  r2 <- UDepirasts[[ind2]]
-  # r1 <- extend(r1, extent(merge(r1,r2)))
-  # r2 <- extend(r2, extent(merge(r1,r2)))
-  # product of probabilities, divided by area
-  udprob <- r1*r2
-  UDepiprods[[paste(ind1,ind2,sep = "-")]] <- UDepiprods[[paste(ind2,ind1,sep = "-")]] <- udprob/cellarea2
-  sdprob <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))
-  UDepisds[[paste(ind1,ind2,sep = "-")]] <- UDepisds[[paste(ind2,ind1,sep = "-")]] <- sdprob/cellarea2
-}
-
-### Correlation ###
-# list to store correlation values
-gridcors2 <- list()
-
-for (i in seq_along(UDepiprods)) {
-  r1 <- UDepiprods[[i]]
-
-  # individual IDs from the name of the rasters
-  indpair <- names(UDepiprods)[i]
-  ind1 <- as.numeric(substr(indpair, 1,1))
-  ind2 <- as.numeric(substr(indpair, 3,3))
-  # get position histories (i.e. which cell was each individual in at every time
-  # point). With large grids this represents a memory issue, because you have to
-  # calculate a very large matrix of distances. I'll need to get just the actual
-  # cell the individual is in, and create the vectors of the whole history at
-  # the time of the correlation calculation
-  pos1 <- cellFromXY(r1, xy = cbind(xsoc[,ind1],ysoc[,ind1]))
-  pos2 <- cellFromXY(r1, xy = cbind(xsoc[,ind2],ysoc[,ind2]))
-
-  # keep only cells that both visited at some point
-  ovlpcells <- pos1[pos1 %in% pos2]
-  if(length(ovlpcells)==0) {
-    # Still fill in an item in the list, but write just NA. 
-    gridcors[[paste(ind1,ind2,sep = "-")]] <- gridcors[[paste(ind2,ind1,sep = "-")]] <- NA
-    message("There are no overlap cells between ", ind1, " and ", ind2,", moving on to next pair")
-    next
-  }
-
-  maxlag <- nsteps-1
-  cormat_ab <- cormat_ba <- matrix(0,nrow = nsteps, ncol = length(ovlpcells))
-  for (j in seq_along(ovlpcells)) {
-    cell <- ovlpcells[j]
-    a <- b <- numeric(nsteps)
-    a[match(cell, pos1)] <- b[match(cell, pos2)]<- 1
-    xcorr <- ccf(a,b,lag.max = maxlag, plot = F)
-    xcorr_vals <- as.numeric(xcorr$acf)
-    cormat_ab[,j] <- rev(xcorr_vals[1:nsteps])
-    cormat_ba[,j] <- xcorr_vals[nsteps:length(xcorr_vals)]
-  }
-  dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = ovlpcells)
-  gridcors2[[paste(ind1,ind2,sep = "-")]] <- cormat_ab
-  gridcors2[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
-}
-```
-
-
 ### Random point approach
 In the random sampling approach, we calculate the FOI at the scale that we estimated the correlation by sampling the UD and SD products in the underlying cells. The UD products are calculated as probability density functions for each cell, so we need to multiply the products by the sampling area.
 
@@ -558,6 +478,105 @@ for (i in seq_along(CDErasters2)) {
 }
 dev.off()
 ```
+
+## Smaller cells
+
+A simple way to avoid scale mismatches is to set the scale of the discretized utilization distributions based on the threshold distance of the transmission process. That way all the calculations are performed at the same scale, which is the one relevant for transmission. 
+
+```{r epi size grid}
+# create UDs with specified grid resolution
+UDS_epi <- akde(telemetries, FITS, grid = list(dr = c(2*cdist, 2*cdist)))
+
+### UD and SD products ###
+UDepirasts <- lapply(UDS_epi, raster, DF = "PMF")
+cellarea <- prod(res(UDepirasts[[1]]))
+
+# extend all rasters to have the same extent. Could be done inside loop
+UDepirasts <- lapply(UDepirasts, extend, y = extent(do.call(merge,UDepirasts)), value = 0)
+# Create lists to store objects
+UDepiprods <- UDepisds <- list()
+combs <- combn(length(UDS_epi), 2)
+for (i in seq_len(ncol(combs))) {
+  ind1 <- combs[1,i]
+  ind2 <- combs[2,i]
+  r1 <- UDepirasts[[ind1]]
+  r2 <- UDepirasts[[ind2]]
+  # product of probabilities, divided by area
+  udprob <- r1*r2
+  UDepiprods[[paste(ind1,ind2,sep = "-")]] <- UDepiprods[[paste(ind2,ind1,sep = "-")]] <- udprob/cellarea
+  sdprob <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))
+  UDepisds[[paste(ind1,ind2,sep = "-")]] <- UDepisds[[paste(ind2,ind1,sep = "-")]] <- sdprob/cellarea
+}
+
+### Correlation ###
+# list to store correlation values
+gridcors2 <- list()
+
+for (i in seq_along(UDepiprods)) {
+  r1 <- UDepiprods[[i]]
+
+  # individual IDs from the name of the rasters
+  indpair <- names(UDepiprods)[i]
+  ind1 <- as.numeric(substr(indpair, 1,1))
+  ind2 <- as.numeric(substr(indpair, 3,3))
+  # get position histories (i.e. which cell was each individual in at every time
+  # point). With large grids this represents a memory issue, because you have to
+  # calculate a very large matrix of distances. I'll need to get just the actual
+  # cell the individual is in, and create the vectors of the whole history at
+  # the time of the correlation calculation
+  pos1 <- cellFromXY(r1, xy = cbind(xsoc[,ind1],ysoc[,ind1]))
+  pos2 <- cellFromXY(r1, xy = cbind(xsoc[,ind2],ysoc[,ind2]))
+
+  # keep only cells that both visited at some point
+  ovlpcells <- pos1[pos1 %in% pos2]
+  if(length(ovlpcells)==0) {
+    # Still fill in an item in the list, but write just NA. 
+    gridcors2[[paste(ind1,ind2,sep = "-")]] <- NA
+    gridcors2[[paste(ind2,ind1,sep = "-")]] <- NA
+    message("There are no overlap cells between ", ind1, " and ", ind2,", moving on to next pair")
+    next
+  }
+
+  maxlag <- nsteps-1
+  cormat_ab <- cormat_ba <- matrix(0,nrow = nsteps, ncol = length(ovlpcells))
+  for (j in seq_along(ovlpcells)) {
+    cell <- ovlpcells[j]
+    a <- b <- numeric(nsteps)
+    a[match(cell, pos1)] <- b[match(cell, pos2)]<- 1
+    xcorr <- ccf(a,b,lag.max = maxlag, plot = F)
+    xcorr_vals <- as.numeric(xcorr$acf)
+    cormat_ab[,j] <- rev(xcorr_vals[1:nsteps])
+    cormat_ba[,j] <- xcorr_vals[nsteps:length(xcorr_vals)]
+  }
+  dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = ovlpcells)
+  gridcors2[[paste(ind1,ind2,sep = "-")]] <- cormat_ab
+  gridcors2[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
+}
+
+### FOI ###
+
+foirasts2 <- list()
+pdf("../docs/figures/epigridFOI.pdf")
+for (i in seq_along(gridcors2)) {
+  if (is.array(gridcors2[[i]])) {
+    # scale and integrate correlation at every cell
+    corcells <- as.numeric(colnames(gridcors2[[i]]))
+    corvals <- numeric(length(UDepiprods[[i]]))
+    corvals[corcells] <- colSums(gridcors2[[i]]*exp(-nu*lags))
+    corrast <- UDepiprods[[i]]
+    values(corrast) <- corvals
+    
+    foi <- beta/cellarea*lam*(1/nu*UDepiprods[[i]]*cellarea+UDepisds[[i]]*cellarea*corrast)
+  } else {
+    foi <- beta/cellarea*lam*(1/nu*UDepiprods[[i]]*cellarea)
+  }
+  foirasts2[[i]] <- foi
+  plot(foi, las = 1, main = names(gridcors2)[i])
+}
+dev.off()
+names(foirasts2) <- names(gridcors2)
+```
+
 
 ## FOI calculations
 
