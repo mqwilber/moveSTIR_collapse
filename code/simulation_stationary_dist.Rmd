@@ -5,7 +5,6 @@ date: "2023-06-16"
 output: html_document
 ---
 
-## Example
 
 Here we show an example of how to  implement the probabilistic moveSTIR framework, using simulated movement tracks. The base movement model is an Ohrstein Uhlenbeck process (Martinez-Garcia et al. 2020) which represents the movement of animals with an established home range behavior around a central attractor. We combine this with the social smoothing kernel convolution approach described by Scharf et al. (2018), which allows to account for animals moving closer to each other, or travelling together. I will simulate a set of individuals, some pairs will be moving independently from each other, others move together constantly while others get close to each other temporarily and then drift apart. 
 When movement is independent across individuals there could be spatial overlap in the resulting utilization distributions and points where the tracks cross each other, but there should be no significant temporal correlation in the location histories. In contrast, animals the move in association with each other will have temporal correlation in their movements, which will influence their pairwise FOIs.  
@@ -481,7 +480,23 @@ dev.off()
 
 ## Smaller cells
 
-A simple way to avoid scale mismatches is to set the scale of the discretized utilization distributions based on the threshold distance of the transmission process. That way all the calculations are performed at the same scale, which is the one relevant for transmission. 
+A simple way to avoid scale mismatches is to set the scale of the discretized utilization distributions based on the threshold distance of the transmission process. That way all the calculations are performed at the same scale, which is the one relevant for transmission. Here I follow all the steps, starting with the estimation of the utilization distributions. The process is as follows:
+  1. Create UDs, forcing a resolution equal to twice the threshold distance
+  2. Transform UD objects to raster, extracting the per-cell probability mass, i.e. the probability density multiplied by the cell area
+  3. Extend all rasters to a common grid
+  4. Calculate the product of the UDs, and of the standard deviations. These are stored as rasters with the same grid. The values are divided by the cell area.
+  5. Calculate the correlation in every grid cell. For this, I 
+    a. Find which cell (of the large grid) the individual is in at every time point
+    b. Find cells that both individuals visited at some point
+    c. Create binary visit vectors for every cell in common
+    d. Calculate the cross-correlation between corresponding vectors
+    The results are stored as LxC matrices, where L is the number of lags, and C is the number of cells that both animals visited
+  6. Calculate the FOI at every cell.
+    a. Divide the UD products by $nu$, and multiply by the cell area
+    b. Multiply the correlation values by $e^{-\nu \mathbf l}$, where $\mathbf l$ is the vector of lags. The unit of lags has to match the units of the decay rate. Integrate the results together.
+    c. Multiply the integrated correlation term by the product of the SDs and by the cell area
+    d. Add the result to the scaled UD product
+    e. Multiply everything by $\beta\lambda/A$, where $A$ is the cell area. 
 
 ```{r epi size grid}
 # create UDs with specified grid resolution
