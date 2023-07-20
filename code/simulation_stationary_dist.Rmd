@@ -18,6 +18,8 @@ library(adehabitatLT)
 library(ctmm)
 ```
 
+## Movement simulation
+
 ```{r sim mov}
 set.seed(1)
 nind = 6
@@ -47,7 +49,7 @@ for (s in seq_len(nind)) {
 }
 ```
 
-## Social smoothing
+### Social smoothing
 
 Once we have the tracks from the OU process, we apply a social filter. The social smoothing kernel proposed in Scharf et al. (2018) is
 $$
@@ -60,7 +62,7 @@ $$
 \mu_1^{(soc)}(\tau_{soc})\equiv\sum_{j=1}^p\int_\mathcal{T} h_{ij}^{(soc)}(\tau_{soc},\tau)\mu_j(\tau)d\tau
 $$
 
-Simply, the x or y position is the weighted average of the positions of the individual and the other individuals, with the weights the social network edge values at that moment. I will create a convolution kernel where one pair of individuals moves together, one gets close and then drifts away, and the other pairs are independent from each other. 
+Simply, the x or y position is the weighted average of the positions of the individual and the other individuals, with the weights the social network edge values at that moment. In this example, we create a convolution kernel where one pair of individuals moves together, one gets close and then drifts away, and the other pairs are independent from each other. 
 
 ```{r social convolution}
 # Social network edge strengths. This can be time dependent, e.g. a list of length nsteps where each element is a matrix of edge weights
@@ -100,16 +102,6 @@ points(p.lambdas, bg = pal, pch  = 24)
 legend("bottomright", legend = 1:nind, col = pal, lty = 1, cex = 0.5)
 ```
 
-
-```{r plot tracks, fig.cap="x and y positions of a pair of individuals with dynamic social interaction"}
-par(mfrow = c(3,1))
-plot(xsoc[,3], type = 'l', col = pal[3], ylab = "x",xlab='')
-lines(xsoc[,4], col = pal[4])
-
-plot(ysoc[,3], type = 'l', col = pal[3], ylab = "y",xlab = "")
-lines(ysoc[,4], col = pal[4])
-plot(sqrt((ysoc[,3]-ysoc[,4])^2+(xsoc[,3]-xsoc[,4])^2), type = 'l', ylab = "Distance",xlab = "Time (h)")
-```
 
 To calculate the FOI between pairs of individuals we first determine where they may come into contact, directly or indirectly. We determine the areas of probable contact using the conditional distribution of encounters. The instantaneous encounter rate is calculated as (Noonan et al. 2021)
 
