@@ -18,6 +18,7 @@
 \usepackage{rotating}
 \usepackage{bbm}
 \usepackage{array}
+\usepackage{xcolor}
 \newcolumntype{C}[1]{>{\centering\arraybackslash}m{#1}}
 % \usepackage{kbordermatrix}
 \usepackage{footnote}
@@ -48,41 +49,58 @@
 
 \begin{document}
 
+\doublespacing
 \section*{PMoveSTIR in continuous space}
 
-In the main text, we derive PMoveSTIR assuming that hosts are moving and contacting each other within some area $A_x$, which we can conceptually think about as a grid cell.  While this simplifies the conceptual mathematical notation, it is more general to consider the case of continuous space where we define contact as potentially happening when present or past host $j$ is (was) within some distance $r$ of host $i$ at its present location \citep{Wilber2022}.  The output we want from this alternative version of PMoveSTIR is the function $\hat{h}(x, t)$, which is the force of infection \emph{per unit area} at point $x$ on the landscape (e.g., $\hat{h}(x, t)$ might have units day$^{-1}\text{m}^{-2}$).  Integrating this function over different areas on will yield estimates of force of infection for any area of interest on the landscape.
+In the main text, we derive PMoveSTIR assuming that hosts are moving and contacting each other within some area $A_x$, which we can conceptually think about as a grid cell on a gridded landscape.  While this conceptually simplifies the problem, it is more general to consider the case of continuous space where we define contact as potentially happening when present or past host $j$ is (was) within some distance $r$ of host $i$ at its present location \citep{Wilber2022}.  The output we want from this alternative version of PMoveSTIR is the function $\hat{h^*}(x, t)$, which is the force of infection \emph{per unit area} at point $x$ on the landscape (e.g., $\hat{h^*}(x, t)$ might have units day$^{-1}\text{m}^{-2}$).  Integrating this function over different areas will yield estimates of force of infection felt by host $i$ from host $j$ for any area of interest on the landscape.
 
-Let's start with the example where a host $i$ is occupying some circular area $A_{x, \rho}$ where $x$ is the center of the area and $\rho$ is the radius of the area.  A contact can occur when host $j$ (past or present) is in the area $A_{x, \rho + r}$ where $r$ is our epidemilogically relevant contact distance and $r >> \rho$.  The force of infection felt by host $i$ from host $j$ as time $t$ in area $A_{x, \rho}$ is given by
+Let's start with the situation where a host $i$ is occupying some circular area $A_{x, \rho}$ where $x$ is the center of the area and $\rho$ is the radius of the area.  A contact can occur when host $j$ (past or present) is in the area $A_{x, \rho + r}$ where $r$ is our epidemilogically relevant contact distance and $r >> \rho$.  The force of infection felt by host $i$ from host $j$ as time $t$ in area $A_{x, \rho}$ is given by
 
 \begin{equation}
     h_{i \leftarrow j}(t, A_{x, \rho}) = \int_{-\infty}^{t} \beta' \lambda \delta'_{x_i(t)}(A_{x, \rho}) \delta'_{x_j(u)}(A_{x, \rho + r}) e^{-\nu(t - u)} du.
     \label{eq:prob_foi}
 \end{equation} 
-where, consistent with the main text, $\delta'_{x_i(t)}(A_{x, \rho})$ is a random variable that determines whether or not host $i$ is located in area $A_{x, \rho}$ at time $t$ and $\delta'_{x_j(u)}(A_{x, \rho + r})$ is a random variable that determines whether or not host $j$ is in area $A_{x, \rho + r}$ at time $u$.  Finally, $\beta' = \frac{\tilde{\beta}}{A_{x, \rho + r}}$ which indicates our assumption that encounters are equally likely within an area $A_{x, \rho + r}$.
+where, consistent with the main text, $\delta'_{x_i(t)}(A_{x, \rho})$ is a Bernoulli random variable that determines whether or not host $i$ is located in area $A_{x, \rho}$ at time $t$ and $\delta'_{x_j(u)}(A_{x, \rho + r})$ is a Bernoulli random variable that determines whether or not host $j$ is in area $A_{x, \rho + r}$ at time $u$.  The variables $x_i(t)$ and $x_j(u)$ indicate the locations of host $i$ and $j$ at time $t$ and $u$, respectively.  The parameter $\beta' = \frac{\tilde{\beta}}{A_{x, \rho + r}}$ and indicates our assumption that encounters are equally likely within an area $A_{x, \rho + r}$. The parameter $\lambda$ is the pathogen shedding rate of host $j$ and $\nu$ is the pathogen decay rate once deposited in the environment.  As in the main text, we are computing maximum transmission risk and assuming that host $j$ is always infected at any time $u$.
 
 As we did in the main text, we can envision simulating many different movement trajectories for host $i$ and $j$ and take the expectation of $h_{i \leftarrow j}(t, A_{x, \rho})$.  We obtain
-
 
 \begin{equation}
     h^*_{i \leftarrow j}(t, A_{x, \rho}) = \int_{-\infty}^{t} \beta' \lambda E[\delta'_{x_i(t)}(A_{x, \rho}) \delta'_{x_j(u)}(A_{x, \rho + r})] e^{-\nu(t - u)} du.
     \label{eq:prob_foi}
 \end{equation} 
 
-Assuming hosts are moving independently, we can write
+As we do in the main text, we can rewrite equation \ref{eq:prob_foi} as
+
+\begin{equation}
+    \begin{aligned}
+        h^*_{i \leftarrow j}(t, A_{x, \rho})  = \frac{\tilde{\beta}}{A_{x, \rho + r}} \lambda \int_{-\infty}^{t} [p_i(A_{x, \rho}, t) p_j(A_{x, \rho + r}, u) + Cov(\delta'_{x_i(t)}(A_{x, \rho}), \delta'_{x_j(u)}(A_{x, \rho + r}))] e^{-\nu(t - u)} du,
+    \end{aligned}
+    \label{eq:correlated_movement}
+\end{equation}
+where the force of infection felt by host $i$ from host $j$ is the related to the utilization distributions of the two hosts and their covariance within an area [really two nested areas]. 
+
+If hosts are moving independently, we can write
 
 \begin{equation}
     h^*_{i \leftarrow j}(t, A_{x, \rho}) = \beta' \lambda \int_{-\infty}^{t} [p_i(A_{x, \rho}, t) p_j(A_{x, \rho + r}, u)] e^{-\nu(t - u)} du
+    \label{eq:ind_movement}
 \end{equation}
 where $p_i(A_{x, \rho}, t)$ is the probability of host $i$ being in area $A_{x, \rho}$ at time $t$ and $p_j(A_{x, \rho + r}, u)$ is the probability of host $j$ being in area $A_{x, \rho + r}$ at time $u$.
 
-Dividing both sides by $A_{x, \rho}$ and taking the limit as $\rho \rightarrow 0$ (such that $A_{x, \rho} \rightarrow 0$), we obtain
+Now we want to calculate $h^*_{i \leftarrow j}(t, A_{x, \rho})$ in the limit as $\rho \rightarrow 0$. For equation \ref{eq:ind_movement}, we can divide both sides by $A_{x, \rho}$ and take the limit as $\rho \rightarrow 0$ (such that $A_{x, \rho} \rightarrow 0$). Doing this we obtain [I think...] 
 
 \begin{equation}
     \hat{h}^*_{i \leftarrow j}(t, x) = \beta' \lambda \int_{-\infty}^{t} [f_i(x, t) p_j(A_{x, r}, u)] e^{-\nu(t - u)} du = \beta' \lambda \int_{-\infty}^{t} [f_i(x, t) \int_{s \in A_{x, r}} f_j(s, u) ds] e^{-\nu(t - u)} du
+    \label{eq:limit}
 \end{equation}
-where $f_i(x, t)$ and $f_j(x, t)$ are the probability density functions of space use for host $i$ and host $j$, respectively.  Note that the units on $f_i(x, t)$ or $f_j(x, t)$ are per area, such that the force of infection $\hat{h}^*_{i \leftarrow j}(t, x)$ has units per time per area as opposed to $h^*_{i \leftarrow j}(t, A_{x, \rho})$ which has units per time. Conceptually, for $h^*_{i \leftarrow j}(t, A_{x, \rho})$ we have already integrated over area in quantity $h^*_{i \leftarrow j}(t, A_{x, \rho})$ so we cancel out the per area units.  
+where $f_i(x, t)$ and $f_j(x, t)$ are the probability density functions of space use for host $i$ and host $j$, respectively.  Note that the units on $f_i(x, t)$ or $f_j(x, t)$ are per area, such that the force of infection $\hat{h}^*_{i \leftarrow j}(t, x)$ has units per time per area as opposed to $h^*_{i \leftarrow j}(t, A_{x, \rho})$ which has units per time. Conceptually, for $h^*_{i \leftarrow j}(t, A_{x, \rho})$ we have already integrated over area in $h^*_{i \leftarrow j}(t, A_{x, \rho})$ so we cancel out the per area units.  
 
-Assuming a stationary process we can write
+
+\textcolor{red}{
+[This is where I am stuck.  How do you take the equivalent limit of equation \ref{eq:correlated_movement}? In particular, any suggestions on what happens to the Covariance term after you divide by $A_{x, \rho}$ and take the limit?  Before you take the limit you are looking at the covariance of two Bernoulli random variables at different time lags. But as you take the limit, $\delta'_{x_i(t)}(A_{x, \rho})$ isn't really a Bernoulli random variable anymore.  It seems to me that this term should converge to something in the limit (i.e., it shouldn't explode or go to zero), but I am not sure what that something is.  My intuition (perhaps faulty) is that if you have two hosts exactly together on a landscape, then their correlation should always be one at a short time lag (i.e., host 1 at time $t$ is always in the same location as host 2 at time $t$) and letting $\rho$ go to zero doesn't change this.  But I am not seeing how this emerges from equation \ref{eq:correlated_movement} after dividing by $A_{x, \rho}$ and taking the limit as $\rho \rightarrow 0$.]
+}
+
+Assuming a stationary process, we can write equation \ref{eq:limit}
 
 \begin{equation}
     \hat{h}^*_{i \leftarrow j}(t, x) =  \frac{\beta' \lambda}{\nu} [f_i(x) \int_{s \in A_{x, r}} f_j(s) ds]
