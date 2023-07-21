@@ -580,9 +580,9 @@ names(foirasts2) <- names(gridcors2)
 With the landscape pairwise FOI we can estimate the total FOI for every pair of individuals, the total FOI that an individual experiences from all other individuals, either at a specific location or across the whole landscape, as well as the total FOI across the landscape.
 
 ```{r total pairwise FOI}
-pairfoi <- sapply(foirasts2, cellStats, sum)
+pairfoi <- sapply(foirasts2*(foirasts2>=0), cellStats, sum)
 foi_pair_df <- data.frame(do.call(rbind, strsplit(names(foirasts2), split = "-")),
-           foi = pairfoi,
+           foi = pairfoi),
            covfoi = sapply(seq_along(foirasts2), \(x) cellStats((foirasts2[[x]]-beta/cellarea*lam*UDepiprods[[x]]/nu)/foirasts2[[x]]*100,mean)))
 
 p1 <- ggplot(foi_pair_df)+geom_raster(aes(X1,X2,fill = foi))+
@@ -612,7 +612,6 @@ plot_grid(p1,p2, align = 'v')
 The FOI is much higher for the individuals that are interacting, which is to be expected given the higher overlap produced by the interaction. How much of this is actually contributed from the correlation/covariance terms, as opposed to the spatial overlap? The covariance term contributes less than 1% of the FOI (cell average), and only for the pair that travels together. This contribution is variable, it could be higher with a larger contact area or lower parasite decay rate, whereas the contribution from spatial overlap is stationary. 
 
 ### Effect of changing parasite decay rate
-The $\nu$ parasite decay parameter can have a substantial impact on the overall FOI. 
 ```{r foi v nu}
 nus <- 1/2^(0:10)
 covdf <- expand.grid(pair = names(gridcors2), nu = nus, totfoi = 0, covcontrib = 0)
@@ -655,6 +654,17 @@ ggplot(covdf)+geom_line(aes(1/nu/24, covcontrib,color = pair))+
   geom_hline(yintercept = 1, linetype=2)+
   theme_classic(base_size = 14)
 ```
+
+```{r pairwise foi plot}
+covdf %>% separate(pair, into = c("Ind1", "Ind2")) %>% 
+  ggplot()+geom_raster(aes(Ind1,Ind2,fill = totfoi))+
+  facet_wrap(~round(1/nu/24,digits = 1))+
+  scale_fill_gradient(low = "white", high = "red")+
+  theme_classic()+
+  labs(fill = "Total FOI")
+  coord_equal()
+```
+
 
 
 Next we explore how the contact distance affects the estimations. With a longer contact distance, the likelihood of two individuals being in the same cell increases, so there should be more positive correlations and an overall greater contribution of the correlation term.
@@ -771,28 +781,6 @@ cell_foi_indep <- calculate_cell_foi(UDprods, cell_cov_int)
 ```
 
 
-
-
-
-We can see that individual 1 has hardly any overlap, and its FOI values are the lowest. The product of the UDs is symmetrical, but the difference in order of arrival at a given site creates differences due to the covariance term.
-
-```{r ind-foi}
-# total FOI experienced across from all hosts combined
-tapply(colSums(cell_foi_indep), ind_combs$ind1, sum)
-# total FOI contributed to all other hosts
-tapply(colSums(cell_foi_indep), ind_combs$ind2, sum)
-```
-```{r plot-cellfoi}
-# Plot one example
-plot(SpatialPixelsDataFrame(coordinates(kuds[[1]]), 
-                            data = data.frame(rowSums(cell_foi_indep))))
-```
-
-```{r}
-sapply(cell_covs, rowMeans) %>% as_tibble() %>% add_column(lag = lags) %>% 
-  pivot_longer(cols = starts_with("v")) %>% 
-  ggplot()+geom_point(aes(lag,value,color = name))
-```
 
 ## Joint movement
 
