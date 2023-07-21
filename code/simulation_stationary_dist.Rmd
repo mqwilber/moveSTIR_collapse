@@ -782,71 +782,7 @@ cell_foi_indep <- calculate_cell_foi(UDprods, cell_cov_int)
 
 
 
-## Joint movement
 
-Now we will do the same for a case where there is joint movement for two hosts, but the rest are moving independently.
-
-```{r joint-mov}
-## 1. Import data, calculate UDs
-sim_tracks <- lapply(list.files("../data", "joint(.*).csv",full.names = TRUE), read.csv)
-sim_tracks_db <- do.call(rbind, sim_tracks)[,2:3] |> cbind(ind = rep(seq_along(sim_tracks), sapply(sim_tracks,nrow))) 
-# create the spatialPoints object with id column
-sim_tracks_sppoints <- SpatialPointsDataFrame(coords = sim_tracks_db[,1:2], 
-                                              data = data.frame(id = sim_tracks_db$ind))
-# get the UDs with a common grid
-kuds <- kernelUD(sim_tracks_sppoints, same4all = TRUE)
-# Get the cell area, for FOI calculation
-cell_area <- kuds[[1]]@grid@cellsize |> prod()
-
-## 2. UD product
-ind_combs <- expand.grid(ind2 = seq_along(kuds), ind1 = seq_along(kuds))
-ind_combs <- ind_combs[ind_combs$ind1!=ind_combs$ind2,]
-UDprods <- apply(ind_combs, 1, \(x) udprod(kuds[[x[2]]],kuds[[x[1]]]), simplify = FALSE)
-
-## 3. Location history
-# Get the distance between the grid cell centers and every point in the tracking history. 
-point_grid_dists <- spDists(sim_tracks_sppoints, kuds[[1]])
-# Create a binary matrix and split it by individual
-loc_histories <-  apply(point_grid_dists, MARGIN = 1, \(x) x==min(x)) |> t() |>
-  split(factor(sim_tracks_db$ind)) |> 
-  lapply(matrix, ncol = ncol(point_grid_dists))
-
-## 4. Get the covariance
-cell_covs_joint <- get_cov(loc_histories)
-
-## 5. multiply by the decay, and sum across to integrate
-cell_cov_int <- lapply(cell_covs_joint, "*", exp(-nu*lags)) |> lapply(colSums)
-
-## 6. Combine the integrated covariance term and the  UD product, and scale by the epi parameters
-cell_foi_joint <- calculate_cell_foi(UDprods, cell_cov_int)
-```
-
-```{r plot_joint_sim}
-## 7. plots
-data.frame(ind_combs, foi = colSums(cell_foi_joint))|>
-  ggplot()+
-  geom_raster(aes(factor(ind1),factor(ind2, levels = 6:1),fill=foi))+
-  theme_minimal(base_size = 14)+
-  labs(fill = "FOI", y = "Acquiring individual", x = "Depositing individual")+
-  scale_x_discrete(breaks = 1:6, position = "top",expand = c(0,0))+
-  scale_y_discrete(breaks = 1:6, expand = c(0,0))+
-  theme(aspect.ratio = 1, panel.grid = element_blank()) -> gg.pairfoi
-
-data.frame(ind_combs, foi = beta*lam*sapply(UDprods, sum)) |>
-  ggplot()+
-  geom_raster(aes(factor(ind1),factor(ind2, levels = 6:1),fill=foi))+
-  theme_minimal(base_size = 14)+
-  labs(fill = "FOI", y = "Acquiring individual", x = "Depositing individual")+
-  scale_x_discrete(breaks = 1:6, position = "top",expand = c(0,0))+
-  scale_y_discrete(breaks = 1:6, expand = c(0,0))+
-  theme(aspect.ratio = 1, panel.grid = element_blank())-> gg.pairfoiindep
-
-gg.tracks <- sim_tracks_db %>% ggplot()+geom_path(aes(x,y,color = factor(ind)), size=1)+theme_void(base_size = 14)+coord_sf()+labs(color="Individual")+theme(legend.position = "left")
-
-plot_grid(gg.tracks,plot_grid(gg.pairfoi,gg.pairfoiindep,nrow=2, align = "v"))
-```
-
-There is a clear difference in FOI between the two individuals who are moving together, and the rest. The estimated FOI is at least twice as high for that pair as for the others. This difference is not due solely to the degree of overlap; while they do have the highest degree of overlap, they also overlap similarly with other individuals,
 
 What happens if we do not incorporate the covariance term? This is, what if we assumed independent movement, and only used the product of the UDs, how much error would we be incurring?
 
