@@ -489,7 +489,7 @@ UDS_epi <- akde(telemetries, FITS, grid = list(dr = c(2*cdist, 2*cdist)))
 UDepirasts <- lapply(UDS_epi, raster, DF = "PMF")
 cellarea <- prod(res(UDepirasts[[1]]))
 
-# extend all rasters to have the same extent. Could be done inside loop
+# extend all rasters to have the same extent. 
 UDepirasts <- lapply(UDepirasts, extend, y = extent(do.call(merge,UDepirasts)), value = 0)
 # Create lists to store objects
 UDepiprods <- UDepisds <- list()
@@ -552,7 +552,6 @@ for (i in seq_along(UDepiprods)) {
 }
 
 ### FOI ###
-
 foirasts2 <- list()
 pdf("../docs/figures/epigridFOI.pdf")
 for (i in seq_along(gridcors2)) {
@@ -568,14 +567,14 @@ for (i in seq_along(gridcors2)) {
   } else {
     foi <- beta/cellarea*lam*(1/nu*UDepiprods[[i]]*cellarea)
   }
+  foi <- foi*(foi>=0)
+
   foirasts2[[i]] <- foi
   plot(foi, las = 1, main = names(gridcors2)[i])
 }
 dev.off()
 names(foirasts2) <- names(gridcors2)
 ```
-
-
 ## FOI calculations
 
 With the landscape pairwise FOI we can estimate the total FOI for every pair of individuals, the total FOI that an individual experiences from all other individuals, either at a specific location or across the whole landscape, as well as the total FOI across the landscape.
@@ -584,7 +583,7 @@ With the landscape pairwise FOI we can estimate the total FOI for every pair of 
 pairfoi <- sapply(foirasts2, cellStats, sum)
 foi_pair_df <- data.frame(do.call(rbind, strsplit(names(foirasts2), split = "-")),
            foi = pairfoi,
-           covfoi = sapply(seq_along(foirasts2), \(x) cellStats((foirasts2[[x]]-beta/cellarea2*lam*UDepiprods[[x]]/nu)/foirasts2[[x]]*100,mean)))
+           covfoi = sapply(seq_along(foirasts2), \(x) cellStats((foirasts2[[x]]-beta/cellarea*lam*UDepiprods[[x]]/nu)/foirasts2[[x]]*100,mean)))
 
 p1 <- ggplot(foi_pair_df)+geom_raster(aes(X1,X2,fill = foi))+
   coord_equal()+
@@ -612,50 +611,51 @@ plot_grid(p1,p2, align = 'v')
 ```
 The FOI is much higher for the individuals that are interacting, which is to be expected given the higher overlap produced by the interaction. How much of this is actually contributed from the correlation/covariance terms, as opposed to the spatial overlap? The covariance term contributes less than 1% of the FOI (cell average), and only for the pair that travels together. This contribution is variable, it could be higher with a larger contact area or lower parasite decay rate, whereas the contribution from spatial overlap is stationary. 
 
-```{r decay rate, fig.cap="Contribution of covariance to the force of infection"}
-nuvals <- 1/seq(24*2,24*30,12)
-maxcovs <- meancovs <- numeric(length(nuvals))
-for (j in seq_along(nuvals)) {
-  nu2 <- nuvals[j]
-  foirasts2 <- list()
-  # maybe best to create the global raster first, that way we would have a set of common cells for the remainder.
-  for (i in seq_along(ptcors)) {
-    if (is.array(ptcors[[i]])) {
-      # scale and integrate correlation at sampled points
-      corvals <- colSums(Re(ptcors[[i]])*exp(-nu2*lags))
-      # get the indices of the points with values
-      ptsswithvalues <- as.numeric(colnames(ptcors[[i]]))
-      # find the corresponding cells in the global raster
-      corcells <- cellFromXY(globrast, samplepts2[[i]][ptsswithvalues,])
-      # mean correlation for all sampled points within a cell
-      cellmeancor <- tapply(corvals, INDEX = corcells, mean) 
-      # create global
-      rcor <- globrast
-      values(rcor) <- 0
-      rcor[as.numeric(names(cellmeancor))] <- cellmeancor
+### Effect of changing parasite decay rate
+The $\nu$ parasite decay parameter can have a substantial impact on the overall FOI. 
+```{r foi v nu}
+nus <- 1/2^(0:10)
+covdf <- expand.grid(pair = names(gridcors2), nu = nus, totfoi = 0, covcontrib = 0)
+for (x in seq_along(nus)) {
+  nu = nus[x]
+  rows = which(covdf$nu==nu)
+  for (i in seq_along(gridcors2)) {
+    if (is.array(gridcors2[[i]])) {
+      # scale and integrate correlation at every cell
+      corcells <- as.numeric(colnames(gridcors2[[i]]))
+      corvals <- numeric(length(UDepiprods[[i]]))
+      corvals[corcells] <- colSums(gridcors2[[i]]*exp(-nu*lags))
+      corrast <- UDepiprods[[i]]
+      values(corrast) <- corvals
       
-      foi <- beta/nu2*UDprods[[i]]+UDsds[[i]]*rcor
-      
+      foi <- beta/cellarea*lam*(1/nu*UDepiprods[[i]]*cellarea+UDepisds[[i]]*cellarea*corrast)
     } else {
-      foi <- beta/nu2*UDprods[[i]]
+      foi <- beta/cellarea*lam*(1/nu*UDepiprods[[i]]*cellarea)
     }
-    # fill NAs with 0
-    foi[is.na(foi)] <- 0
-    foirasts2[[i]] <- foi
+    covdf$totfoi[rows[i]] <- cellStats(foi*(foi>=0), sum)
+    covdf$covcontrib[rows[i]] <- cellStats(UDepisds[[i]]*corrast/(1/nu*UDepiprods[[i]]), mean)
   }
-  names(foirasts2) <- names(ptcors)
-  
-  foi_pair_df <- data.frame(do.call(rbind, strsplit(names(foirasts2), split = "-")),
-                            covfoi = sapply(seq_along(foirasts2), \(x) cellStats((foirasts2[[x]]-beta*lam/nu*UDprods[[x]])/foirasts2[[x]],mean)))
-  
-  maxcovs[j] <- foi_pair_df$covfoi[which.max(abs(foi_pair_df$covfoi))]
-  meancovs[j] <- mean(foi_pair_df$covfoi)
 }
-data.frame(nu = nuvals, cov = maxcovs, meancov = meancovs) %>% ggplot()+geom_line(aes(1/nu/24, 100*cov))+
-  theme_classic(base_size = 14)+
-  labs(x = "Days to decay", y = "Contribution (%)")+
-  geom_hline(yintercept = 0, linetype = 2)
 ```
+```{r foi v nu plot}
+ggplot(covdf)+geom_line(aes(1/nu/24, totfoi,color = pair))+
+  labs(x = expression(paste("Decay time ", 1/nu, " (Days)")),
+       y = "Total FOI",
+       color = "Pair")+
+  theme_classic(base_size = 14)
+```
+
+
+```{r covcontrib v nu plot}
+ggplot(covdf)+geom_line(aes(1/nu/24, covcontrib,color = pair))+
+  labs(x = expression(paste("Decay time ", 1/nu, " (Days)")),
+       y = "Covariance contribution (Cov/UD)",
+       color = "Pair")+
+  scale_y_log10()+
+  geom_hline(yintercept = 1, linetype=2)+
+  theme_classic(base_size = 14)
+```
+
 
 Next we explore how the contact distance affects the estimations. With a longer contact distance, the likelihood of two individuals being in the same cell increases, so there should be more positive correlations and an overall greater contribution of the correlation term.
 
