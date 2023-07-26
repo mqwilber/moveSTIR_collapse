@@ -13,3 +13,4 @@ docs/prob_movestir_theory.pdf
 
 *.DS_Store
 *.Rhistory
+.Rproj.user
