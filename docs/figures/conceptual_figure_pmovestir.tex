@@ -34,10 +34,10 @@
     \draw[-] (ul.center)--(ll.center);
     \draw[-] (ll.center)--(lr.center);
 
-    \node[at=(ur.north), above, font=\tiny, align=center] {Heterogeneous space use\\and heterogeneous time};
-    \node[at=(lr.south), below, font=\tiny, align=center] {Heterogeneous space use,\\ stationary time};
-    \node[at=(ll.south), below, font=\tiny, align=center] {Uniform space use,\\stationary time};
-    \node[at=(ul.north), above, font=\tiny, align=center] {Uniform space use,\\heterogeneous time};
+    \node[at=(ur.north), above, font=\tiny, align=center] {Heterogeneous space use\\and heterogeneous time \\ (Equation 4)};
+    \node[at=(lr.south), below, font=\tiny, align=center] {Heterogeneous space use,\\ stationary time \\ (Equation 5, 6)};
+    \node[at=(ll.south), below, font=\tiny, align=center] {Uniform space use,\\stationary time \\ (Equation 7)};
+    \node[at=(ul.north), above, font=\tiny, align=center] {Uniform space use,\\heterogeneous time \\ (Not considered here)};
 
 
     \draw[-stealth, dashed] ($(ur.south) + (-0.5, -0.1)$)--($(ul.south) + (0.5, -0.1)$) node[midway, below, font=\tiny, align=center] {Increasingly uniform space use};
@@ -45,11 +45,11 @@
     \draw[-stealth, dashed] ($(ur.south) + (0.3, -0.1)$)--($(lr.north) + (0.3, 0.1)$) node[midway, above, font=\tiny, align=center, rotate=-90] {Increasingly stationary time};
 
 
-    \draw[fill=gray] (-2*\scale*0.5, -1*\scale) circle  [radius=\rad*0.5 cm] node[above, font=\tiny, align=center] (hro) {\emph{Stationary home range}\\\emph{overlap}};
+    \draw[fill=gray] (-2*\scale*0.5, -1*\scale) circle  [radius=\rad*0.5 cm] node[above, font=\tiny, align=center] (hro) {\emph{Stationary home range}\\\emph{overlap} \\ \emph{(Equation 8)}};
 
-    \draw[fill=gray] (-2*\scale*0.5, -1*\scale*0.5) circle  [radius=\rad*0.5 cm] node[above, font=\tiny, align=center] (hro) {\emph{Time-varying home range}\\\emph{overlap}};
+    \draw[fill=gray] (-2*\scale*0.5, -1*\scale*0.5) circle  [radius=\rad*0.5 cm] node[above, font=\tiny, align=center] (hro) {\emph{Time-varying home range}\\\emph{overlap} \\ \emph{(Equation 9)}};
 
-    \draw[fill=gray] (-2*\scale*0, -1*\scale*0.5) circle  [radius=\rad*0.5 cm] node[above, left, font=\tiny, align=center] (hro) {\emph{Time-varying UD}\\\emph{overlap}};
+    \draw[fill=gray] (-2*\scale*0, -1*\scale*0.5) circle  [radius=\rad*0.5 cm] node[above, left, font=\tiny, align=center] (hro) {\emph{Time-varying UD}\\\emph{overlap} \\ \emph{(Equation 9)}};
 
     \node[above] at (-2*\scale*0.5, -1*\scale*0) {Probabilistic MoveSTIR};
 
