@@ -10,7 +10,7 @@
 *.fls
 docs/figures/conceptual_figure_pmovestir.pdf
 docs/prob_movestir_theory.pdf
-
 *.DS_Store
 *.Rhistory
 .Rproj.user
+*.qgz
