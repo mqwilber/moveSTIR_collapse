@@ -149,7 +149,7 @@ We interpret that a ``contact'' can occur when both individuals visit a given lo
 Importantly, we assume that locations $x$ on the landscape do not overlap such that summing locations $x$ equals some total area over which individuals can move (see SI for a derivation when $x$ is a point, not an area, on the landscape). 
 Furthermore, we assume that the likelihood of contact is uniform within the location $x$, consistent with a so-called top hat encounter function \citep{Gurarie2013,Wilber2022}.
 
-The term $\beta'$ is the rate at which host $i$ picks up pathogen within the location $x$ and can be re-written as $\tilde{\beta} / A_x$, where $\tilde{\beta}$ has units area/time (e.g., $\text{m^2 / day}$) and $A_x$ gives the area of location $x$ (e.g., 10 $\text{m^2}$). 
+The term $\beta'$ is the rate at which host $i$ picks up pathogen within the location $x$ and can be re-written as $\tilde{\beta} / A_x$, where $\tilde{\beta}$ has units area/time (e.g., $m^2 / day$) and $A_x$ gives the area of location $x$ (e.g., 10 $m^2$). 
 Therefore, the total acquisition rate scales with the area in which contact can occur. Larger areas would mean that host $i$ has to search for longer to find a ``packet'' of pathogen deposited by $j$, reducing $i$'s total acquisition rate and the corresponding force of infection.
 %The same amount of pathogen spread over a larger area would reduce the total acquisition rate .  deposited by host $j$  (or, equivalently, host $i$ would have to traverse a larger area ),  .  
 As we derive PMoveSTIR, it is critical to be specific about our definition of contact and the area units associated with $\beta'$.  
@@ -297,19 +297,21 @@ The second case represents individuals that travel together constantly, for exam
 Finally, we simulate a scenario with a dynamic social interaction: two individuals start moving independently, then get closer together, and then drift apart towards their respective home range centers. This could represent a temporal interaction such as mating.
 For every scenario, we fit continuous-time movement models to the simulated tracks, and estimate the individual UDs using autocorrelated kernel density estimation \citep{Calabrese2016}. We calculate the UD probabilities on a grid of square cells, where the cell side $d$ is the threshold contact distance for epidemiological contact. 
 
-% <<<<<<< HEAD
-Given two individual UDs, we can calculate the product of the probabilities of use and the product of their standard deviations for each grid cell.  The UD product represents the overlap between home ranges, and is related to the probability of encounter between individuals \citep{Noonan2021}. Scaling by $1/\nu$ yields the first term in brackets on the right hand side of equation eq. \ref{eq:stationary_cor}. %The area $A_x$ is the area of each grid cell, which is uniform for regular grids. 
-The second term in brackets, $\sigma(\delta_i)\sigma(\delta_j)$, is the product of the standard deviation in probability of use, and represents the variability around the probability of encounter. 
+Given two individual UDs, we can calculate the product of the probabilities of use and the product of their standard deviations for each grid cell.  The UD product represents the overlap between home ranges, and is related to the probability of encounter between individuals \citep{Noonan2021}. Scaling by $1/\nu$ yields the first term in brackets on the right hand side of equation eq. \ref{eq:stationary_cor}. 
+The second term in brackets, $\sigma(\delta_i)\sigma(\delta_j)$, is the product of the standard deviations in probability of use, and is related to the variability around the probability of encounter. 
 %For a binomial process (presence/absence in a given area), the standard deviation is defined as $\sqrt{\hat p(1-\hat p)}$, where $\hat p$ is the estimated probability, corresponding to the UD value at each cell. 
-Both of these products are symmetrical for every pair of individuals. 
+Both products are symmetrical for every pair of individuals. 
 
-The integral term in equation \ref{eq:stationary_cor} represents the cross-correlation between visits of two individuals to the same location, modulated by the parasite decay process. The order of visits matters, so these correlation values can be asymmetric between individuals. For example, if both individuals are at the same location at the same time, there will be a positive correlation at lag 0, both from $i$ to $j$ and from $j$ to $i$. If instead $i$ regularly goes to a given location $\tau$ time units after $j$ has been there, there will be a positive correlation at lag $\tau$ for $i$ from $j$, but not the opposite. The cross-correlation values are scaled due to the decay of the parasite, so that correlations at longer lags have less of an impact on the overall term. 
+The integral term in equation \ref{eq:stationary_cor} represents the cross-correlation between visits of two individuals to the same location, modulated by the parasite decay process. The order of visits matters, so these correlation values can be asymmetric between individuals. 
+For example, if both individuals are at the same location at the same time, there will be a positive correlation at lag 0, both from $i$ to $j$ and from $j$ to $i$. If instead $i$ regularly goes to a given location $\tau$ time units after $j$ has been there, there will be a positive correlation at lag $\tau$ for $i$ from $j$, but not the opposite. The cross-correlation values are scaled due to the decay of the parasite, so that correlations at longer lags have less of an impact on the overall integral term, and on the FOI.
 The cross-correlation is calculated based on the position history for each individual at locations that both visited at some point (locations that only one or neither individual visited have have no correlation). The position history is a binary matrix $H_i$ with times in rows and sites (grid cells) in columns. 
-
-We multiply the integrated correlation term by the standard deviations, add it to the scaled product of the UDs, and scale by $\tilde\beta\lambda/\nu Ax$ to obtain the cell-specific FOI. The full FOI experienced by individual $i$ from $j$ is the sum of the FOI values across all grid cells. 
+Substituting the terms in eq.\ref{eq:stationary_cor} and scaling by the relevant epidemiological parameters $\tilde\beta\lambda/\nu Ax$ we obtain the per-cell FOI. In some instances, negative correlation terms could make the whole FOI negative. In these cases, we set the FOI to zero. We then add all the local FOI values to obtain the total pairwise FOI.
 
 \subsection*{Empirical application - White-tailed deer}
-We explored a case with 
+We applied the PMoveSTIR model to a set of GPS-tracking data of white-tailed deer (\emph{Odocoileus virginianus}) in Tennessee, USA.
+Location data were collected for five individuals between March and July of 2023. The GPS collars were configured to record a location every 30 minutes.
+We set a threshold contact distance of 10 m, a constant decay rate of $\nu=1/7\text{days^-1}$, a transmission rate of $\beta=1 m^2/s$ and deposition rate $\lambda=1/day$.
+We fit continuous-time movement models to each track and estimated the utilization distributions using functions from the ctmm package in R \citep{Calabrese2016}. 
 
 \section*{Results}
 
@@ -328,6 +330,12 @@ For a couple of realized movement paths this defines some specific locations whe
 % Here, I could run multiple simulations changing the strength and temporal dynamics of the interaction. It could be interesting to see how the correlation and resulting FOI are linked to these variables. For example, would a strong interaction for a short duration be the same as a weaker link for longer? Would a weaker link even be enough to create enough overlap?
 
 \subsection*{Empirical example: white-tailed deer}
+The overlap between individual deer ranged between 0.31 and 0.94 (Bhattacharyya coefficient). 
+Similar to our simulations, there was one pair of individuals with highly correlated movement that had a higher estimated FOI than the others. Values for that pair were 6 times higher than the mean FOI value, and more than 200 times the minimum total FOI. 
+There were four paired combinations that did not use any of the same cells, despite having overlapping home ranges.
+The values for the total FOI across when using the correlation term were similar to the FOI estimated using only the product of the UDs, i.e. assuming independence of movement among individuals. Differences between the two were in the order of 10^-6. 
+As shown previously, the difference is linked with the decay rate, and will be different depending on the parasite survival. 
+The maximum correlation was at lag 0 for half of the cases where there was local overlap (6 of 12), which corresponds to individuals encountering each other directly. 
 
  
 
@@ -335,28 +343,31 @@ For a couple of realized movement paths this defines some specific locations whe
 \section*{Discussion}
 % General summary
 We have developed a new framework that allows to infer epidemiological dynamics from spatially and temporally explicit data. Our work generalizes and extends existing methods (moveSTIR) and makes them applicable to more data streams. 
-By adopting a probabilistic focus, we steer away from limitations inherent to analyzing just realized trajectories. Instead we get a more global view of force of infection across the landscape. This is an important first step towards predicting contact and transmission based on underlying spatial or temporal covariates. % the UD focuses on the spatial aspect
+By adopting a probabilistic focus, we steer away from limitations inherent to analyzing just realized trajectories. Instead we get a more global view of force of infection across the landscape. This is an important first step towards predicting contact and transmission based on underlying spatial or temporal covariates.
 We have focused here on linking utilization distributions with epidemiological processes. We believe their widespread use and intuitive nature makes them an attractive bridge between movement and transmission processes. 
 
 %% Main findings
 % 
 % Covariance/correlation is important
-Our simulations showed that strong social links between individuals translate to positive correlations in the use of space. This applied for both constant as well as temporal interactions. 
-We found that the correlation between movement. We found that  social links can drastically increase the force of infection
-Covariance in space has a significant impact on encounter probabilities, and could have drastic implications for inferring epidemiological processes. 
-
+Our simulations showed that strong social links between individuals translate to positive correlations in the use of space, and can therefore significantly increase the FOI experienced by pairs of interacting individuals. 
+The total effect of correlation on FOI will be determined by the interplay between parasite survival in the environment and the range and type of movement. Animals who stay within a given area long will be exposed to parasites that survive in the environment. The type of movement is less relevant if animals are constantly on the move, for example migratory species during their migrations \citep{Peacock2018}, or nomadic species. In these cases there will still be a high FOI for directly transmitted parasites.
+We saw the effect of correlation for constant as well as for dynamic interactions--with a time-varying link strength.
 
 % But maybe you can ignore it in some cases?
 % The effect of correlation varies, it depends on the parasite persistence
 Given the decay of parasites in the environment, the highest impact of correlation comes from correlation at short lags. % what is short, anyway?
 This is particularly relevant for parasites with short persistence times in the environment. %under the assumption of exponential decay, could there be another meaningful decay function, say a step function where the viability is constant until a certain lag?
 The effect is nonetheless cumulative, if there are strong correlations over a range of lags close to 0 the force of infection will increase substantially. This would be the case for two individuals staying together in the same area, there would be an accumulation of viable parasite propagules in the environment that the hosts are exposed to. 
-Here, we have made two key assumptions about the environmental transmission stages of parasites. That parasites in the environment decay at a constant rate, and that they are transmissible immediately following deposition. For some parasite species like helminths, however, propagules are not immediately viable following deposition. Instead, there is a development period in the environment. In this case, correlations at short lags are irrelevant, and it's only after some development period that correlations start playing a role on FOI.
+
+Here, we have made two key assumptions about the environmental transmission stages of parasites. That parasites in the environment are transmissible immediately following deposition, and that they decay at a constant rate. 
+These assumptions are captured by the exponential scaling we used. This function is tractable and likely suitable for many parasites, but our framework allows to use other scaling functions if they are a better representation of the biology of the parasite. 
+Many helminths, for example, have environmental transmission stages that have a development period oare not immediately viable following deposition. Instead, there is a development period in the environment. In this case, correlations at short lags are irrelevant, and it's only after some development period that correlations start playing a role on FOI. This could be easily represented by a decay function that is 0 until after the development period. Similarly, parasites like XXX could be better represented by a step function, where viability is constant until a threshold time, beyond which viability drops to 0 immediately. 
+
 % Could there be a systematic temporal trend in correlation?
 
 % Home range overlap is insufficient, incomplete, no good
-
-
+Some studies of wildlife disease have created transmission networks using the home range overlaps as weights. This would be similar to using the CDE.
+However, as we have shown, this is a limited view that can miss some important nuance.
 % Have we developed a new CDE estimator?
 The probability of encounter between two individuals is their joint probability of occurrence.  Formally, this probability is given by $p(XY)=p(X)p(Y)+Cov(X,Y)$. From a UD perspective, the probability could be expressed simply as the product of their respective UD values, $p(X)$ and $p(Y)$, at a common location. % a bit mathy, no?
 This is in fact what Noonan's CDE estimator does. This calculation, however, makes one key assumption: that movement is independent between individuals. 
@@ -368,18 +379,19 @@ Existing methods for to determine the interaction between individuals \citep{Sch
 % Covariance 
 Here, we divided covariance into the product of standard deviations and the correlation in space use. While the standard deviation component can be estimated from probabilities like the ones in a UD, the correlation cannot. The correlation term relies exclusively on observed data, and thus will be a reflection of a particular realization of a movement process. 
 % Can we calculate an expected covariance?
+% Someone should study the best way to interpolate the observed correlation. My idea would be to use statistical models, sort of like species distribution models, to fill in the surface based on underlying covariates. 
 
 
 %% Future directions
-We have focused on one special case of the probabilistic moveSTIR space. Future studies should put in practice the rest of the methods. The equation in the top left could be used for data that is temporally but not spatially resolved. Proximity loggers, for example, provide information about contact formation and duration across time. Thus, they are still a valuable tool to study transmission.
+We have focused on one special case of the PMoveSTIR space that can be applied to stationary utilization distributions, which we think could be the most readily applicable framework for empirical tracking data. 
+However, as explained previously, the general framework can be adapted to other types of data. Most notably, the equation in the top left of the PMoveSTIR space could be used for data that is temporally but not spatially resolved. Proximity loggers, for example, provide information about contact formation and duration across time. 
+Camera-traps, another common way to study wildlife, could be another foreseeable data source. Camera-traps can provide individually resolved (if animals can identified from fur patterns, for example), spatially and temporally explicit information, which could be incorporated into the PMoveSTIR framework. Even if the total FOI could not be estimated, a local FOI could be calculated based on these data, that could potentially be extrapolated based on environmental covariates. 
 
 % Linking with environmental covariates
-Our simulations ignore the relationship between the landscape and animal movement. However, there are tools available that allow to build UDs based on environmental factors \citep{Signer2017,Michelot2020}. The UDs produced by these methods can be directly input into our framework to estimate the expected force of infection.
+One of the most promising uses for the PMoveSTIR framework is as a first step towards linking environmental covariates with disease transmission risk. 
+However, there are tools available that allow to build UDs based on environmental factors \citep{Signer2017,Michelot2020}. The UDs produced by these methods can be directly input into our framework to estimate the expected force of infection.
 
 
-
-
-% Potts and Borger 2023, Journal of Animal Ecology
 
 \bibliography{references}
 
@@ -388,7 +400,7 @@ Our simulations ignore the relationship between the landscape and animal movemen
     \caption{Conceptual figure for PMoveSTIR}
 \end{figure}
 
-\being{figure}
+\begin{figure}
 \end{figure}
 
 \end{document}
