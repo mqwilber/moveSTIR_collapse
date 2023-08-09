@@ -10,12 +10,13 @@
 # histories and the cross-correlation for every cell. 
 
 # Load libraries
+library(tidyverse)
 library(move)
 library(ctmm)
 
 # Set epidemiological parameters: threshold contact distance and parasite decay rate
-contact_dist <- 10
-nu <- 1/(3600*24*7)# 7 days in seconds
+contact_dist <- 10 # meters
+nu <- 1/(3600*24*7)# 7 days, in seconds
 
 # Import data
 dat_raw <- read.csv("../data/cleaned_movement_data_07132023.csv")
@@ -42,8 +43,11 @@ dat_move <- move(x = dat$x_,y = dat$y_,
                  data = data.frame(HDOP=dat$dop), 
                  proj = "+proj=utm +zone=16N", 
                  animal = dat$animal_id)
-plot(dat_move, col = hcl.colors(length(ids), "Dark 3"),pch=16)
-legend("bottomright", col = hcl.colors(length(ids), "Dark 3"), legend = ids, pch=16)
+# Plot positions
+plot(dat_move, type='n',xlab = "", ylab = "")
+grid()
+points(dat_move, col = hcl.colors(length(ids), "Dark 3"))
+legend("bottomright", col = hcl.colors(length(ids), "Dark 3"), legend = ids, pch=1)
 
 telemetries <- as.telemetry(dat_move)
 
@@ -52,10 +56,13 @@ telemetries <- as.telemetry(dat_move)
 GUESS <- lapply(telemetries, \(i) ctmm.guess(i, interactive = F))
 FITS <- lapply(seq_along(telemetries), \(i) ctmm.select(telemetries[[i]], GUESS[[i]])) 
 names(FITS) <- names(telemetries)
+# export
+saveRDS(FITS, "../outputs/deer_ctmm_fits.rds")
 
 # USE CTMM to build UDs with AKDE. 
 # At this step you use the threshold distance set at the beginning as the resolution of the grid.
 # epigrid <- raster(extent(dat_move), resolution = contact_dist, crs = crs(dat_move))
+FITS <- readRDS("../outputs/deer_ctmm_fits.rds")
 for (i in seq_along(FITS)) {
   # file output name
   outname <- paste0("../outputs/", names(FITS)[i], ".tif")
@@ -68,9 +75,8 @@ for (i in seq_along(FITS)) {
   rm(UD)
 }
 
-
-
-#### Combine UDs and trajectories to calculate pairwise FOI ####
+#### Pairwise FOI ####
+# get names of files with UD grids
 fnames <- paste0("../outputs/X", ids, ".tif")
 
 # Possible combinations of individuals
@@ -171,7 +177,7 @@ for (i in seq_len(ncol(combs))) {
 cors <- lapply(list.files("../outputs/","corr", full.names = T), read.csv)
 # Check the length of all correlations
 sapply(cors, ncol)
-# There is a wide variation, between just 151 rows to more than 5000 rows.
+# There is a wide variation, between just 151 rows (75.5 hours of overlap) to more than 5000 rows (104 days).
 # Similarly, there is variation in spatial overlap, between only 3 cells with
 # overlap, and up to 2500 cells
 
@@ -185,7 +191,7 @@ totfoipairs <- list.files("../outputs/", "FOI(.*)tif$")|>strsplit("[[:punct:]]+"
 totfoisdf <- data.frame(t(rbind(totfoipairs,totfois)))
 names(totfoisdf) <- c("ind1","ind2","FOI")
 
-# compare to overlap
+# Plot vs overlap
 totfoisdf$overlap <- overlap(FITS)$CI[,,2][lower.tri(overlap(FITS)$CI[,,2]) | upper.tri(overlap(FITS)$CI[,,2])]
 totfoisdf
 
@@ -226,3 +232,58 @@ for (i in seq_len(nrow(corpairs))) {
 corpairs <- dplyr::left_join(totfoisdf,corpairs)
 corpairs
 corpairs$foi_cor/corpairs$foi_ud
+
+#### Recalculate FOI with different nu #### 
+# The effect of correlation on FOI
+#is highly dependent on the decay parameter. Here I will recalculate FOI for a
+#set of different parameter values, one shorter and one longer '
+corfiles <- list.files("../outputs/","corr", full.names = T)
+corfilepairs <- basename(corfiles)|>substr(14,26)
+uds <- list.files("../outputs/", "UDprod(.*).tif$", full.names = T) 
+sds <- list.files("../outputs/", "SDprod(.*).tif$", full.names = T) 
+nus <- 1/(3600*24*c(1/24,1/12,1,3,7,14,30))
+fois <- expand.grid(pair = corfilepairs,nu = nus, foicor = 0,foiud = 0)
+cnt=1
+for (j in seq_along(nus)) {
+  nup <- nus[j]
+  for (i in seq_along(corfiles)) {
+    ind1 <- basename(corfiles[i])|>substr(14,19)
+    ind2 <- basename(corfiles[i])|>substr(21,26)
+    # get correlation file, corresponding ud and sd products
+    corrs <- read.csv(corfiles[i], row.names = 1)
+    lags <- as.numeric(row.names(corrs))
+    corrint <- colSums(exp(-nup*lags)*corrs)
+    ud <- Area/nup*raster(uds[grepl(ind1, uds) & grepl(ind2, uds)])
+    sd <- Area*raster(sds[grepl(ind1, sds) & grepl(ind2, sds)])
+    corrast <- ud
+    values(corrast) <- 0
+    corcells <- as.numeric(substring(names(corrs),2))
+    values(corrast)[corcells] <- corrint
+    foi <- beta*lam/Area*(ud+sd*corrast)
+    foi <- foi*(foi>=0)
+    fois[cnt,3] <- cellStats(foi,sum)
+    fois[cnt,4] <- cellStats(beta*lam/Area*ud,sum)
+    cnt=cnt+1
+    
+  }
+  
+}
+# PLot of FOI as a function of nu
+fois %>% 
+  ggplot()+geom_line(aes(1/(nu*3600*24),foicor, color = pair), show.legend = F)+
+  theme_classic(base_size = 16)+
+  labs(x = "Time to decay (days) ",
+       y =  "Force of Infection")
+# PLot of difference in FOI with and without correlation, for different values
+# of nu. 
+fois %>% mutate(dfoi = (foicor-foiud)/foiud) %>% 
+  ggplot()+geom_line(aes(1/(nu*24*3600),dfoi, color = pair), show.legend = F)+
+  theme_classic(base_size = 16)+
+  labs(x = "Time to decay (days) ",
+       y = "Relative contribution",
+       color = "Individuals")#+
+  scale_x_log10()
+# How much does FOI vary?
+fois %>% #filter(nu == 1/(3600*24)|nu == 1/(3600*24*14)) %>% # select two decay rates
+  group_by(pair) %>% mutate(doi = foicor/min(foicor)) %>% view()
+plot(nus*24*3600,fois,las=1,cex=1.5, xlab = expression(paste("Decay rate ",nu," (days"^"-1)")), ylab = "Force of infection")
