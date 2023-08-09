@@ -331,13 +331,14 @@ For a couple of realized movement paths this defines some specific locations whe
 
 \subsection*{Empirical example: white-tailed deer}
 The overlap between individual deer ranged between 0.31 and 0.94 (Bhattacharyya coefficient). 
-Similar to our simulations, there was one pair of individuals with highly correlated movement that had a higher estimated FOI than the others. Values for that pair were 6 times higher than the mean FOI value, and more than 200 times the minimum total FOI. 
-There were four paired combinations that did not use any of the same cells, despite having overlapping home ranges.
-The values for the total FOI across when using the correlation term were similar to the FOI estimated using only the product of the UDs, i.e. assuming independence of movement among individuals. Differences between the two were in the order of 10^-6. 
-As shown previously, the difference is linked with the decay rate, and will be different depending on the parasite survival. 
-The maximum correlation was at lag 0 for half of the cases where there was local overlap (6 of 12), which corresponds to individuals encountering each other directly. 
-
- 
+Similar to our simulations, there was one pair of individuals with substantial overlap in their trajectories that had a higher estimated FOI than the others. Values for that pair were 6 times higher than the mean FOI value, and more than 200 times the minimum total FOI. 
+There were four paired combinations that did not use any of the same cells, despite having overlapping home ranges. % this is bound to happen with small cells
+The maximum correlation was at lag 0 for half of the cases where there was local overlap (6 of 12), which corresponds to individuals encountering each other directly.
+In most cases the FOI estimated with the covariance term was higher than the one estimated without, (i.e. assuming independence of movement among individuals). However, the greatest differences were only in the order of 10^-5, or less than 4\% of the FOI without covariance, and the mean difference was 0.2\%.
+This difference is linked with the parasite decay rate, as shown previously. With slower decay rates the total FOI increased, while the relative contribution of the covariance term decreased. 
+This makes intuitive sense; if parasites can persist only short times in the environment, then transmission happens mostly through direct contact, and the covariance plays a lesser role. 
+For the pair with the largest differences between FOIs, the contribution of covariance decreased from 3.8\% for a decay rate of 1 h^-1, to 0.01\% for a decay rate of 30 days^-1.
+Given the small contribution from the covariance term, the estimated FOI was practically inversely proportional to the decay rate. 
 
 
 \section*{Discussion}
