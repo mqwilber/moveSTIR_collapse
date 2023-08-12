@@ -1,0 +1,120 @@
+---
+title: "Analytical results for correlation effect"
+author: "Mark Wilber"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+Consider the PMoveSTIR equation
+
+$$
+\begin{aligned}
+    h^*_{i \leftarrow j}(x) = \beta' \lambda \left[ p_i(x)p_j(x) \frac{1}{\nu} + \sigma_i(x) \sigma_j(x) \int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | \tau) e^{-\nu s} d\tau\right].
+\end{aligned}
+$$
+
+We can use this equation to gain some analytical insight into into how correlation is expected to affect FOI.  Let's rewrite this equation with a generic survival function $S(s)$ which gives the survival probability of the pathogen after some time period $s$.
+
+
+$$
+\begin{aligned}
+    h^*_{i \leftarrow j}(x) = \beta' \lambda \left[ p_i(x)p_j(x) \int_0^{\infty} S(s) ds + \sigma_i(x) \sigma_j(x) \int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | \tau) S(s) d\tau\right].
+\end{aligned}
+$$
+
+
+ If both hosts are moving randomly on a landscape and the area of potential contact is $A_x$ then we can rewrite this equation as
+ 
+ $$
+\begin{aligned}
+    h^*_{i \leftarrow j}(x) = \beta' \lambda \left[ \frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \int_0^{\infty} S(\tau) d\tau + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | \tau) S(\tau) d\tau\right].
+\end{aligned}
+$$
+
+Now consider the following scenario: Hosts are moving among grid cells of area $A_x$ and transmission can occur uniformly within the grid cell. Hosts reside in a grid cell for exactly $s$ time units before departing to the next grid cell.  The pathogen has 100% survival in the environment the environment for $\pi s$ time units after which survival drops to zero. $\pi$ can be any value between 0 and $\infty$, which indicates how long a pathogen can persist in the environment relative the residence time in the area $A_x$.  
+
+Given that $S(t)$ is a step function we know that $\int_0^{\infty} S(\tau) d\tau = \pi s$ and that 
+
+$$
+\frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | \tau) S(\tau) d\tau = \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \int_{0}^{\pi s} Cor(\delta_{i \in x}, \delta_{j \in x} | \tau) d\tau
+$$
+
+Since pathogen survival is zero after time $\pi s$, we don't need to consider any time points after this interval. Finally, let's assume that hosts are moving together (always sharing the same cell).  
+
+## Direct contact
+
+Let's assume that $\pi$ is small (close to zero) such that we are considering **direct contact**.  This means that $Cor(\delta_{i \in x}, \delta_{j \in x} | \tau) \approx 1$ for all $\tau$ between 0 and $\pi s$ (because hosts are moving together).  We can then write
+
+$$
+\frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | \tau) S(\tau) d\tau = \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \pi s
+$$
+We also know that if a pathogen only survives $\pi s$ time units, then $\int_0^{\infty} S(\tau) d\tau = \pi s$.  We can then substitute in and we get
+
+ $$
+\begin{aligned}
+    h^*_{i \leftarrow j}(x) = \beta' \lambda \pi s [ \frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}})].
+\end{aligned}
+$$
+So in this case, the increase in average FOI from correlation in movement due to direct contact is equal to the variance of use at location $x$. How do the magnitude of the first term and second term compare? 
+
+```{r}
+tol = 1e-5
+p = seq(tol, 1 - tol, len=500)
+ratio = (p*(1 - p)) / (p*p) # The ratio is just the odds...kinda cool
+
+plot(p, log10(ratio), type="l", xlab="Proportion of area in which contact can occur / total area of use", ylab="Log10(COV / UD)")
+
+```
+
+The contribution of covariance to the FOI due to direct contact is orders of magnitude larger than the FOI from UD overlap as the proportion of area in which a contact can occur decreases.  As the area increases, eventually covariance does not matter relative to the UD overlap.  This makes sense: if two individuals are always using an area together and never moving out of this area, then correlation doesn't matter and strictly knowing that they are always there tells you everything you need to know about FOI. In contrast, as the probability of use gets small, the covariance term starts to dominate the FOI.  This also makes sense: if two individuals rarely use an area and they move independently, they are rarely going to use it together and transmission at this location is going to be very rare.  In contrast, if they are highly correlated in there movements, then probability of transmission due to direct contact at this location is going to increase drastically compared to the UD product alone. 
+
+## Indirect contact
+
+If indirect transmission is important, $\pi$ is no longer close to zero and the pathogen can persist for a longer amount of time in the environment. In this case, the function $Cor(\delta_{i \in x}, \delta_{j \in x} | \tau)$ is more complicated and will depend on the biology of animal movement. 
+
+For simplicity, let's consider two hosts moving between two habitat patches of equal area.  Hosts reside in one patch for $s$ time units before moving to the next patch and residing there for $s$ times units and then moving back to the first patch.  Focusing on a single patch, the occupancy trajectory might look like (where 1 indicates a host is in the patch and 0 indicates the host is out of the patch at some time step)
+
+```{r}
+s = 10
+occupancy = rep(rep(c(1, 0), c(s, s)), 10)
+occupancy
+```
+Since hosts are moving together, they have the same occupancy trajectory.  We can now look at the function $Cor(\delta_{i \in x}, \delta_{j \in x} | \tau)$ over different lags $\tau$
+
+```{r}
+vals = acf(occupancy, lag.max=s*4)
+
+```
+
+There is a clear repeating pattern in the correlations.  Over the first 10 lags (or over $s$ more generally) we can approximate this as
+
+$$
+y = (-2 / s)x + 1
+$$
+
+where $x$ is the lag and $y$ is the correlation.  The approximation is pretty good over $s$ (see below).  We will assume $\pi \leq 1$ in this example so we don't need to consider any additional correlations after $s$.
+
+```{r}
+# Approximation function
+x = 0:s
+y = (-2 / s)*x + 1
+
+plot(x, as.vector(vals$acf)[0:(s + 1)], ylab="Correlation", xlab="Lags") # Empirical correlation
+lines(x, y, type="l") # 
+
+```
+
+With this approximation we can we write our FOI equation in this particular case as
+
+ $$
+\begin{aligned}
+    h^*_{i \leftarrow j}(x) &= \beta' \lambda \left[ \frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \pi s + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \int_{0}^{\pi s} (\frac{-2}{s} \tau + 1) d\tau\right] \\
+    &= \beta' \lambda \left[ \frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \pi s + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) (\frac{-\tau^2}{s} + \tau) |_0^{\pi s} \right] \\
+    &= \beta' \lambda \pi s \left[ \frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) (1 - \pi) \right] 
+\end{aligned}
+$$
+
+As $\pi$ gets small (fast pathogen decay), we recover the result for direct contact.  When $\pi = 1$ (pathogen survives $s$ time units) the covariance term disappears.  Why? Because for half the time when a host is in the cell it has a negative correlation with the past, other host and half the time it has a positive correlation with the past, other host. So these cancel out.  When there is indirect transmission, pathogen decay **relative** to movement drives the importance of covariance.  When transmission is primarily direct, pathogen decay stops really affecting the contribution of covariance to FOI. 
+
+Overall, when considering indirect transmission, the nature of the covariance function combined with pathogen decay plays a huge role in how important covariance is for FOI. But from the above example it is easy to see that there are many situations where accounting for covariance could significantly change the FOI.
+

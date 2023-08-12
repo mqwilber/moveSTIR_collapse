@@ -8,8 +8,10 @@
 *.blg
 *.fdb_latexmk
 *.fls
+*.out
 docs/figures/conceptual_figure_pmovestir.pdf
 docs/prob_movestir_theory.pdf
+docs/prob_movestir_theory.out
 *.DS_Store
 *.Rhistory
 .Rproj.user
