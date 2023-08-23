@@ -11,26 +11,32 @@
 
 # Load libraries
 library(tidyverse)
+library(cowplot)
 library(move)
 library(ctmm)
 
+#### Parameters ####
 # Set epidemiological parameters: threshold contact distance and parasite decay rate
 contact_dist <- 10 # meters
 nu <- 1/(3600*24*7)# 7 days, in seconds
 
+#### Load and prep data ####
 # Import data
 dat_raw <- read.csv("../data/cleaned_movement_data_07132023.csv")
 # the data has 13 columns: animal id, x, y, time, dop (error), capture method,
 # lat and long, age, sex, duplicate animal_id x_ y_ t_ dop method_of_capture
-# lat_capture long_capture age sex duplicate_ fast_step_ fast_roundtrip_ Some of
-# the first steps are fast steps (animals going back to their home range from
-# capture site?). I'll remove them since they seem to be different from the
-# actual home range in some cases, and they expand the grid excessively
-dat <- dat_raw[!(dat_raw$fast_step_ | dat_raw$fast_roundtrip_),]
+# lat_capture long_capture age sex duplicate_ fast_step_ fast_roundtrip_
+# I'll remove locations flagged as unrealistically fast steps
+dat1 <- dat_raw[!(dat_raw$fast_step_ | dat_raw$fast_roundtrip_),]
 
 # filter to keep only a subset of individuals
-ids <- c("151600", "151571","151589","151599","151592")
-dat <- dat[dat$animal_id %in% ids,]
+ids <- c("151564","151571","151589","151592","151599")
+dat1 <- dat1[dat1$animal_id %in% ids,]
+
+# Remove also some initial locations that were collected before the collars were
+# on the animals (during storage and transport), these show up as points outside
+# of the core areas on the road and in a town, east of ~ 306000
+dat1 <- dat1[dat1$x_<306000,]
 
 
 #### Create move and telemetry objects. ####
@@ -38,11 +44,11 @@ dat <- dat[dat$animal_id %in% ids,]
 # For the deer data I have the data as a csv,
 # so I need to import the individual columns. If it were a Move object you can
 # use that directly.
-dat_move <- move(x = dat$x_,y = dat$y_, 
-                 time = as.POSIXct(dat$t_, format = "%Y-%m-%dT%H:%M:%SZ", tz="Etc/GMT-6"), 
-                 data = data.frame(HDOP=dat$dop), 
+dat_move <- move(x = dat1$x_,y = dat1$y_, 
+                 time = as.POSIXct(dat1$t_, format = "%Y-%m-%dT%H:%M:%SZ", tz = "Etc/GMT-6"), 
+                 data = data.frame(HDOP=dat1$dop), 
                  proj = "+proj=utm +zone=16N", 
-                 animal = dat$animal_id)
+                 animal = dat1$animal_id)
 # Plot positions
 plot(dat_move, type='n',xlab = "", ylab = "")
 grid()
@@ -71,7 +77,7 @@ for (i in seq_along(FITS)) {
              grid = list(dr = c(contact_dist, contact_dist), 
                          align.to.origin = TRUE))
   # save to disk. This saves the probability mass, not the density 
-  writeRaster(UD, outname, DF = "PMF")
+  writeRaster(UD, outname, DF = "PMF", overwrite = TRUE)
   rm(UD)
 }
 
@@ -102,9 +108,9 @@ for (i in seq_len(ncol(combs))) {
   udprod <- r1*r2/Area
   sdprod <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))/Area
   # export outputs
-  writeRaster(udprod, paste0("../outputs/UDprod_",ids[ind1],"-",ids[ind2],".tif"))
-  writeRaster(sdprod, paste0("../outputs/SDprod_",ids[ind1],"-",ids[ind2],".tif"))
-  
+  writeRaster(udprod, paste0("../outputs/UDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+  writeRaster(sdprod, paste0("../outputs/SDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+
   ### CORRELATIONS
   # to estimate the correlation, I have to put the tracks in a common time
   # frame. For this, I interpolate the positions for a regular set of times
@@ -112,7 +118,7 @@ for (i in seq_len(ncol(combs))) {
   tr2 <- range(telemetries[[ind2]]$timestamp)
   
   if(max(tr1[1],tr2[1])>min(min(tr1[2],tr2[2]))) {# Check if there is temporal overlap
-    cat("There is no temporal overlap between", ids[ind1], "and", ids[ind2])
+    cat("There is no temporal overlap between", ids[ind1], "and", ids[ind2], "\n")
     foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod*Area)
   } else {
     tseq <- seq(max(tr1[1],tr2[1]),min(tr1[2],tr2[2]), "30 mins")
@@ -127,9 +133,9 @@ for (i in seq_len(ncol(combs))) {
     pos2 <- cellFromXY(r2, xy = as.matrix(interp_traj_2[,c("x","y")], ncol = 2))
     
     # keep only cells that both visited at some point
-    ovlpcells <- pos1[pos1 %in% pos2]
+    ovlpcells <- unique(pos1)[unique(pos1) %in% unique(pos2)]
     if(length(ovlpcells)==0) {
-      cat("There are no overlap cells between", ids[ind1], "and", ids[ind2])
+      cat("There are no overlap cells between", ids[ind1], "and", ids[ind2], "\n")
       foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod*Area)
     } else {
       maxlag <- nsteps-1
@@ -169,48 +175,76 @@ for (i in seq_len(ncol(combs))) {
     }
   }
   # export
-  writeRaster(foi_ab, paste0("../outputs/FOI_",ids[ind1],"-",ids[ind2],".tif"))
-  writeRaster(foi_ba, paste0("../outputs/FOI_",ids[ind2],"-",ids[ind1],".tif"))
+  writeRaster(foi_ab, paste0("../outputs/FOI_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+  writeRaster(foi_ba, paste0("../outputs/FOI_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
 }
 
 #### Correlation analysis ####
-cors <- lapply(list.files("../outputs/","corr", full.names = T), read.csv)
+cors <- lapply(list.files("../outputs/","corr", full.names = T), read.csv, row.names = 1)
 # Check the length of all correlations
 sapply(cors, ncol)
-# There is a wide variation, between just 151 rows (75.5 hours of overlap) to more than 5000 rows (104 days).
-# Similarly, there is variation in spatial overlap, between only 3 cells with
-# overlap, and up to 2500 cells
+# There is variation in spatial overlap, between only 1 cells with
+# overlap, and up to 1064 cells
 
 # Find the maximum correlation and corresponding lag
-sapply(cors, \(x) apply(x, 2, which.max)) |> sapply(min)
+data.frame(maxcor = sapply(cors, max),
+           maxclag = sapply(cors, \(x) apply(x, 2, which.max)) |> sapply(min)-1)
 
+# For four pairs, the maximum correlation is at lag 0, meaning they have direct
+# encounters. For these, the maximum correlation is 1. This is likely two
+# individuals encountering each other only once in a given cell. For others the
+# maximum correlation is close to 1, but at higher lags. These cases correspond
+# to spatial but not temporal overlap, with ~1 visits per cell for each
+# individual. Finally, in two cases the maximum correlation is actually low, in
+# the order of 1e-4. These correlations happened at high lags, and are likely
+# produced by multiple visits to the same cell. 
+
+sapply(cors, summary)
+
+# It seems the correlation is small (e-2) in most cases, let's check.
+sapply(cors, function(x) {
+  lags <- (seq_len(nrow(x))-1)*1800
+  mean(colSums(x*exp(-nu*lags)))
+})
+# The integral term with nu = 1/7days is close to 1 at the highest for a single
+# cell. In most cases the effect is negative, reducing the FOI wrt overlap-only.
+# The effect is additionally small, in the order of 1e-2. When you multiply by a
+# sd product that is already two orders of magnitude lower than the UD product,
+# then the contribution of the covariance term is very small
+par(mfrow = c(1,2))
+plot(raster("../outputs/UDprod_151571-151599.tif")/nu*Area, zlim = cellStats(raster("../outputs/UDprod_151571-151599.tif")/nu*Area,range))
+plot(raster("../outputs/SDprod_151571-151599.tif")*Area, zlim = cellStats(raster("../outputs/UDprod_151571-151599.tif")/nu*Area,range))
 
 #### Visualize total pairwise FOI ####
 totfois <- lapply(list.files("../outputs/", "FOI(.*)tif$", full.names = T), raster)|>sapply(cellStats,sum)
 totfoipairs <- list.files("../outputs/", "FOI(.*)tif$")|>strsplit("[[:punct:]]+")|>sapply("[",c(2,3))
-totfoisdf <- data.frame(t(rbind(totfoipairs,totfois)))
-names(totfoisdf) <- c("ind1","ind2","FOI")
+totfoisdf <- data.frame(foi = totfois, ind1 = totfoipairs[1,], ind2 = totfoipairs[2,])
 
 # Plot vs overlap
 totfoisdf$overlap <- overlap(FITS)$CI[,,2][lower.tri(overlap(FITS)$CI[,,2]) | upper.tri(overlap(FITS)$CI[,,2])]
-totfoisdf
+head(totfoisdf)
 
-plot(totfoisdf$overlap, totfoisdf$FOI, pch = 16, las = 1, xlab = "Home range overlap", ylab = "Total FOI")
-sapply(cors,nrow)
-plot(sapply(cors,nrow),totfoisdf$FOI)
+ggplot(totfoisdf)+geom_point(aes(overlap, foi))+
+  labs(x = "Home range overlap",
+       y = "Total pairwise FOI")+
+  lims(x = c(0,1))
+
 
 # Pairwise FOI plot
-library(ggplot2)
-ggplot(totfoisdf)+geom_raster(aes(ind1,ind2,fill=as.numeric(FOI)))+
+ggplot(totfoisdf)+geom_raster(aes(ind1,ind2,fill=as.numeric(foi)))+
   coord_equal()+
   theme_minimal(base_size = 16)+
   labs(x = "", y="", fill = "FOI")+
   scale_fill_gradientn(colors = hcl.colors(10, "Plasma"))
 
-# Plot correlated pair 
-plot(dat[dat$animal_id %in% c("151571","151589"),c("x_","y_")], type = "n", asp = 1, las = 1, xlab = "", ylab = "")
-lines(dat[dat$animal_id =="151571",c("x_","y_")], col = hcl.colors(5, "Dark 3")[2])
-lines(dat[dat$animal_id =="151589",c("x_","y_")], col = hcl.colors(5, "Dark 3")[3])
+# Pairwise FOI plot (relative to minimum FOI)
+ggplot(totfoisdf)+geom_raster(aes(ind1,ind2,fill=as.numeric(foi)/min(as.numeric(foi))))+
+  coord_equal()+
+  theme_minimal(base_size = 16)+
+  labs(x = "", y="", fill = "Relative FOI")+
+  scale_fill_gradientn(colors = hcl.colors(10, "Plasma"))
+# The FOI for the pair with highly correlated movement is more than 9000 times
+# greater than the lowest observed FOI
 
 #### FOI with and without correlation ####
 corpairs <- data.frame(ind1 = list.files("../outputs/", "corr") |> substr(14,19),
@@ -229,9 +263,11 @@ for (i in seq_len(nrow(corpairs))) {
   corpairs[i,"foi_ud"] <- cellStats(ud,sum)
   corpairs[i,"dif"] <- corpairs[i,"foi_cor"]-corpairs[i,"foi_ud"]
 }
-corpairs <- dplyr::left_join(totfoisdf,corpairs)
+corpairs <- left_join(totfoisdf,corpairs)
 corpairs
 corpairs$foi_cor/corpairs$foi_ud
+# The covariance contribution is in the order of 2e-3 at the highest.
+
 
 #### Recalculate FOI with different nu #### 
 # The effect of correlation on FOI
@@ -241,7 +277,7 @@ corfiles <- list.files("../outputs/","corr", full.names = T)
 corfilepairs <- basename(corfiles)|>substr(14,26)
 uds <- list.files("../outputs/", "UDprod(.*).tif$", full.names = T) 
 sds <- list.files("../outputs/", "SDprod(.*).tif$", full.names = T) 
-nus <- 1/(3600*24*c(1/24,1/12,1,3,7,14,30))
+nus <- 1/(3600*24*c(1/24,1/12,1/6, 1/3,1/2,1,3,7))
 fois <- expand.grid(pair = corfilepairs,nu = nus, foicor = 0,foiud = 0)
 cnt=1
 for (j in seq_along(nus)) {
@@ -264,28 +300,57 @@ for (j in seq_along(nus)) {
     fois[cnt,3] <- cellStats(foi,sum)
     fois[cnt,4] <- cellStats(beta*lam/Area*ud,sum)
     cnt=cnt+1
-    
   }
-  
 }
 # PLot of FOI as a function of nu
 fois %>% 
   ggplot()+geom_line(aes(1/(nu*3600*24),foicor, color = pair), show.legend = F)+
-  theme_classic(base_size = 16)+
+  theme_classic(base_size = 24)+
   labs(x = "Time to decay (days) ",
        y =  "Force of Infection")
 # PLot of difference in FOI with and without correlation, for different values
 # of nu. 
 fois %>% mutate(dfoi = (foicor-foiud)/foiud) %>% 
   ggplot()+geom_line(aes(1/(nu*24*3600),dfoi, color = pair), show.legend = F)+
-  theme_classic(base_size = 16)+
+  theme_classic(base_size = 24)+
   labs(x = "Time to decay (days) ",
        y = "Relative contribution",
        color = "Individuals")
 # How much does FOI vary?
 fois %>% #filter(nu == 1/(3600*24)|nu == 1/(3600*24*14)) %>% # select two decay rates
   group_by(pair) %>% mutate(doi = foicor/min(foicor)) %>% view()
-plot(nus*24*3600,fois,las=1,cex=1.5, xlab = expression(paste("Decay rate ",nu," (days"^"-1)")), ylab = "Force of infection")
+
+# Combined figure
+p1 <- ggplot(dat1)+geom_point(aes(x_,y_, color = factor(animal_id)))+
+  coord_equal()+
+  theme_minimal(base_size = 8)+
+  labs(x = "Easting (m)", y = "Northing (m)", color = "Animal ID")
+p2 <- ggplot(totfoisdf)+geom_raster(aes(ind1,ind2,fill=as.numeric(foi)))+
+  coord_equal()+
+  theme_minimal(base_size = 8)+
+  labs(x = "", y="", fill = "FOI")+
+  scale_fill_gradientn(colors = hcl.colors(10, "Plasma"))+
+  theme(legend.key.size = unit(1/12,"inch"), legend.text = element_text(size = 6))
+p3 <- ggplot(totfoisdf)+geom_point(aes(overlap, foi))+
+  theme_classic(base_size = 8)+
+  labs(x = "Home range overlap",
+       y = "Total pairwise FOI")+
+  lims(x = c(0,1))
+p4 <- fois %>% 
+  ggplot()+geom_line(aes(1/(nu*3600*24),foicor, color = pair), show.legend = F)+
+  theme_classic(base_size = 8)+
+  labs(x = "Time to decay (days) ",
+       y =  "Force of Infection")
+p5 <- fois %>% mutate(dfoi = (foicor-foiud)/foiud) %>% 
+  ggplot()+geom_line(aes(1/(nu*24*3600),dfoi, color = pair), show.legend = F)+
+  theme_classic(base_size = 8)+
+  labs(x = "Time to decay (days) ",
+       y = "Relative contribution",
+       color = "Individuals")
+x11(width = 10,height = 4.75)
+plot_grid(p1,
+          plot_grid(p2,p3,p4,p5,  labels = c("b","c","d","e"), axis = "lrbt", align = "hv"), 
+          rel_widths = c(1,1.5),  labels = "a")
 
 #### Recalculate FOI for different distances ####
 # Get new UDs using a different contact distance, for example 20 m
@@ -397,4 +462,6 @@ foidistcomp <- data.frame(foi = sapply(list.files("../outputs/","FOI(.*).tif$", 
                           d = ifelse(grepl("20m",list.files("../outputs/","FOI(.*).tif$")),20,10),
                           pair = substr(list.files("../outputs/","FOI(.*).tif$"), 5,17)
 )
-foidistcomp
+foidistcomp %>% pivot_wider(names_from = d, values_from = foi,names_prefix = "d") %>% 
+  mutate(absdif = (d20-d10),reldif = (d20-d10)/d10) %>% 
+  summary()
