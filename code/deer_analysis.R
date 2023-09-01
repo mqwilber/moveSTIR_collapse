@@ -67,7 +67,6 @@ saveRDS(FITS, "../outputs/deer_ctmm_fits.rds")
 
 # USE CTMM to build UDs with AKDE. 
 # At this step you use the threshold distance set at the beginning as the resolution of the grid.
-# epigrid <- raster(extent(dat_move), resolution = contact_dist, crs = crs(dat_move))
 FITS <- readRDS("../outputs/deer_ctmm_fits.rds")
 for (i in seq_along(FITS)) {
   # file output name
@@ -187,10 +186,12 @@ sapply(cors, ncol)
 # overlap, and up to 1064 cells
 
 # Find the maximum correlation and corresponding lag
-data.frame(maxcor = sapply(cors, max),
-           maxclag = sapply(cors, \(x) apply(x, 2, which.max)) |> sapply(min)-1)
+data.frame(name = list.files("../outputs/","corr"),
+  maxcor = sapply(cors, max),
+           maxclag = sapply(cors, \(x) apply(x, 2, which.max)) |> sapply(min)-1,
+  ncells = sapply(cors, ncol)) %>% separate(1,into = c(NA,"ind1","ind2",NA)) %>% arrange(ncells)
 
-# For four pairs, the maximum correlation is at lag 0, meaning they have direct
+# For 2 pairs, the maximum correlation is at lag 0, meaning they have direct
 # encounters. For these, the maximum correlation is 1. This is likely two
 # individuals encountering each other only once in a given cell. For others the
 # maximum correlation is close to 1, but at higher lags. These cases correspond
@@ -465,3 +466,30 @@ foidistcomp <- data.frame(foi = sapply(list.files("../outputs/","FOI(.*).tif$", 
 foidistcomp %>% pivot_wider(names_from = d, values_from = foi,names_prefix = "d") %>% 
   mutate(absdif = (d20-d10),reldif = (d20-d10)/d10) %>% 
   summary()
+
+#### FIGURES ####
+# Plot deer FOI
+pdf("../outputs/deer_FOI.pdf", width = 9)
+par(mfrow = c(2,2))
+for (i in 1:ncol(combs)) {
+  # get IDs
+  ind1 <- ids[combs[1,i]]
+  ind2 <- ids[combs[2,i]]
+  ud <- if (file.exists(paste0("../outputs/UDprod_",ind1,"-",ind2,".tif"))) {
+    raster(paste0("../outputs/UDprod_",ind1,"-",ind2,".tif"))
+  }else {raster(paste0("../outputs/UDprod_",ind2,"-",ind1,".tif"))}
+               
+  sd <- if (file.exists(paste0("../outputs/SDprod_",ind1,"-",ind2,".tif"))) {
+    raster(paste0("../outputs/SDprod_",ind1,"-",ind2,".tif"))
+  }else{raster(paste0("../outputs/SDprod_",ind2,"-",ind1,".tif"))}
+  ud <- ud*prod(res(ud))
+  sd <- sd*prod(res(sd))
+  foi <- raster(paste0("../outputs/FOI_",ind1,"-",ind2,".tif"))
+  r[is.na(r)] <- 0
+  
+  plot(telemetries[combs[,i]], col = hcl.colors(5,"Dark 3")[combs[,i]], main = paste("Tracks", ind1, ind2))
+  plot(ud,main = paste("UD product", ind1, ind2))
+  plot(sd,main = paste("SD product", ind1, ind2))
+  plot(foi, main = paste("FOI",ind1,ind2))
+}
+dev.off()
