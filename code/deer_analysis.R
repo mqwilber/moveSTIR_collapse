@@ -270,89 +270,8 @@ corpairs$foi_cor/corpairs$foi_ud
 # The covariance contribution is in the order of 2e-3 at the highest.
 
 
-#### Recalculate FOI with different nu #### 
-# The effect of correlation on FOI
-#is highly dependent on the decay parameter. Here I will recalculate FOI for a
-#set of different parameter values, one shorter and one longer '
-corfiles <- list.files("../outputs/","corr", full.names = T)
-corfilepairs <- basename(corfiles)|>substr(14,26)
-uds <- list.files("../outputs/", "UDprod(.*).tif$", full.names = T) 
-sds <- list.files("../outputs/", "SDprod(.*).tif$", full.names = T) 
-nus <- 1/(3600*24*c(1/24,1/12,1/6, 1/3,1/2,1,3,7))
-fois <- expand.grid(pair = corfilepairs,nu = nus, foicor = 0,foiud = 0)
-cnt=1
-for (j in seq_along(nus)) {
-  nup <- nus[j]
-  for (i in seq_along(corfiles)) {
-    ind1 <- basename(corfiles[i])|>substr(14,19)
-    ind2 <- basename(corfiles[i])|>substr(21,26)
-    # get correlation file, corresponding ud and sd products
-    corrs <- read.csv(corfiles[i], row.names = 1)
-    lags <- as.numeric(row.names(corrs))
-    corrint <- colSums(exp(-nup*lags)*corrs)
-    ud <- Area/nup*raster(uds[grepl(ind1, uds) & grepl(ind2, uds)])
-    sd <- Area*raster(sds[grepl(ind1, sds) & grepl(ind2, sds)])
-    corrast <- ud
-    values(corrast) <- 0
-    corcells <- as.numeric(substring(names(corrs),2))
-    values(corrast)[corcells] <- corrint
-    foi <- beta*lam/Area*(ud+sd*corrast)
-    foi <- foi*(foi>=0)
-    fois[cnt,3] <- cellStats(foi,sum)
-    fois[cnt,4] <- cellStats(beta*lam/Area*ud,sum)
-    cnt=cnt+1
-  }
-}
-# PLot of FOI as a function of nu
-fois %>% 
-  ggplot()+geom_line(aes(1/(nu*3600*24),foicor, color = pair), show.legend = F)+
-  theme_classic(base_size = 24)+
-  labs(x = "Time to decay (days) ",
-       y =  "Force of Infection")
-# PLot of difference in FOI with and without correlation, for different values
-# of nu. 
-fois %>% mutate(dfoi = (foicor-foiud)/foiud) %>% 
-  ggplot()+geom_line(aes(1/(nu*24*3600),dfoi, color = pair), show.legend = F)+
-  theme_classic(base_size = 24)+
-  labs(x = "Time to decay (days) ",
-       y = "Relative contribution",
-       color = "Individuals")
-# How much does FOI vary?
-fois %>% #filter(nu == 1/(3600*24)|nu == 1/(3600*24*14)) %>% # select two decay rates
-  group_by(pair) %>% mutate(doi = foicor/min(foicor)) %>% view()
-
-# Combined figure
-p1 <- ggplot(dat1)+geom_point(aes(x_,y_, color = factor(animal_id)))+
-  coord_equal()+
-  theme_minimal(base_size = 8)+
-  labs(x = "Easting (m)", y = "Northing (m)", color = "Animal ID")
-p2 <- ggplot(totfoisdf)+geom_raster(aes(ind1,ind2,fill=as.numeric(foi)))+
-  coord_equal()+
-  theme_minimal(base_size = 8)+
-  labs(x = "", y="", fill = "FOI")+
-  scale_fill_gradientn(colors = hcl.colors(10, "Plasma"))+
-  theme(legend.key.size = unit(1/12,"inch"), legend.text = element_text(size = 6))
-p3 <- ggplot(totfoisdf)+geom_point(aes(overlap, foi))+
-  theme_classic(base_size = 8)+
-  labs(x = "Home range overlap",
-       y = "Total pairwise FOI")+
-  lims(x = c(0,1))
-p4 <- fois %>% 
-  ggplot()+geom_line(aes(1/(nu*3600*24),foicor, color = pair), show.legend = F)+
-  theme_classic(base_size = 8)+
-  labs(x = "Time to decay (days) ",
-       y =  "Force of Infection")
-p5 <- fois %>% mutate(dfoi = (foicor-foiud)/foiud) %>% 
-  ggplot()+geom_line(aes(1/(nu*24*3600),dfoi, color = pair), show.legend = F)+
-  theme_classic(base_size = 8)+
-  labs(x = "Time to decay (days) ",
-       y = "Relative contribution",
-       color = "Individuals")
-x11(width = 10,height = 4.75)
-plot_grid(p1,
-          plot_grid(p2,p3,p4,p5,  labels = c("b","c","d","e"), axis = "lrbt", align = "hv"), 
-          rel_widths = c(1,1.5),  labels = "a")
-
+#### Recalculate FOI with different nu 
+          
 #### Recalculate FOI for different distances ####
 # Get new UDs using a different contact distance, for example 20 m
 FITS <- readRDS("../outputs/deer_ctmm_fits.rds")
@@ -469,7 +388,7 @@ foidistcomp %>% pivot_wider(names_from = d, values_from = foi,names_prefix = "d"
 
 #### FIGURES ####
 # Plot deer FOI
-pdf("../outputs/deer_FOI.pdf", width = 9)
+pdf("../outputs/deer_FOI.pdf", width = 11)
 par(mfrow = c(2,2))
 for (i in 1:ncol(combs)) {
   # get IDs
@@ -482,14 +401,97 @@ for (i in 1:ncol(combs)) {
   sd <- if (file.exists(paste0("../outputs/SDprod_",ind1,"-",ind2,".tif"))) {
     raster(paste0("../outputs/SDprod_",ind1,"-",ind2,".tif"))
   }else{raster(paste0("../outputs/SDprod_",ind2,"-",ind1,".tif"))}
-  ud <- ud*prod(res(ud))
+  ud <- ud*prod(res(ud))/nu
   sd <- sd*prod(res(sd))
   foi <- raster(paste0("../outputs/FOI_",ind1,"-",ind2,".tif"))
   r[is.na(r)] <- 0
   
   plot(telemetries[combs[,i]], col = hcl.colors(5,"Dark 3")[combs[,i]], main = paste("Tracks", ind1, ind2))
-  plot(ud,main = paste("UD product", ind1, ind2))
+  plot(ud,main = paste("scaled UD product", ind1, ind2))
   plot(sd,main = paste("SD product", ind1, ind2))
   plot(foi, main = paste("FOI",ind1,ind2))
 }
+dev.off()
+
+#### 
+# The effect of correlation on FOI
+#is highly dependent on the decay parameter. Here I will recalculate FOI for a
+#set of different parameter values, one shorter and one longer '
+corfiles <- list.files("../outputs/","corr", full.names = T)
+corfilepairs <- basename(corfiles)|>substr(14,26)
+uds <- list.files("../outputs/", "UDprod(.*).tif$", full.names = T) 
+sds <- list.files("../outputs/", "SDprod(.*).tif$", full.names = T) 
+nus <- 1/(3600*24*c(1/24,1/12,1/6, 1/3,1/2,1,3,7))
+fois <- expand.grid(pair = corfilepairs,nu = nus, foicor = 0,foiud = 0)
+cnt=1
+for (j in seq_along(nus)) {
+  nup <- nus[j]
+  for (i in seq_along(corfiles)) {
+    ind1 <- basename(corfiles[i])|>substr(14,19)
+    ind2 <- basename(corfiles[i])|>substr(21,26)
+    # get correlation file, corresponding ud and sd products
+    corrs <- read.csv(corfiles[i], row.names = 1)
+    lags <- as.numeric(row.names(corrs))
+    corrint <- colSums(exp(-nup*lags)*corrs)
+    ud <- Area/nup*raster(uds[grepl(ind1, uds) & grepl(ind2, uds)])
+    sd <- Area*raster(sds[grepl(ind1, sds) & grepl(ind2, sds)])
+    corrast <- ud
+    values(corrast) <- 0
+    corcells <- as.numeric(substring(names(corrs),2))
+    values(corrast)[corcells] <- corrint
+    foi <- beta*lam/Area*(ud+sd*corrast)
+    foi <- foi*(foi>=0)
+    fois[cnt,3] <- cellStats(foi,sum)
+    fois[cnt,4] <- cellStats(beta*lam/Area*ud,sum)
+    cnt=cnt+1
+  }
+}
+# PLot of FOI as a function of nu
+fois %>% 
+  ggplot()+geom_line(aes(1/(nu*3600*24),foicor, color = pair), show.legend = F)+
+  theme_classic(base_size = 24)+
+  labs(x = "Time to decay (days) ",
+       y =  "Force of Infection")
+# PLot of difference in FOI with and without correlation, for different values
+# of nu. 
+fois %>% mutate(dfoi = (foicor-foiud)/foiud) %>% 
+  ggplot()+geom_line(aes(1/(nu*24*3600),dfoi, color = pair), show.legend = F)+
+  theme_classic(base_size = 24)+
+  labs(x = "Time to decay (days) ",
+       y = "Relative contribution",
+       color = "Individuals")
+# How much does FOI vary?
+fois %>% #filter(nu == 1/(3600*24)|nu == 1/(3600*24*14)) %>% # select two decay rates
+  group_by(pair) %>% mutate(doi = foicor/min(foicor)) %>% view()
+
+# Combined figure
+p1 <- ggplot(dat1)+geom_point(aes(x_,y_, color = factor(animal_id)), shape=1)+
+  coord_equal()+
+  theme_minimal(base_size = 10)+
+  labs(x = "Easting (m)", y = "Northing (m)", color = "Animal ID")+
+  theme(legend.position = c(0.95,0.05), legend.justification = c(0.9,0.1))
+p2 <- ggplot(totfoisdf)+geom_raster(aes(ind1,ind2,fill=foi))+
+  coord_equal()+
+  theme_minimal(base_size = 10)+
+  labs(x = "", y="", fill = "FOI")+
+  scale_fill_gradientn(colors = hcl.colors(10, "Plasma"))+
+  theme(legend.key.size = unit(1/8,"inch"), legend.text = element_text(size = 6))
+p3 <- ggplot(totfoisdf)+geom_point(aes(overlap, foi))+
+  theme_classic(base_size = 10)+
+  labs(x = "Home range overlap",
+       y = "Total pairwise FOI")+
+  lims(x = c(0,1))
+# p4 <- fois %>% 
+#   ggplot()+geom_line(aes(1/(nu*3600*24),foicor, color = pair), show.legend = F)+
+#   theme_classic(base_size = 8)+
+#   labs(x = "Time to decay (days) ",
+#        y =  "Force of Infection")
+# p5 <- fois %>% mutate(dfoi = (foicor-foiud)/foiud) %>% 
+#   ggplot()+geom_line(aes(1/(nu*24*3600),dfoi, color = pair), show.legend = F)+
+#   theme_classic(base_size = 8)+
+#   labs(x = "Time to decay (days) ",
+#        y = "Relative contribution",
+#        color = "Individuals")
+pdf("../docs/figures/deer_results.pdf", width = 8,height = 6)
+plot_grid(p1,plot_grid(p3,p2, labels = c("b", "c"), ncol=1, axis = "lr", align = "v", rel_heights = c(0.8,1)), labels = "a", rel_widths = c(1,0.7))
 dev.off()
