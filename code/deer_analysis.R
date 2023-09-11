@@ -19,6 +19,8 @@ library(ctmm)
 # Set epidemiological parameters: threshold contact distance and parasite decay rate
 contact_dist <- 10 # meters
 nu <- 1/(3600*24*7)# 7 days, in seconds
+beta <- 1 # search efficiency, m^2/s
+lam <- 1/(3600*2) # deposition rate, s^-1
 
 #### Load and prep data ####
 # Import data
@@ -80,7 +82,7 @@ for (i in seq_along(FITS)) {
   rm(UD)
 }
 
-#### Pairwise FOI ####
+#### FOI ####
 # get names of files with UD grids
 fnames <- paste0("../outputs/X", ids, ".tif")
 
@@ -104,8 +106,8 @@ for (i in seq_len(ncol(combs))) {
   # cell area
   Area <- prod(res(r1))
   # get the UD and sd products
-  udprod <- r1*r2/Area
-  sdprod <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))/Area
+  udprod <- r1*r2
+  sdprod <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))
   # export outputs
   writeRaster(udprod, paste0("../outputs/UDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
   writeRaster(sdprod, paste0("../outputs/SDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
@@ -118,7 +120,7 @@ for (i in seq_len(ncol(combs))) {
   
   if(max(tr1[1],tr2[1])>min(min(tr1[2],tr2[2]))) {# Check if there is temporal overlap
     cat("There is no temporal overlap between", ids[ind1], "and", ids[ind2], "\n")
-    foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod*Area)
+    foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
   } else {
     tseq <- seq(max(tr1[1],tr2[1]),min(tr1[2],tr2[2]), "30 mins")
     lags <- as.numeric(tseq-min(tseq))
@@ -135,7 +137,7 @@ for (i in seq_len(ncol(combs))) {
     ovlpcells <- unique(pos1)[unique(pos1) %in% unique(pos2)]
     if(length(ovlpcells)==0) {
       cat("There are no overlap cells between", ids[ind1], "and", ids[ind2], "\n")
-      foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod*Area)
+      foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
     } else {
       maxlag <- nsteps-1
       cormat_ab <- cormat_ba <- matrix(0, nrow = nsteps, ncol = length(ovlpcells))
@@ -164,9 +166,13 @@ for (i in seq_len(ncol(combs))) {
       corrast_ab <- corrast_ba <- udprod
       values(corrast_ab) <- corvals_ab
       values(corrast_ba) <- corvals_ba
+      # Export scaled cross-corr rasters
+      writeRaster(corrast_ab, paste0("../outputs/Corrast_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+      writeRaster(corrast_ba, paste0("../outputs/Corrast_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
+      
       # Calculate FOI
-      foi_ab <- beta/Area*lam*(1/nu*udprod*Area+sdprod*Area*corrast_ab)
-      foi_ba <- beta/Area*lam*(1/nu*udprod*Area+sdprod*Area*corrast_ba)
+      foi_ab <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ab)
+      foi_ba <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ba)
       
       # Keep only positive values
       foi_ab <- foi_ab*(foi_ab>=0)
@@ -178,43 +184,15 @@ for (i in seq_len(ncol(combs))) {
   writeRaster(foi_ba, paste0("../outputs/FOI_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
 }
 
-#### Correlation analysis ####
-cors <- lapply(list.files("../outputs/","corr", full.names = T), read.csv, row.names = 1)
-# Check the length of all correlations
-sapply(cors, ncol)
-# There is variation in spatial overlap, between only 1 cells with
-# overlap, and up to 1064 cells
+#### Step randomization (Spiegel 2016) #### 
 
-# Find the maximum correlation and corresponding lag
-data.frame(name = list.files("../outputs/","corr"),
-  maxcor = sapply(cors, max),
-           maxclag = sapply(cors, \(x) apply(x, 2, which.max)) |> sapply(min)-1,
-  ncells = sapply(cors, ncol)) %>% separate(1,into = c(NA,"ind1","ind2",NA)) %>% arrange(ncells)
-
-# For 2 pairs, the maximum correlation is at lag 0, meaning they have direct
-# encounters. For these, the maximum correlation is 1. This is likely two
-# individuals encountering each other only once in a given cell. For others the
-# maximum correlation is close to 1, but at higher lags. These cases correspond
-# to spatial but not temporal overlap, with ~1 visits per cell for each
-# individual. Finally, in two cases the maximum correlation is actually low, in
-# the order of 1e-4. These correlations happened at high lags, and are likely
-# produced by multiple visits to the same cell. 
-
-sapply(cors, summary)
-
-# It seems the correlation is small (e-2) in most cases, let's check.
-sapply(cors, function(x) {
-  lags <- (seq_len(nrow(x))-1)*1800
-  mean(colSums(x*exp(-nu*lags)))
-})
-# The integral term with nu = 1/7days is close to 1 at the highest for a single
-# cell. In most cases the effect is negative, reducing the FOI wrt overlap-only.
-# The effect is additionally small, in the order of 1e-2. When you multiply by a
-# sd product that is already two orders of magnitude lower than the UD product,
-# then the contribution of the covariance term is very small
-par(mfrow = c(1,2))
-plot(raster("../outputs/UDprod_151571-151599.tif")/nu*Area, zlim = cellStats(raster("../outputs/UDprod_151571-151599.tif")/nu*Area,range))
-plot(raster("../outputs/SDprod_151571-151599.tif")*Area, zlim = cellStats(raster("../outputs/UDprod_151571-151599.tif")/nu*Area,range))
+#One way to determine the contribution of the correlation in movement is to
+#randomize the steps within each individual, and recalculate the correlation. We
+#would expect if correlation is playing a sizeable role, randomizing the steps
+#of tracks that are originally correlated tracks would reduce the overall FOI I
+#can do this randomization using the spatsoc package, and then redo the process
+#of calculating correlations and FOI. The steps are the same, so the UD and SD
+#should stay constant 
 
 #### Visualize total pairwise FOI ####
 totfois <- lapply(list.files("../outputs/", "FOI(.*)tif$", full.names = T), raster)|>sapply(cellStats,sum)
@@ -247,13 +225,76 @@ ggplot(totfoisdf)+geom_raster(aes(ind1,ind2,fill=as.numeric(foi)/min(as.numeric(
 # The FOI for the pair with highly correlated movement is more than 9000 times
 # greater than the lowest observed FOI
 
+
+#### Correlation analysis ####
+cors <- lapply(list.files("../outputs/","corr", full.names = T), read.csv, row.names = 1)
+# Check the length of all correlations
+sapply(cors, ncol)
+# There is variation in spatial overlap, between only 1 cells with
+# overlap, and up to 1064 cells
+
+# Find the maximum correlation and corresponding lag
+data.frame(name = list.files("../outputs/","corr"),
+  maxcor = sapply(cors, max),
+           maxclag = sapply(cors, \(x) apply(x, 2, which.max)) |> sapply(min)-1,
+  ncells = sapply(cors, ncol)) %>% separate(1,into = c(NA,"ind1","ind2",NA)) %>% arrange(ncells)
+
+# For 2 pairs, the maximum correlation is at lag 0, meaning they have direct
+# encounters. For these, the maximum correlation is 1. This is likely two
+# individuals encountering each other only once in a given cell. For others the
+# maximum correlation is close to 1, but at higher lags. These cases correspond
+# to spatial but not temporal overlap, with ~1 visits per cell for each
+# individual. Finally, in two cases the maximum correlation is actually low, in
+# the order of 1e-4. These correlations happened at high lags, and are likely
+# produced by multiple visits to the same cell. 
+
+sapply(cors, summary)
+
+# It seems the correlation is small (e-2) in most cases, let's check.
+sapply(cors, function(x) {
+  lags <- (seq_len(nrow(x))-1)*1800
+  summary(colSums(x*exp(-nu*lags)))
+}) 
+
+# The integral term with nu = 1/7days is close to 1 at the highest for a single
+# cell. In most cases the effect is negative, reducing the FOI wrt overlap-only.
+# The effect is additionally small, in the order of 1e-2. When you multiply by a
+# sd product that is already two orders of magnitude lower than the UD product,
+# then the contribution of the covariance term is very small
+sapply(cors, function(x) {
+  lags <- (seq_len(nrow(x))-1)*1800
+  c(negcells = sum(colSums(x*exp(-nu*lags))<0),
+    totcells = ncol(x))
+})|> rbind(pair = substr(list.files("../outputs/","corr"), 14, 26)) |> t()
+
+# In most cases, the cumulative scaled correlation is negative, and would reduce
+# the FOI, but by how much?
+
 #### FOI with and without correlation ####
+corrastfiles <- list.files("../outputs/", "Corrast(.*).tif$", full.names = T)
+udprodfiles <- list.files("../outputs/", "UDprod(.*).tif$", full.names = T) 
+sdprodfiles <- list.files("../outputs/", "SDprod(.*).tif$", full.names = T) 
+
+pdf("../docs/figures/Cov_contrib.pdf")
+for (i in seq_along(corrastfiles)) {
+  ind1 = substr(basename(corrastfiles[i]),9,14)
+  ind2 = substr(basename(corrastfiles[i]),16,21)
+  corrast <- raster(corrastfiles[i])
+  Area <- prod(res(corrast))
+  ud <- 1/nu*raster(udprodfiles[grepl(ind1, udprodfiles) & grepl(ind2, udprodfiles)])
+  sd <- raster(sdprodfiles[grepl(ind1, sdprodfiles) & grepl(ind2, sdprodfiles)])
+  covrast <- sd*corrast
+  plot(covrast/ud, main = paste("Covariance/UD",ind1,ind2))
+}
+dev.off()
+
+# The approach below calculates only total FOI, not by cell
 corpairs <- data.frame(ind1 = list.files("../outputs/", "corr") |> substr(14,19),
            ind2 = list.files("../outputs/", "corr") |> substr(21,26),
            foi_cor = 0,
            foi_ud = 0,
            dif = 0)
-uds <- list.files("../outputs/", "UDprod(.*).tif$", full.names = T) 
+
 
 for (i in seq_len(nrow(corpairs))) {
   ind1 <- corpairs[i,1]
@@ -270,7 +311,7 @@ corpairs$foi_cor/corpairs$foi_ud
 # The covariance contribution is in the order of 2e-3 at the highest.
 
 
-#### Recalculate FOI with different nu 
+
           
 #### Recalculate FOI for different distances ####
 # Get new UDs using a different contact distance, for example 20 m
@@ -386,34 +427,9 @@ foidistcomp %>% pivot_wider(names_from = d, values_from = foi,names_prefix = "d"
   mutate(absdif = (d20-d10),reldif = (d20-d10)/d10) %>% 
   summary()
 
-#### FIGURES ####
-# Plot deer FOI
-pdf("../outputs/deer_FOI.pdf", width = 11)
-par(mfrow = c(2,2))
-for (i in 1:ncol(combs)) {
-  # get IDs
-  ind1 <- ids[combs[1,i]]
-  ind2 <- ids[combs[2,i]]
-  ud <- if (file.exists(paste0("../outputs/UDprod_",ind1,"-",ind2,".tif"))) {
-    raster(paste0("../outputs/UDprod_",ind1,"-",ind2,".tif"))
-  }else {raster(paste0("../outputs/UDprod_",ind2,"-",ind1,".tif"))}
-               
-  sd <- if (file.exists(paste0("../outputs/SDprod_",ind1,"-",ind2,".tif"))) {
-    raster(paste0("../outputs/SDprod_",ind1,"-",ind2,".tif"))
-  }else{raster(paste0("../outputs/SDprod_",ind2,"-",ind1,".tif"))}
-  ud <- ud*prod(res(ud))/nu
-  sd <- sd*prod(res(sd))
-  foi <- raster(paste0("../outputs/FOI_",ind1,"-",ind2,".tif"))
-  r[is.na(r)] <- 0
-  
-  plot(telemetries[combs[,i]], col = hcl.colors(5,"Dark 3")[combs[,i]], main = paste("Tracks", ind1, ind2))
-  plot(ud,main = paste("scaled UD product", ind1, ind2))
-  plot(sd,main = paste("SD product", ind1, ind2))
-  plot(foi, main = paste("FOI",ind1,ind2))
-}
-dev.off()
 
-#### 
+
+#### Recalculate FOI with different nu #### 
 # The effect of correlation on FOI
 #is highly dependent on the decay parameter. Here I will recalculate FOI for a
 #set of different parameter values, one shorter and one longer '
@@ -446,6 +462,33 @@ for (j in seq_along(nus)) {
     cnt=cnt+1
   }
 }
+#### FIGURES ####
+# Plot deer FOI
+pdf("../outputs/deer_FOI.pdf", width = 11)
+par(mfrow = c(2,2))
+for (i in 1:ncol(combs)) {
+  # get IDs
+  ind1 <- ids[combs[1,i]]
+  ind2 <- ids[combs[2,i]]
+  ud <- if (file.exists(paste0("../outputs/UDprod_",ind1,"-",ind2,".tif"))) {
+    raster(paste0("../outputs/UDprod_",ind1,"-",ind2,".tif"))
+  }else {raster(paste0("../outputs/UDprod_",ind2,"-",ind1,".tif"))}
+  
+  sd <- if (file.exists(paste0("../outputs/SDprod_",ind1,"-",ind2,".tif"))) {
+    raster(paste0("../outputs/SDprod_",ind1,"-",ind2,".tif"))
+  }else{raster(paste0("../outputs/SDprod_",ind2,"-",ind1,".tif"))}
+  ud <- ud*prod(res(ud))/nu
+  sd <- sd*prod(res(sd))
+  foi <- raster(paste0("../outputs/FOI_",ind1,"-",ind2,".tif"))
+  r[is.na(r)] <- 0
+  
+  plot(telemetries[combs[,i]], col = hcl.colors(5,"Dark 3")[combs[,i]], main = paste("Tracks", ind1, ind2))
+  plot(ud,main = paste("scaled UD product", ind1, ind2))
+  plot(sd,main = paste("SD product", ind1, ind2))
+  plot(foi, main = paste("FOI",ind1,ind2))
+}
+dev.off()
+
 # PLot of FOI as a function of nu
 fois %>% 
   ggplot()+geom_line(aes(1/(nu*3600*24),foicor, color = pair), show.legend = F)+

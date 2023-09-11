@@ -1,0 +1,323 @@
+---
+title: "Analysis of deer data using the PMoveSTIR framework"
+author: "Juan S Vargas"
+date: "2023-09-08"
+output: html_document
+---
+# Introduction
+We have developed a framework to estimate the expected FOI from movement data (e.g. GPS collar data). The original position data is used to create individual utilization distributions, and to estimate the cross-correlation in space use.
+The process is as follows:
+
+  1. Estimate utilization distributions. This could be done using autocorrelated kernel density estimations based on continuous-time movement models, or regular kernel density estimations. The grid over which the UDs are estimated is made up of square cells with side length equal to $d$, the epidemiological contact distance. We assume a uniform contact probability if both individuals are in the same cell.
+  2. For every cell, calculate the product of the UDs and the SDs. It is important here that the values we are using represent the total probability per cell, i.e. the probability density function integrated over the area of the cell. In the UD objects of ctmm this corresponds to the PMF (Probability Mass Function), and is equal to the average PDF per cell multiplied by the cell area.
+  3. Get the position history for every individual. As a first step we interpolate the trajectories so that the timestamps are the same for both individuals in a pair. 
+  4. Calculate the correlation in presence for every cell and every pair, at different lags.
+  5. Scale the values by the parasite survival function. Here we assume a constant rate of decay $\nu$, represented by an exponential function $S(t)=e^{-\nu t}$. The decay process also scales the product of the UDs. This value is approximated by $1/\nu$.
+
+
+```{r libraries, message=FALSE}
+# Load libraries
+library(tidyverse)
+library(raster)
+library(move)
+library(ctmm)
+```
+
+
+## Parameters
+Set epidemiological parameters: threshold contact distance and parasite decay rate. These parameters influence the size of the area $x$ in which contact can occur, and how long the parasite persists in the environment. We also set the transmission parameter $\beta$ and the deposition rate $\lambda$. These are important for the estimation of the absolute value of FOI, but they are scalars so they don't matter much for comparative analyses.
+
+```{r params}
+contact_dist <- 10 # meters
+nu <- 1/(3600*24*7)# 7 days, in seconds
+beta <- 1 # search efficiency, m^2/s
+lam <- 1/(3600*2) # deposition rate, s^-1
+```
+
+## Load and prepare data
+
+```{r}
+# Import data
+dat_raw <- read.csv("../data/cleaned_movement_data_07132023.csv")
+# the data has 13 columns: animal id, x, y, time, dop (error), capture method,
+# lat and long, age, sex, duplicate animal_id x_ y_ t_ dop method_of_capture
+# lat_capture long_capture age sex duplicate_ fast_step_ fast_roundtrip_
+# I'll remove locations flagged as unrealistically fast steps
+dat1 <- dat_raw[!(dat_raw$fast_step_ | dat_raw$fast_roundtrip_),]
+
+# filter to keep only a subset of individuals
+ids <- c("151564","151571","151589","151592","151599")
+dat1 <- dat1[dat1$animal_id %in% ids,]
+
+# Remove also some initial locations that were collected before the collars were
+# on the animals (during storage and transport), these show up as points outside
+# of the core areas on the road and in a town, east of ~ 306000
+dat1 <- dat1[dat1$x_<306000,]
+```
+
+
+## Create move and telemetry objects.
+
+The ctmm analysis requires an object of type `telemetry`, which can be created from a `move` object. We can create the move object from csv data.
+
+```{r telemetries, message=FALSE}
+dat_move <- move(x = dat1$x_,y = dat1$y_, 
+                 time = as.POSIXct(dat1$t_, format = "%Y-%m-%dT%H:%M:%SZ", tz = "Etc/GMT-6"), 
+                 data = data.frame(HDOP=dat1$dop), 
+                 proj = "+proj=utm +zone=16N", 
+                 animal = dat1$animal_id)
+telemetries <- as.telemetry(dat_move)
+plot(telemetries, col = hcl.colors(length(telemetries), "Dark 3"))
+legend("bottomright", legend = ids, pch = 1, col = hcl.colors(length(telemetries), "Dark 3"))
+```
+
+
+# Utilization distribution
+
+The utilization distribution can be obtained in two ways, 1) fitting a CTMM model to the movement data, and using autocorrelated kernel density estimation to obtain the UD, 2) using kernel density estimation. The latter does not account for autocorrelation in movement.
+
+```{r ctmm, eval=FALSE}
+# Fit a CTMM model to the trajectories
+GUESS <- lapply(telemetries, \(i) ctmm.guess(i, interactive = F))
+FITS <- lapply(seq_along(telemetries), \(i) ctmm.select(telemetries[[i]], GUESS[[i]])) 
+names(FITS) <- names(telemetries)
+# export
+saveRDS(FITS, "../outputs/deer_ctmm_fits.rds")
+```
+
+## Autocorrelated kernel density estimation 
+At this step you use the threshold distance set at the beginning as the resolution of the grid.
+
+```{r akde, eval=FALSE}
+FITS <- readRDS("../outputs/deer_ctmm_fits.rds")
+for (i in seq_along(FITS)) {
+  # file output name
+  outname <- paste0("../outputs/", names(FITS)[i], ".tif")
+  # create UD
+  UD <- akde(data = telemetries[[i]], CTMM = FITS[[i]], 
+             grid = list(dr = c(contact_dist, contact_dist), 
+                         align.to.origin = TRUE))
+  # save to disk. This saves the probability mass, not the density 
+  writeRaster(UD, outname, DF = "PMF", overwrite = TRUE)
+  rm(UD)
+}
+```
+
+## Kernel density estimation
+We can also use simple kernel density estimation, which is much faster and often produces similar output. We use the `adehabitatHR` package, and transform the data to a SpatialPoints object.
+
+```{r KDE}
+library(adehabitatHR)
+# Create SpatialPoints object
+dat_sp <- SpatialPointsDataFrame(coords = dat1[,c("x_","y_")], data = data.frame(id = dat1$animal_id))
+# Create grid on which UD will be estimated
+kde_grid <- SpatialGrid(grid = GridTopology(cellcentre.offset =bbox(dat_sp)[,1]-bbox(dat_sp)[,1]%%10, cellsize = c(contact_dist,contact_dist), cells.dim = ceiling(apply(bbox(dat_sp), 1, diff)/contact_dist)))
+kde_grid_px <- SpatialPixels(SpatialPoints(coordinates(kde_grid)))
+# Estimate UD
+ud_kde <- kernelUD(dat_sp, grid = kde_grid_px)
+```
+
+How similar are the estimated UDs? Here is one example.
+```{r}
+ud_kde_rasts <- lapply(ud_kde,raster)
+par(mfrow = c(1,3))
+with(list(a = raster(list.files("../outputs/", "X(.*)tif$", full.names = T)[1]),
+          b = ud_kde_rasts[[1]]*contact_dist^2),{
+            raster::plot(crop(a,b), main = "AKDE UD")
+            raster::plot(b, main = "KDE UD")
+            raster::plot((a-b)/a, main = "Relative difference\nbetween KDE and AKDE UDs")})
+```
+
+There are some important differences in the probability, since it is more concentrated for the KDE, the probability values are higher. The AKDE account for movement between core areas and spreads the probability across larger space. I will move forward using the AKDE estimates.
+
+# FOI calculation
+
+The pairwise local FOI assuming temporal stationarity is calculated as:
+
+$$
+h_{i\leftarrow j}(x)=\frac{\tilde\beta\lambda}{A_x}\left(\frac{1}{\nu}p_i(x)p_j(x)+\sigma_i(x)\sigma_j(x)\int_0^SCor(\delta_i(x)\delta_j(x))e^{-\nu\tau}d\tau\right)
+$$
+
+The first term in brackets is the product of the local UD probabilities, i.e. the probabilities of being in cell $x$ at any time. The second term is the product of the standard deviation of the probabilities. Both of these terms are calculated based on the UDs estimated before. The probability $p_i(x)$ in each cell is the probability density function, integrated across the cell. In practice it is the _average_ probability in the cell multiplied by the cell area. We use these probabilities to calculate the pairwise product of the UDs ($p_i(x)p_j(x)$) and of their respective standard deviations. ($\sigma_i(x)\sigma_j(x)=\sqrt{p_i(x)(1-p_i(x))}\sqrt{(p_j(x)(1-p_j(x))}$).
+The following step is to obtain the cross-correlation term. The cross-correlation assumes a constant sampling interval, so we must first interpolate the trajectories so that they have the same timestamps, and the positions are obtained at regular intervals. This also fills in gaps in the data where the positions were not obtained. 
+Given the interpolated trajectories, we determine which cell of the UD/SD grid the individuals are in at each timestep. From this, we determine which cells were visited by both individuals. For each one of these overlap cells, we create a binary presence vector for each individual. These vectors are the input for calculating the cross-correlation. The cross-correlation is given for positive and negative lags, which is the same as calculating for individual $i$ after $j$, or *vice versa*. We split the cross-correlation values into two series to reflect this. The correlation values are then multiplied by the decay parameter, and integrated across lags. 
+Finally, we put it all together. We multiply the cross-correlation term by the product of the standard deviations, and add it to the product of the UDs, scaled by \nu. 
+
+
+```{r foi_calc, eval=FALSE}
+# get names of files with UD grids
+fnames <- paste0("../outputs/X", ids, ".tif")
+# Possible combinations of individuals
+combs <- combn(length(ids), 2)
+
+# Calculate UD and SD products from UD pair values, the correlations, and
+# corresponding FOIs
+for (i in seq_len(ncol(combs))) {
+  # read in UDs, two at a time
+  ind1 <- combs[1,i]
+  ind2 <- combs[2,i]
+  
+  r1 <- raster(fnames[ind1]) 
+  r2 <- raster(fnames[ind2])
+  
+  # Check whether the grids overlap/extend to a common grid for both, or all
+  r1 <- extend(r1, extent(merge(r1,r2)), value = 0)
+  r2 <- extend(r2, extent(merge(r1,r2)), value = 0)
+  
+  # cell area
+  Area <- prod(res(r1))
+  # get the UD and sd products
+  udprod <- r1*r2
+  sdprod <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))
+  # export outputs
+  writeRaster(udprod, paste0("../outputs/UDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+  writeRaster(sdprod, paste0("../outputs/SDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+
+  ### CORRELATIONS
+  # to estimate the correlation, I have to put the tracks in a common time
+  # frame. For this, I interpolate the positions for a regular set of times
+  tr1 <- range(telemetries[[ind1]]$timestamp)
+  tr2 <- range(telemetries[[ind2]]$timestamp)
+  
+  if(max(tr1[1],tr2[1])>min(min(tr1[2],tr2[2]))) {# Check if there is temporal overlap
+    cat("There is no temporal overlap between", ids[ind1], "and", ids[ind2], "\n")
+    foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
+  } else {
+    tseq <- seq(max(tr1[1],tr2[1]),min(tr1[2],tr2[2]), "30 mins")
+    lags <- as.numeric(tseq-min(tseq))
+    nsteps <- length(tseq)
+    # Interpolate trajectories
+    interp_traj_1 <- predict(telemetries[[ind1]], FITS[[ind1]], t = tseq) 
+    interp_traj_2 <- predict(telemetries[[ind2]], FITS[[ind2]], t = tseq)
+    
+    # get position histories, this is the cell that the individual is in at
+    # every timestep
+    pos1 <- cellFromXY(r1, xy = as.matrix(interp_traj_1[,c("x","y")], ncol = 2))
+    pos2 <- cellFromXY(r2, xy = as.matrix(interp_traj_2[,c("x","y")], ncol = 2))
+    
+    # keep only cells that both visited at some point
+    ovlpcells <- unique(pos1)[unique(pos1) %in% unique(pos2)]
+    if(length(ovlpcells)==0) {
+      cat("There are no overlap cells between", ids[ind1], "and", ids[ind2], "\n")
+      foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
+    } else {
+      # maximum lag to estimate cross-correlation. Using all lags here.
+      maxlag <- nsteps-1
+      # create matrix to store correlations
+      cormat_ab <- cormat_ba <- matrix(0, nrow = nsteps, ncol = length(ovlpcells))
+      # for every cell where there was overlap, create the presence vector for
+      # both individuals and calculate the cross-correlation between the vectors
+      for (j in seq_along(ovlpcells)) {
+        cell <- ovlpcells[j]
+        cellx <- xFromCell(r1,cell)
+        celly <- yFromCell(r1,cell)
+        # vectors with presence/absence
+        a <- b <- numeric(nsteps)
+        a[match(cell, pos1)] <- b[match(cell, pos2)]<- 1
+        # calculate cross-corr
+        xcorr <- ccf(a,b,lag.max = maxlag, plot = F)
+        xcorr_vals <- as.numeric(xcorr$acf)
+        # split the cross-corrs in half, the first half in reverse order
+        # corresponds to j->i, and the second half corresponds to i->j
+        cormat_ab[,j] <- rev(xcorr_vals[1:nsteps])
+        cormat_ba[,j] <- xcorr_vals[nsteps:length(xcorr_vals)]
+      }
+      dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(lag = tseq-min(tseq), cell = ovlpcells)
+      # Export 
+      write.csv(cormat_ab, paste0("../outputs/correlations_",ids[ind1],"-",ids[ind2],".csv"))
+      write.csv(cormat_ba, paste0("../outputs/correlations_",ids[ind2],"-",ids[ind1],".csv"))
+      
+      ## FOI
+      # scale correlation by e^-nu*tau and integrate at every cell
+      corcells <- ovlpcells
+      corvals_ab <- corvals_ba <- numeric(length(udprod))
+      corvals_ab[corcells] <- colSums(cormat_ab*exp(-nu*lags))
+      corvals_ba[corcells] <- colSums(cormat_ba*exp(-nu*lags))
+      # create new rasters, and assign the values estimated with the correlations
+      corrast_ab <- corrast_ba <- udprod
+      values(corrast_ab) <- corvals_ab
+      values(corrast_ba) <- corvals_ba
+      # Export scaled cross-corr rasters
+      writeRaster(corrast_ab, paste0("../outputs/Corrast_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+      writeRaster(corrast_ba, paste0("../outputs/Corrast_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
+      
+      # Calculate FOI
+      foi_ab <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ab)
+      foi_ba <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ba)
+      
+      # Keep only positive values
+      foi_ab <- foi_ab*(foi_ab>=0)
+      foi_ba <- foi_ba*(foi_ba>=0)
+    }
+  }
+  # export FOI rasters
+  writeRaster(foi_ab, paste0("../outputs/FOI_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+  writeRaster(foi_ba, paste0("../outputs/FOI_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
+}
+```
+
+
+# Visualization
+## Total FOI
+```{r}
+FITS <- readRDS("../outputs/deer_ctmm_fits.rds")
+totfois <- lapply(list.files("../outputs/", "FOI(.*)tif$", full.names = T), raster)|>sapply(cellStats,sum)
+totfoipairs <- list.files("../outputs/", "FOI(.*)tif$")|>strsplit("[[:punct:]]+")|>sapply("[",c(2,3))
+totfoisdf <- data.frame(foi = totfois, ind1 = totfoipairs[1,], ind2 = totfoipairs[2,])
+
+# Plot vs overlap
+totfoisdf$overlap <- overlap(FITS)$CI[,,2][lower.tri(overlap(FITS)$CI[,,2]) | upper.tri(overlap(FITS)$CI[,,2])]
+head(totfoisdf)
+
+ggplot(totfoisdf)+geom_point(aes(overlap, foi))+
+  labs(x = "Home range overlap",
+       y = "Total pairwise FOI")+
+  lims(x = c(0,1))
+```
+
+
+## Pairwise FOI
+```{r}
+ggplot(totfoisdf)+geom_raster(aes(ind1,ind2,fill=as.numeric(foi)))+
+  coord_equal()+
+  theme_minimal(base_size = 16)+
+  labs(x = "", y="", fill = "FOI")+
+  scale_fill_gradientn(colors = hcl.colors(10, "Plasma"))
+```
+
+
+Pairs with higher overlap have usually higher FOI, but there is one case that has a much higher FOI with similar overlap index. This pair is potentially a mother with its calf, so their movement should be highly correlated. How much of the FOI is due to the high spatial overlap, compared to the contribution of the temporal correlation?
+
+# Contribution of correlation to FOI
+
+We calculate the relative contribution of covariance/correlation to the local (cell) and overall pairwise FOI. In some cases the covariance term (SD product multiplied by correlation terms) is negative and greater than the product of the UDs. The cell FOI would become negative, which by definition is not possible. In these cases the contribution is set to equal the product of the UDs, but with negative sign. 
+Here I calculate the contribution for three pairs: 151589 with 151571 (the mother-calf pair), 151599 with 151571, and 151564 with 151599. 
+
+```{r cov-contrib, fig.height=10}
+corrastfiles <- list.files("../outputs/", "Corrast(.*).tif$", full.names = T)
+udprodfiles <- list.files("../outputs/", "UDprod(.*).tif$", full.names = T) 
+sdprodfiles <- list.files("../outputs/", "SDprod(.*).tif$", full.names = T) 
+par(mfrow = c(3,2))
+for (i in c(3,5,2)) {
+  ind1 = substr(basename(corrastfiles[i]),9,14)
+  ind2 = substr(basename(corrastfiles[i]),16,21)
+  corrast <- raster(corrastfiles[i])
+  Area <- prod(res(corrast))
+  # calculate scaled UD, and SD
+  ud <- 1/nu*raster(udprodfiles[grepl(ind1, udprodfiles) & grepl(ind2, udprodfiles)])
+  sd <- raster(sdprodfiles[grepl(ind1, sdprodfiles) & grepl(ind2, sdprodfiles)])
+  # multiply SD product by integrated cross-corr
+  covrast <- sd*corrast
+  # quantify the absolute contribution: if the covariance term is positive, or
+  # negative but with lower absolute value than the UD product then the value
+  # stays the same. If it's negative and of greater magnitude than the UD, then
+  # it's the opposite of the UD.
+  contrib <- (covrast>=0)*covrast-(covrast<0&abs(covrast)>ud)*ud+(covrast<0&abs(covrast)<=ud)*covrast
+  raster::plot(ud+covrast, main = paste("FOI",ind1,ind2))
+  raster::plot(contrib/(ud+covrast), main = paste("Covariance relative contribution", ind1, ind2))
+  cat("Total covariance relative contribution to FOI, ", ind1, ind2,":", cellStats(contrib,sum)/cellStats(ud+covrast, sum),"\n")
+}
+```
+
+At the cell scale, the covariance term could contribute as much as 60% of the FOI, but seemingly only for a few cells. For the pairs with lower overlap the highest local contribution is around 6% of the FOI. 
+The total contribution, however, is very low, the highest is for the pair that is moving together, but it is estimated to increase the total FOI by merely 0.02%. The other contributions are even lower, one increases it by 0.003%, while the other decreases total FOI by 0.001%. 
