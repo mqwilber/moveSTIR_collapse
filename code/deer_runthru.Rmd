@@ -321,3 +321,64 @@ for (i in c(3,5,2)) {
 
 At the cell scale, the covariance term could contribute as much as 60% of the FOI, but seemingly only for a few cells. For the pairs with lower overlap the highest local contribution is around 6% of the FOI. 
 The total contribution, however, is very low, the highest is for the pair that is moving together, but it is estimated to increase the total FOI by merely 0.02%. The other contributions are even lower, one increases it by 0.003%, while the other decreases total FOI by 0.001%. 
+
+
+## Direct contact correlation
+
+How would this be different if I focused only on direct contact? The UD and SD product remain the same, the difference is the number of lags considered. Here we explore how changing the number of lags considered affect the FOI estimation, and the estimated contribution from the covariance term. I will do this only for the pair that is travelling together. My time step is 30 minutes, I will explore correlations up to lag 2 (1 h lag), lag 48 (24 h), along with half of the maximum lag and the maximum lag. Instead of scaling the UD product by $1/\nu$, we scale by $\int_0^se^{-\nu \tau}d\tau=(1-e^{-\nu\tau})/\nu$
+
+```{r changing lags}
+cordat <- read.csv("../outputs/correlations_151571-151589.csv", row.names = 1)
+maxlag <- nrow(cordat)-1
+udprod <- raster("../outputs/UDprod_151571-151589.tif")
+sdprod <- raster("../outputs/SDprod_151571-151589.tif")
+par(mfrow = c(2,2))
+for (lag in c(2,48,maxlag/2,maxlag)) {
+  rowindex = lag+1
+  # get lags in seconds
+  lags <- (0:lag)*1800
+  # select only the rows corresponding to the lags of interest
+  d <- cordat[1:rowindex,]
+  # create correlation raster based on the ud product raster, but set its values
+  # to 0
+  corrast <- udprod
+  values(corrast) <- NA
+  # calculate the scaled and integrated correlation term
+  intcors <- colSums(d*exp(-nu*lags))
+  # get the cell indices corresponding to the correlation values, substitute its
+  # values in the raster
+  corcells <- as.numeric(substring(names(cordat),2))
+  corrast[corcells] <- intcors
+  # multiply by the SD
+  covrast <- sdprod*corrast
+  # scale UD by decay. here I am using the solution of the integral int_0^x
+  # e^(-nu t) dt, rather than 1/nu
+  udscaled <- udprod*((1-exp(-nu*lag*1800))/nu)
+  # estimate the local contribution.
+  contrib <- (covrast>=0)*covrast-(covrast<0&abs(covrast)>udscaled)*udscaled+(covrast<0&abs(covrast)<=udscaled)*covrast
+
+  hist(log10(contrib/udscaled), main = paste("Covariance contribution, lag",lag), xlab = "Covar contrib/UD contrib")
+}
+```
+
+In most cases, the contribution of the covariance term is 0, and the FOI is made up solely by the product of the UDs. This happens when the covariance term is negative but of greater magnitude than the If we remove these, there are a few cases where the covariance is contributing equally to the UD, and would make up about half of the total FOI. In most other instances the contribution is negative and would reduce the FOI, but the magnitude is small. When we consider longer lags, the values of the contribution seem to get smaller and smaller with respect to the product of the UD. On average it seems in this case the covariance reduces the FOI, but only by around 1%.
+
+We also explore the case of direct transmission where the decay rate does not come into play. Here we only take the correlation at lag 0, multiply directly by the product of the SD, and add to the product of the UD.
+```{r}
+cordat <- read.csv("../outputs/correlations_151571-151589.csv", row.names = 1)
+udprod <- raster("../outputs/UDprod_151571-151589.tif")
+sdprod <- raster("../outputs/SDprod_151571-151589.tif")
+corrast <- udprod
+values(corrast) <- NA
+corcells <- as.numeric(substring(names(cordat),2))
+corrast[corcells] <- as.numeric(cordat[1,])
+covrast <- sdprod*corrast
+contrib <- (covrast>=0)*covrast-(covrast<0&abs(covrast)>udprod)*udprod+(covrast<0&abs(covrast)<=udprod)*covrast
+par(mfrow=c(1,2))
+hist(contrib/udprod,  main = "Cov contrib/UD")
+hist(log10(contrib/udprod), main = "log10(Cov contrib/UD)")
+```
+
+The case of direct transmission seems somewhat different. Again we get the covariance is negative and of greater magnitude for many cells, resulting in reducing the FOI to 0. For the other cells, however, the covariance is orders of magnitude greater than the UD product. The total FOI estimated is also  `r cellStats(covrast+udprod, sum)/cellStats(udprod, sum)` times greater with the covariance term than with the UD product alone.
+
+
