@@ -160,19 +160,19 @@ getFOI <- function(xy, uds, beta = 1, lambda = 1/24, nu = 1/(24*7)) {
   foirasts2 <- list()
   gridcors2 <- getCorrs(xy,uds[[1]])
   for (i in seq_along(gridcors2)) {
+    udp <- uds[[1]][[i]]
+    sdp <- uds[[2]][[i]]
+    cellarea <- prod(res(udp))
+    
     if (is.array(gridcors2[[i]])) {
       corcells <- as.numeric(colnames(gridcors2[[i]]))
-      corvals <- numeric(length(uds[[1]][[i]]))
+      corrast <- udp
+      values(corrast) <- NA
+      # corvals <- numeric(length(uds[[1]][[i]])) # to remove
       # get lags
       lags <- 0:(nrow(gridcors2[[i]])-1)
       # scale and integrate correlation at every cell
-      corvals[corcells] <- colSums(gridcors2[[i]]*exp(-nu*lags))
-      udp <- uds[[1]][[i]]
-      sdp <- uds[[2]][[i]]
-      corrast <- udp
-      values(corrast) <- corvals
-      cellarea <- prod(res(corrast))
-      
+      corrast[corcells] <- colSums(gridcors2[[i]]*exp(-nu*lags))
       foi <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
     } else {
       foi <- beta/cellarea*lambda*(1/nu*udp)
