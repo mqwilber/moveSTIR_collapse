@@ -70,7 +70,7 @@ An alternative approach would be to use utilization distributions (UDs) to infer
 Individually defined UDs can be combined to study pairwise interactions, for example to quantify the degree of overlap between home ranges \citep{Winner2018}, or to estimate the expected location and rate of encounter between individuals  \citep{Noonan2021}, which could be used to infer contact and transmission \citep{Godfrey2010, Godfrey2013}. 
 Moreover, because UDs can be directly linked to environmental drivers of movement \citep{Signer2017}, they have the potential to predict contact and transmission in novel environments and can also be used for prospective analyses to understand how the effects of environmental and social perturbations cascade across scales, from individual movement to population and landscape-level disease transmission. 
 
-Current contact metrics based on UDs focus only on direct interaction, ignoring temporal dynamics that are especially relevant for epidemiological processes. The Conditional Distribution of Encounters \citep{Noonan2021}, for example, estimates the probability that two individuals will come into contact with each other at a given location assuming that individuals move independently from each other.
+Current contact metrics based on UDs focus only on direct interaction, ignoring temporal dynamics that are especially relevant for epidemiological processes. The Conditional Distribution of Encounters (CDE) \citep{Noonan2021}, for example, estimates the probability that two individuals will come into contact with each other at a given location, assuming that individuals move independently from each other.
 While a useful simplification, social interactions like territoriality or gregariousness can invalidate this assumption  \citep{Manlove2018,Sah2018}. In these cases, temporal correlations in space use could increase or decrease the expected probability of encounter compared to an assumption of independent movement. 
 Moreover, direct interactions do not necessarily equate to \emph{epidemiological contacts}, which consist of contact formation, contact duration, pathogen acquisition, pathogen shedding, and pathogen decay. As some parasites can persist in the environment for months or years (e.g. anthrax, CWD), ignoring these processes could severely underestimate the risk of transmission \citep{Wilber2022,Yang2023,Richardson2015}.
 
@@ -106,7 +106,7 @@ Our approach provides probabilistic, spatio-temporal contact networks that can b
 
 The PMoveSTIR approach builds on the recently developed MoveSTIR model \citep{Wilber2022} and formally links host utilization distributions, direct and indirect contacts, and spatial estimates of force of infection (FOI). This an essential quantity in disease ecology that underlies our ability to predict the spread of disease across populations and landscapes. Essentially, we want to know, for two individuals $i$ and $j$ moving and interacting across a landscape, what is the FOI host $i$ experiences from host $j$, across space and time?  
 
-As in MoveSTIR, we assume that transmission happens by one host depositing pathogen into the environment and another host picking that pathogen up. 
+As in MoveSTIR, we assume that transmission happens by an infected host depositing pathogen into the environment and another host picking that pathogen up. 
 Deposition and acquisition can represent a range of processes, from one individual coughing and another inhaling in a matter of seconds, to one host depositing parasite eggs or larvae in the environment and another individual consuming these  days or weeks later. 
 This fairly general assumption encompasses standard density-dependent transmission as a special case \citep{Cortez2021}. 
 Moreover, considering transmission through deposition and acquisition components clearly links direct transmission and indirect transmission along a continuum \citep{Wilber2022}.
@@ -175,7 +175,18 @@ Equation \ref{eq:foi_cov} is the most general formulation of PMoveSTIR, where ut
 
 In the upper-left corner, we consider space use is uniform, but movement is non-stationary. In this case, it is not important where an individual is, just when. Considering this framing from an empirical point of view, proximity loggers deployed on individual hosts---a commonly used tool to measure among-animal contacts---only tell us when contacts between individuals occur, but not where.  Thus, we cannot make inference about spatial factors driving contacts, but can make inference on temporal processes.  We consider this case in a future study.
 
-The lower-right corner represents the special case of statistical stationarity in movement (i.e., the mean location is constant through time, though the animal is still moving).
+In the lower left-hand corner of the PMoveSTIR framework (Fig. \ref{fig:square}), we have the case where space use is uniform and time is stationary. 
+Given these assumptions, we can write the FOI equation as
+\begin{equation}
+    \begin{aligned}
+        h^*_{i \leftarrow j}(A_x) = \beta' \lambda \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \frac{1}{\nu} +  \int_{0}^{\infty} Cov(\delta_{i \in A_x}, \delta_{j \in A_x} | s) e^{-\nu s} ds\right]
+    \end{aligned}
+    \label{eq:uniform_stationary1}
+\end{equation}
+where the covariance in contact is constant across all areas $A_x$ on the landscape (such that $\delta_{i \in A_x}$ indicates the use of some arbitrary area $A_x$).  
+If hosts are moving independently (i.e., covariance is 0) we obtain $\frac{\tilde{\beta}}{A_x} \frac{A_x}{A_{tot}} \frac{A_x}{A_{tot}}  \frac{\lambda}{\nu}$. Given a gridded landscape with non-overlapping grids and $x$ is a single grid cell, summing over all $n$ areas $A_x$ that comprise the landscape yields $\bar{h}_{i \leftarrow j} =\frac{\tilde{\beta}}{A_\text{tot}} \frac{\lambda}{\nu}$, which is the standard mass action assumption \citep{McCallum2001}. 
+
+Finally, the lower-right corner represents the special case of statistical stationarity in movement (i.e., the mean location is constant through time, though the animal is still moving).
 For clarity, assume that pathogen survival in the environment follows $S(t - u) = e^{-\nu (t - u)}$, where $\nu$ is a constant pathogen decay rate.  We  can simplify equation \ref{eq:foi_cov} to (derivation in SI)
 \begin{equation}
     \begin{aligned}
@@ -183,7 +194,7 @@ For clarity, assume that pathogen survival in the environment follows $S(t - u) 
     \end{aligned}
     \label{eq:foi_stationary}
 \end{equation}
-The key insight here is that, given a stationary assumption, the expected force of infection in location $x$ depends on i) the marginal probabilities that host $i$ and host $j$ use location $x$ (i.e. their UDs), 
+The key insight here is that, given a stationarity assumption, the expected force of infection in location $x$ depends on i) the marginal probabilities that host $i$ and host $j$ use location $x$ (i.e. their UDs), 
 %, where $p_i(x) = \int_{A_x} f_i(s) ds$ and $p_j(x) = \int_{A_x} f_j(s) ds$ and $f_i$ and $f_j$ are the utilization distributions of host $i$ and $j$ 
 and ii) the covariance in how host $i$ and host $j$ use location $x$, integrated over different time lags $\tau$. 
 To improve intuition, we can redefine $Cov(\delta_{i \in x}, \delta_{j \in x} | s) = \sigma_i(x) \sigma_j(x) Cor(\delta_{i \in x}, \delta_{j \in x} | s)$, where $\sigma_i(x) = \sqrt{p_i(x)(1 - p_i(x))}$  and $\sigma_j(x) = \sqrt{p_j(x)(1 - p_j(x))}$ are the standard deviation in probability of host $i$ and $j$ using location $x$, respectively.  We can then write
@@ -199,21 +210,11 @@ In what follows, we focus on this case and explore how and under what circumstan
 %Given an assumption of exponential parasite decay, these correlations at short lags also have the greatest effect on the FOI. The effect is nonetheless cumulative, which captures the increase in FOI through prolonged contacts.
 %Thus, the importance of correlated movements will depend on the biology of the parasite: for parasites that can persist long times in the environment such as anthrax and chronic wasting disease, correlation in host movements may significantly augment transmission risk compared to an assumption of no correlation.
 
-In the lower left-hand corner of the PMoveSTIR framework (Fig. \ref{fig:square}), we have the special case where space use is uniform and time is stationary. 
-Given these assumptions, we can write the FOI equation as
-\begin{equation}
-    \begin{aligned}
-        h^*_{i \leftarrow j}(A_x) = \beta' \lambda \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \frac{1}{\nu} + \sigma_i(x) \sigma_j(x) \int_{0}^{\infty} Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) e^{-\nu s} ds\right]
-    \end{aligned}
-    \label{eq:uniform_stationary1}
-\end{equation}
-where the correlation in contact is constant across all areas $A_x$ on the landscape (such that $\delta_{i \in A_x}$ indicates the use of some arbitrary area $A_x$).  
-If hosts are moving independently (i.e., correlation is 0) we obtain $\frac{\tilde{\beta}}{A_x} \frac{A_x}{A_{tot}} \frac{A_x}{A_{tot}}  \frac{\lambda}{\nu}$. Given a gridded landscape with non-overlapping grids and $x$ is a single grid cell, summing over all $n$ areas $A_x$ that comprise the landscape yields $\bar{h}_{i \leftarrow j} =\frac{\tilde{\beta}}{A_\text{tot}} \frac{\lambda}{\nu}$, which is the standard mass action assumption \citep{McCallum2001}. 
 
 
 \subsubsection*{Beyond the corners of PMoveSTIR}
 
-PMoveSTIR also accounts for other useful cases regarding how heterogeneity in space and time relate to the expected FOI. For example, home range overlap is an intermediate case of of PMoveSTIR (Fig. 1), where time is stationary and space use is uniform within a home range, and the area of contact is the home range overlap.  
+PMoveSTIR also accounts for other useful cases regarding how heterogeneity in space and time relate to the expected FOI. For example, home range overlap is an intermediate case of of PMoveSTIR (Fig. 1), where time is stationary, space use is uniform within a home range, and the area of contact is the home range overlap.  
 Transmission networks commonly assume that this overlap is proportional to the edge weight between host $i$ and host $j$. 
 Given an area of overlap $A_{hro}$ between two individual home ranges $A_{tot, i}$ and $A_{tot, j}$, we can write
 \begin{equation}
@@ -237,17 +238,17 @@ This could be generalized to any number of intervals within the period $T$, depe
 \subsection*{Simulation insight into correlated movement and FOI}
 
 %In the analytical analysis above, we assumed uniform utilization distributions and perfectly correlated hosts and used PMoveSTIR to show how correlation in movement can significantly alter FOI compared to habitat overlap alone. 
-We used simulations to explore how temporally correlated movements affect  transmission, and how the pairwise FOI estimate depends on epidemiological parameters such as the contact distance and parasite survival. We focus on the lower-right corner of the PMoveSTIR square (eq. \ref{eq:stationary_cor}), where we assume statistical stationarity in movement. 
+We used simulations to explore how temporally correlated movements affect  transmission, and how the pairwise FOI estimate depends on epidemiological parameters such as contact distance and parasite survival. We focus on the lower-right corner of the PMoveSTIR square (eq. \ref{eq:stationary_cor}), where we assume statistical stationarity in movement. 
 
 In every simulation, we have two individuals moving around established home ranges, according to an Orstein-Uhlenbeck process. To create different levels of correlation, we modify the initial simulated tracks using a convolution approach with a social interaction kernel \citep{Scharf2018}. This method accounts for constant or temporally varying attraction between pairs of individuals. For our purposes we assume attraction strength is constant in time, but varies across pairs from 0 (completely independent movement) to 1 (joint movement). Strong interactions lead to similar and highly overlapping trajectories, which could represent animals in a herd, courting/mating pairs, or parents with their offspring.
 For every scenario, we fit continuous-time movement models to the simulated tracks, and estimate individual UDs using autocorrelated kernel density estimation \citep{Calabrese2016}. We calculate the UD probabilities on a grid of square cells, where the cell side $d$ is the threshold contact distance for epidemiological contact. 
 
 We use the UDs to calculate the product of the probabilities of use ($p_i(x)p_j(x)$) and the product of their standard deviations ($\sqrt{p_i(x)(1-p_i(x))}\sqrt{p_j(x)(1-p_j(x))}$) for each grid cell. 
-The UD product represents the overlap between home ranges, and is related to the probability of encounter between individuals \citep{Noonan2021}. Assuming we are integrating over infinite lags, we can scale the UD product by $1/\nu$ to obtain the first term in brackets on the right hand side of equation eq. \ref{eq:stationary_cor}. In practice we will actually have a limited time given by the data, which sets an upper limit on the lags that can be considered. If this time is short relative to the parasite decay function there could be substantial error in the estimation. A more formal approach is then to use the integral over a specified  $\int_0^\infty e^{-\nu\tau}d\tau=(1-e^{-\nu\tau})/\nu$. % Mark here: We are going to want to be careful about the 1 / \nu term if we can't integrate the Correlation function from 1 to infinity.  This could really affect out results. We might what to think about using a modified, truncated survival function (e.g., a step function or truncated exponential so that we are integrating over the same bounds for habitat overlap and correlation)
+The UD product represents the overlap between home ranges, and is related to the probability of encounter between individuals \citep{Noonan2021}. Assuming we are integrating over infinite lags, we can scale the UD product by $1/\nu$ to obtain the first term in brackets on the right hand side of equation eq. \ref{eq:stationary_cor}. In practice we will actually have a limited time given by the data, which sets an upper limit on the lags that can be considered. If this time is short relative to the parasite decay function there could be substantial error in the estimation. A more formal approach is then to use the integral over a specified  $\int_0^\infty e^{-\nu\tau}d\tau=(1-e^{-\nu\tau})/\nu$. % Mark here: We are going to want to be careful about the 1 / \nu term if we can't integrate the Correlation function from 1 to infinity.  This could really affect out results. We might what to think about using a modified, truncated survival function (e.g., a step function or truncated exponential so that we are integrating over the same bounds for habitat overlap and correlation).  JUAN: I've explored the error a bit, it is only an issue if the time lag considered is close to the 1/nu. The highest error is around 40%.
 The second term in brackets, $\sigma(\delta_i)\sigma(\delta_j)$, is the product of the standard deviations in probability of use, and is related to the variability around the probability of encounter. 
 Both products are symmetrical for every pair of individuals. 
 
-The cross-correlation term is calculated based on the position history for each individual at locations that both visited (locations that only one or neither individual visited have a correlation of zero). This is a binary vector that specifies whether the individual was present (1) or absent (0) at location $x$ at time $t$. 
+The lagged correlation term is calculated based on the position history for each individual at locations that both visited (locations that only one or neither individual visited have a correlation of zero). This is a binary vector that specifies whether the individual was present (1) or absent (0) at location $x$ at time $t$. 
 The order of visits matters, so these correlation values can be asymmetric between individuals. 
 We then scale the correlation values by $e^{-\nu\tau}$ due to the decay of the parasite, where $\tau$ is the lag corresponding to each cross-correlation, between 0 and $t-dt$, where $dt$ is the time lag between measurements. 
 
@@ -272,7 +273,6 @@ We also compare the pairwise FOI calculated using PMoveSTIR with the average FOI
 To gain analytical intuition into the role that correlated movement can have on FOI, consider equation \ref{eq:uniform_stationary1} where movement is statistically stationary and hosts use space uniformly.  As we showed above, when correlation in movement is zero, equation \ref{eq:uniform_stationary1} reduces to mass action transmission. 
 For illustrative purposes, consider a case where two individual hosts are moving together across some area $A_{tot}$. We assume that hosts spend $\eta$ time units within a habitat patch/grid cell of area $A_x$ before moving to the next patch/grid cell. Second, we assume that the pathogen survival function $S(s)$ is a step function with a survival probability of one when lag $s \leq \pi \eta$ and zero when $s > \pi \eta$.  
 The term $\pi \eta$ gives the time the pathogen survives in the environment as a function of host residence time, where $\pi$ ranges from near zero for directly transmitted pathogens to some arbitrarily large number for pathogens with long environmental persistence times.  With these assumptions, we can rewrite equation \ref {eq:uniform_stationary1} as 
-
 \begin{equation}
     \begin{aligned}
         h^*_{i \leftarrow j}(A_x) = \beta' \lambda \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \pi \eta + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \int_{0}^{\pi \eta} Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) ds\right],
@@ -324,7 +324,7 @@ The overall FOI varied orders of magnitude among simulations, in response to bot
 %Pairs of individuals with higher home-range overlap (Bhattacharya coefficient) had higher global FOI values (Fig. \ref{fig:simresults}a). % this should be mainly driven by UD product term
 %In our simulations, this overlap is strongly dependent on the strength of the interaction between individuals. An interaction coefficient of 0.5 can produce a range of overlap values between 0.65 and 1.0, while higher coefficients of 0.7 produce a much narrower range of overlap values, between 0.87 and 1, and higher values consistently result in overlap values close to 1 for all iterations. 
 %The effect of spatial overlap on FOI is nevertheless marginal when compared with the effect of epidemiological parameters such as parasite decay. 
-The overall pairwise FOI was inversely proportional to the rate of parasite decay; if parasites survived  longer in the environment this led to higher FOI (Fig. \ref{fig:simresults}a). However, the relative contribution of correlation to the FOI decreases significantly with longer decay times. At short decay times, correlation and overlap contributed equally on average to the total FOI, but the contribution of correlation was less than 20\% for a mean decay time of one week (Fig. \ref{fig:simresults}b). 
+The overall pairwise FOI was inversely proportional to the rate of parasite decay; if parasites survived  longer in the environment this led to higher FOI (Fig. \ref{fig:simresults}a). However, the relative contribution of correlation to the FOI decreases significantly with longer decay times. At short decay times, correlation and overlap contributed equally on average to the total FOI, but the contribution of correlation was less than 20\% for a mean decay time of one week (Fig. \ref{fig:simresults}b).  This makes intuitive sense; if parasites can persist only short times in the environment, then transmission happens mostly through direct contact, and the covariance plays a lesser role. 
 %There multiple cases where there was high (>0.9) overlap, and relatively small FOI values (Fig. \ref{fig:simresults}). The difference in magnitude can be attributed to the correlation in movement.
 
 
@@ -338,14 +338,16 @@ The correlation terms are estimated from observed data, so their spatial distrib
 For a couple of realized movement paths this defines some specific locations where the risk of infection were been highest. From a probabilistic perspective, however, the realized trajectories and the resulting temporal correlations could be interpolated across space, or predicted using a statistical model that linked e.g. the product of the UDs with the observed correlation. This process would give a more informative perspective of expected FOI across the landscape. 
 
 
+
 \subsection*{Empirical example: white-tailed deer}
 The overlap between individual deer ranged between 0.31 and 0.94 (Bhattacharyya coefficient). 
+
 Similar to our simulations, there was one pair of individuals with substantial overlap in their trajectories that had a higher estimated FOI than the others. Values for that pair were 6 times higher than the mean FOI value, and more than 200 times the minimum total FOI. 
 There were four paired combinations that did not use any of the same cells, despite having overlapping home ranges. % this is bound to happen with small cells
 The maximum correlation was at lag 0 for half of the cases where there was local overlap (4 of 12), which corresponds to direct encounters between individuals.
 In most cases the FOI estimated with the covariance term was lower than the one estimated without, (i.e. assuming independence of movement among individuals). However, the greatest differences were only in the order of 10\textsuperscript{-5}, or less than 4 \% of the FOI without covariance, and the mean difference was 0.2 \%.
-This difference is linked with the parasite decay rate, as shown previously. With slower decay rates the total FOI increased, while the relative contribution of the covariance term decreased \ref{fig:empiricalres}. 
-This makes intuitive sense; if parasites can persist only short times in the environment, then transmission happens mostly through direct contact, and the covariance plays a lesser role. 
+
+
 For the pair with the largest differences between FOIs, the contribution of covariance to the total FOI decreased from 1.5\% for a decay rate of 1 h\textsuperscript{-1}, to xxx\% for a decay rate of 30 days\textsuperscript{-1}.
 Given the small contribution from the covariance term, the estimated FOI was practically inversely proportional to the decay rate. 
 Similarly, the estimated FOI depends on the contact distance, but the differences are small, in the order of 0.001\%. 
