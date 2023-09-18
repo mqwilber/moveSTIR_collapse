@@ -2,12 +2,12 @@
 # Author: Juan S. Vargas Soto
 # Date: July 2023
 
-# Intro 
+# Intro
 # We have developed a framework to estimate the expected FOI from movement data.
 # GPS tracking data is described using ctmm, and from that we build utilization
 # distributions. These are the basis for calculating the overlap (as product of
 # UDs) and the product of the SDs at every cell. We then calculate the location
-# histories and the cross-correlation for every cell. 
+# histories and the cross-correlation for every cell.
 
 # Load libraries
 library(tidyverse)
@@ -58,6 +58,9 @@ points(dat_move, col = hcl.colors(length(ids), "Dark 3"))
 legend("bottomright", col = hcl.colors(length(ids), "Dark 3"), legend = ids, pch=1)
 
 telemetries <- as.telemetry(dat_move)
+plot(telemetries, col = hcl.colors(5, "Dark 3"))
+grid()
+legend("bottomright", col = hcl.colors(length(ids), "Dark 3"), legend = ids, pch=1)
 
 #### CTMM and AKDE ####
 # Fit a CTMM model to the trajectories
@@ -122,7 +125,7 @@ for (i in seq_len(ncol(combs))) {
     cat("There is no temporal overlap between", ids[ind1], "and", ids[ind2], "\n")
     foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
   } else {
-    tseq <- seq(max(tr1[1],tr2[1]),min(tr1[2],tr2[2]), "30 mins")
+    tseq <- seq(max(tr1[1],tr2[1]),min(tr1[2],tr2[2]), "10 mins")
     lags <- as.numeric(tseq-min(tseq))
     nsteps <- length(tseq)
     # Interpolate trajectories
@@ -154,8 +157,8 @@ for (i in seq_len(ncol(combs))) {
       }
       dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(lag = tseq-min(tseq), cell = ovlpcells)
       # Export 
-      write.csv(cormat_ab, paste0("../outputs/correlations_",ids[ind1],"-",ids[ind2],".csv"))
-      write.csv(cormat_ba, paste0("../outputs/correlations_",ids[ind2],"-",ids[ind1],".csv"))
+      write.csv(cormat_ab, paste0("../outputs/correlations_10min_",ids[ind1],"-",ids[ind2],".csv"))
+      write.csv(cormat_ba, paste0("../outputs/correlations_10min_",ids[ind2],"-",ids[ind1],".csv"))
       
       ## FOI
       # scale and integrate correlation at every cell
@@ -167,8 +170,8 @@ for (i in seq_len(ncol(combs))) {
       values(corrast_ab) <- corvals_ab
       values(corrast_ba) <- corvals_ba
       # Export scaled cross-corr rasters
-      writeRaster(corrast_ab, paste0("../outputs/Corrast_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
-      writeRaster(corrast_ba, paste0("../outputs/Corrast_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
+      writeRaster(corrast_ab, paste0("../outputs/Corrast_10min_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+      writeRaster(corrast_ba, paste0("../outputs/Corrast_10min_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
       
       # Calculate FOI
       foi_ab <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ab)
@@ -180,19 +183,9 @@ for (i in seq_len(ncol(combs))) {
     }
   }
   # export
-  writeRaster(foi_ab, paste0("../outputs/FOI_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
-  writeRaster(foi_ba, paste0("../outputs/FOI_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
+  writeRaster(foi_ab, paste0("../outputs/FOI_10min_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+  writeRaster(foi_ba, paste0("../outputs/FOI_10min_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
 }
-
-#### Step randomization (Spiegel 2016) #### 
-
-#One way to determine the contribution of the correlation in movement is to
-#randomize the steps within each individual, and recalculate the correlation. We
-#would expect if correlation is playing a sizeable role, randomizing the steps
-#of tracks that are originally correlated tracks would reduce the overall FOI I
-#can do this randomization using the spatsoc package, and then redo the process
-#of calculating correlations and FOI. The steps are the same, so the UD and SD
-#should stay constant 
 
 #### Visualize total pairwise FOI ####
 totfois <- lapply(list.files("../outputs/", "FOI(.*)tif$", full.names = T), raster)|>sapply(cellStats,sum)
@@ -284,7 +277,7 @@ for (i in seq_along(corrastfiles)) {
   ud <- 1/nu*raster(udprodfiles[grepl(ind1, udprodfiles) & grepl(ind2, udprodfiles)])
   sd <- raster(sdprodfiles[grepl(ind1, sdprodfiles) & grepl(ind2, sdprodfiles)])
   covrast <- sd*corrast
-  plot(covrast/ud, main = paste("Covariance/UD",ind1,ind2))
+  plot((covrast+ud)/ud, main = paste("(Covariance+UD)/UD",ind1,ind2))
 }
 dev.off()
 
@@ -345,8 +338,8 @@ for (i in seq_len(ncol(combs))) {
   # cell area
   Area <- prod(res(r1))
   # get the UD and sd products
-  udprod <- r1*r2/Area
-  sdprod <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))/Area
+  udprod <- r1*r2
+  sdprod <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))
   # export outputs
   writeRaster(udprod, paste0("../outputs/UDprod_",ids[ind1],"-",ids[ind2],"_20m.tif"))
   writeRaster(sdprod, paste0("../outputs/SDprod_",ids[ind1],"-",ids[ind2],"_20m.tif"))
@@ -359,7 +352,7 @@ for (i in seq_len(ncol(combs))) {
   
   if(max(tr1[1],tr2[1])>min(min(tr1[2],tr2[2]))) {# Check if there is temporal overlap
     cat("There is no temporal overlap between", ids[ind1], "and", ids[ind2])
-    foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod*Area)
+    foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
   } else {
     tseq <- seq(max(tr1[1],tr2[1]),min(tr1[2],tr2[2]), "30 mins")
     lags <- as.numeric(tseq-min(tseq))
@@ -376,7 +369,7 @@ for (i in seq_len(ncol(combs))) {
     ovlpcells <- pos1[pos1 %in% pos2]
     if(length(ovlpcells)==0) {
       cat("There are no overlap cells between", ids[ind1], "and", ids[ind2])
-      foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod*Area)
+      foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
     } else {
       maxlag <- nsteps-1
       cormat_ab <- cormat_ba <- matrix(0, nrow = nsteps, ncol = length(ovlpcells))
@@ -406,8 +399,8 @@ for (i in seq_len(ncol(combs))) {
       values(corrast_ab) <- corvals_ab
       values(corrast_ba) <- corvals_ba
       # Calculate FOI
-      foi_ab <- beta/Area*lam*(1/nu*udprod*Area+sdprod*Area*corrast_ab)
-      foi_ba <- beta/Area*lam*(1/nu*udprod*Area+sdprod*Area*corrast_ba)
+      foi_ab <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ab)
+      foi_ba <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ba)
       
       # Keep only positive values
       foi_ab <- foi_ab*(foi_ab>=0)
@@ -462,6 +455,9 @@ for (j in seq_along(nus)) {
     cnt=cnt+1
   }
 }
+
+
+
 #### FIGURES ####
 # Plot deer FOI
 pdf("../outputs/deer_FOI.pdf", width = 11)
@@ -538,3 +534,12 @@ p3 <- ggplot(totfoisdf)+geom_point(aes(overlap, foi))+
 pdf("../docs/figures/deer_results.pdf", width = 8,height = 6)
 plot_grid(p1,plot_grid(p3,p2, labels = c("b", "c"), ncol=1, axis = "lr", align = "v", rel_heights = c(0.8,1)), labels = "a", rel_widths = c(1,0.7))
 dev.off()
+
+## Plot UDs
+deer_uds <- lapply(list.files("../outputs/", "X(.*).tif$", full.names = T), raster)
+plot(telemetries, error = F, UD = deer_uds,
+     col = hcl.colors(5, "Dark 3"), col.grid = NA)
+plot(uds[[2]], col.grid=NA, DF = "PDF", level=0,
+     col.level = hcl.colors(2, palette = "Dark 3"),
+     col.DF = hcl.colors(2, palette = "Dark 3"), 
+     xaxt="n", yaxt="n",labels=c("","0.95",""))
