@@ -20,7 +20,7 @@ library(ctmm)
 contact_dist <- 10 # meters
 nu <- 1/(3600*24*7)# 7 days, in seconds
 beta <- 1 # search efficiency, m^2/s
-lam <- 1/(3600*2) # deposition rate, s^-1
+lam <- 1/(3600*24) # deposition rate, s^-1
 
 #### Load and prep data ####
 # Import data
@@ -51,7 +51,8 @@ dat_move <- move(x = dat1$x_,y = dat1$y_,
                  data = data.frame(HDOP=dat1$dop), 
                  proj = "+proj=utm +zone=16N", 
                  animal = dat1$animal_id)
-# Plot positions
+
+# Plot positions (2 ways)
 plot(dat_move, type='n',xlab = "", ylab = "")
 grid()
 points(dat_move, col = hcl.colors(length(ids), "Dark 3"))
@@ -187,38 +188,6 @@ for (i in seq_len(ncol(combs))) {
   writeRaster(foi_ba, paste0("../outputs/FOI_10min_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
 }
 
-#### Visualize total pairwise FOI ####
-totfois <- lapply(list.files("../outputs/", "FOI(.*)tif$", full.names = T), raster)|>sapply(cellStats,sum)
-totfoipairs <- list.files("../outputs/", "FOI(.*)tif$")|>strsplit("[[:punct:]]+")|>sapply("[",c(2,3))
-totfoisdf <- data.frame(foi = totfois, ind1 = totfoipairs[1,], ind2 = totfoipairs[2,])
-
-# Plot vs overlap
-totfoisdf$overlap <- overlap(FITS)$CI[,,2][lower.tri(overlap(FITS)$CI[,,2]) | upper.tri(overlap(FITS)$CI[,,2])]
-head(totfoisdf)
-
-ggplot(totfoisdf)+geom_point(aes(overlap, foi))+
-  labs(x = "Home range overlap",
-       y = "Total pairwise FOI")+
-  lims(x = c(0,1))
-
-
-# Pairwise FOI plot
-ggplot(totfoisdf)+geom_raster(aes(ind1,ind2,fill=as.numeric(foi)))+
-  coord_equal()+
-  theme_minimal(base_size = 16)+
-  labs(x = "", y="", fill = "FOI")+
-  scale_fill_gradientn(colors = hcl.colors(10, "Plasma"))
-
-# Pairwise FOI plot (relative to minimum FOI)
-ggplot(totfoisdf)+geom_raster(aes(ind1,ind2,fill=as.numeric(foi)/min(as.numeric(foi))))+
-  coord_equal()+
-  theme_minimal(base_size = 16)+
-  labs(x = "", y="", fill = "Relative FOI")+
-  scale_fill_gradientn(colors = hcl.colors(10, "Plasma"))
-# The FOI for the pair with highly correlated movement is more than 9000 times
-# greater than the lowest observed FOI
-
-
 #### Correlation analysis ####
 cors <- lapply(list.files("../outputs/","corr", full.names = T), read.csv, row.names = 1)
 # Check the length of all correlations
@@ -306,7 +275,7 @@ corpairs$foi_cor/corpairs$foi_ud
 
 
           
-#### Recalculate FOI for different distances ####
+####  FOI for different distances ####
 # Get new UDs using a different contact distance, for example 20 m
 FITS <- readRDS("../outputs/deer_ctmm_fits.rds")
 UDSdeer20 <- list()
@@ -422,17 +391,75 @@ foidistcomp %>% pivot_wider(names_from = d, values_from = foi,names_prefix = "d"
 
 
 
-#### Recalculate FOI with different nu #### 
-# The effect of correlation on FOI
-#is highly dependent on the decay parameter. Here I will recalculate FOI for a
-#set of different parameter values, one shorter and one longer '
-corfiles <- list.files("../outputs/","corr", full.names = T)
-corfilepairs <- basename(corfiles)|>substr(14,26)
-uds <- list.files("../outputs/", "UDprod(.*).tif$", full.names = T) 
-sds <- list.files("../outputs/", "SDprod(.*).tif$", full.names = T) 
-nus <- 1/(3600*24*c(1/24,1/12,1/6, 1/3,1/2,1,3,7))
-fois <- expand.grid(pair = corfilepairs,nu = nus, foicor = 0,foiud = 0)
-cnt=1
+####  FOI with different nu #### 
+
+#The effect of correlation on FOI is highly dependent on the decay parameter.
+#Here we recalculate FOI for a set of different decay rates. Deer in
+#our study area have two parasites of interest, SARS-CoV-2, which is transmitted
+#in close proximity over short periods, and Chronic Wasting Disease, which is a
+#transmitted through a prion that can survive long times in the environment. We
+#will recalculate the FOIs for the deer in our study for these two cases. For
+#SARS-CoV-2 we assume transmission occurs within one hour, through saliva
+#droplets. For CWD, the probability of persistence from one year to the next has
+#been estimated as 0.91 (Cook et al. 2022), which translates to a decay rate of
+#nu = 0.096/yr, or 3.04e-9/s. Analyzing this requires to use the exact expression
+#of the decay function rather than assuming integrating over infinite lags. In
+#practice it is virtually the same as assuming no decay over the study period
+udprodfiles <- list.files("../outputs/", "UDprod(.*).tif$", full.names = T) 
+sdprodfiles <- list.files("../outputs/", "SDprod(.*).tif$", full.names = T) 
+deer_FOIs_nus <- data.frame()
+for (i in 1:ncol(combs)) {
+  ind1 = combs[1,i]
+  ind2 = combs[2,i]
+  id1 = ids[ind1]
+  id2 = ids[ind2]
+  
+  udprod <- raster(udprodfiles[grepl(id1, udprodfiles) & grepl(id2, udprodfiles)])
+  sdprod <- raster(sdprodfiles[grepl(id1, sdprodfiles) & grepl(id2, sdprodfiles)])
+  corfiles <- c(paste0("../outputs/correlations_30min_",id1,"-",id2,".csv"),
+                paste0("../outputs/correlations_30min_",id2,"-",id1,".csv"))
+  correxists <- file.exists(corfiles[1])
+  for (j in 1:2) {
+    if (correxists) {
+      corrs <- read.csv(corfiles[j], row.names = 1)
+      lags <- as.numeric(row.names(corrs))
+      corrintCWD <- colSums(exp(-3.04e-9*lags)*corrs)
+      corrintSARS <- colSums(exp(-1/3600*lags)*corrs)
+      corrastCWD <- corrastSARS <- udprod
+      values(corrastCWD) <- values(corrastSARS) <- NA
+      corcells <- as.numeric(substring(names(corrs),2))
+      corrastCWD[corcells] <- corrintCWD
+      corrastSARS[corcells] <- corrintSARS
+      foiCWDrast <- beta*lam/prod(res(udprod))*(udprod*(1-exp(-3.04e-9*max(lags)))/3.04e-9+sdprod*corrastCWD)
+      foiSARSrast <- beta*lam/prod(res(udprod))*(udprod*1/(1/3600)+sdprod*corrastSARS)
+    }else {
+      foiCWDrast <- beta*lam/prod(res(udprod))*(udprod*(1-exp(-3.04e-9*3600*24*100))/3.04e-9) # need to deal with the lags, here I am assuming the lag is integrated over 100 days only
+      foiSARSrast <- beta*lam/prod(res(udprod))*(udprod*1/(1/3600))
+    }
+    foiCWDrast <- max(foiCWDrast,0)
+    foiSARSrast <- max(foiSARSrast,0)
+    
+    deer_FOIs_nus <- rbind(deer_FOIs_nus, c(id1,id2, correxists,
+            cellStats(foiCWDrast,sum),
+            cellStats(foiSARSrast, sum)))
+  }
+}
+
+names(deer_FOIs_nus) <- c("ind1", "ind2", "correlation","FOI_SARS","FOI_CWD")
+deer_FOIs_nus
+
+# The FOI experienced by deer differs orders of magnitude depending on the
+# parasite of interest and its respective decay rate. For parasites that persist
+# for longer in the environment like CWD, the FOI is three orders of magnitude
+# lower than for a parasite with fast decay rates. This effect is due to the
+# effect of decay on the product of the UDs, rather than the effect of
+# correlation. The effect of correlation can be seen in the difference between
+# the FOi for i->j and for j->i. This difference is usually in the order of
+# 0.1%.
+
+# nus <- 1/(3600*c(1,2,4,8,24,48,96,192))
+# fois <- expand.grid(pair = corfilepairs,nu = nus, foicor = 0,foiud = 0)
+# cnt=1
 for (j in seq_along(nus)) {
   nup <- nus[j]
   for (i in seq_along(corfiles)) {
@@ -442,8 +469,8 @@ for (j in seq_along(nus)) {
     corrs <- read.csv(corfiles[i], row.names = 1)
     lags <- as.numeric(row.names(corrs))
     corrint <- colSums(exp(-nup*lags)*corrs)
-    ud <- Area/nup*raster(uds[grepl(ind1, uds) & grepl(ind2, uds)])
-    sd <- Area*raster(sds[grepl(ind1, sds) & grepl(ind2, sds)])
+    ud <- 1/nup*raster(udprodfiles[grepl(ind1, udprodfiles) & grepl(ind2, udprodfiles)])
+    sd <- raster(sdprodfiles[grepl(ind1, sdprodfiles) & grepl(ind2, sdprodfiles)])
     corrast <- ud
     values(corrast) <- 0
     corcells <- as.numeric(substring(names(corrs),2))
@@ -456,9 +483,107 @@ for (j in seq_along(nus)) {
   }
 }
 
+####---- Network analysis ----####
 
+# We can use the estimated FOIs to assign edge weight to a contact network among
+# the deer. We can compare this network with a network built based on Home Range
+# overlap, and compare the networks with and without a covariance term, as well
+# as for direct and indirect transmission
 
-#### FIGURES ####
+### Home Range overlap
+
+# We calculate home range overlap index the `overlap` function in the
+# `ctmm` package. The default is the Bhattacharya coefficient, which is the
+# geometric mean of the UDs. 
+
+# We calculate the FOI for Home Range overlap using equation 8 in the paper. For
+# this, we need to calculate the HR areas of each individual, as well as the
+# area of overlap
+deer_uds <- lapply(list.files("outputs/", "X(.*).tif$", full.names = T), raster)
+hr95 <- lapply(readRDS("outputs/deer_HR_95.rds"), polygons)
+# get areas
+hr95_areas <- sapply(1:5, \(x) hr95[[x]]@polygons[[2]]@area)
+names(hr95_areas) <- gsub("[^[:digit:]]","", list.files("outputs","X(.*).tif$"))
+# create overlap areas matrix
+ovlpAreas <- matrix(numeric(length(hr95)^2),ncol = length(hr95))
+dimnames(ovlpAreas) <- list(names(hr95_areas),names(hr95_areas))
+# fill in the matrix
+for(i in 1:5) {
+  for(j in 1:5){
+    if (i == j) next
+    if(rgeos::gIntersects(hr95[[i]],hr95[[j]])) {
+      intersection <- intersect(hr95[[i]],hr95[[j]])
+      ovlpAreas[i,j] <- intersection@polygons[[1]]@area
+    }
+  }
+}
+
+# this can be used, multiplied by the epi parameters, to estimate an FOI in the
+# same units (equation 8)
+HR_FOI <- beta*lam/nu*ovlpAreas/outer(hr95_areas,hr95_areas)
+diag(HR_FOI) <- NA
+
+# The FOI assuming direct contact only is the product of the UDs multiplied by the epi parameters
+Direct_FOI <- lapply(udprodfiles, raster) |> lapply(\(x) beta*lam/nu*x/100) |> sapply(cellStats,sum)
+Direct_FOI_mat <- matrix(NA, nrow=5,ncol = 5)
+Direct_FOI_mat[lower.tri(Direct_FOI_mat)] <- Direct_FOI
+Direct_FOI_mat[upper.tri(Direct_FOI_mat)] <- t(Direct_FOI_mat)[upper.tri(Direct_FOI_mat)]
+
+# The total FOI with the covariance term is obtained by the sum of the cell FOIs
+# obtained previously. We put it all together in a single dataframe
+totfoisdf <- data.frame(ind1 = list.files("../outputs/", "FOI_30min(.*)tif$")|>strsplit("[[:punct:]]+")|>sapply("[",3),
+                        ind2 = list.files("../outputs/", "FOI_30min(.*)tif$")|>strsplit("[[:punct:]]+")|>sapply("[",4),
+                        foi_cov = lapply(list.files("../outputs/", "FOI_30min(.*)tif$", full.names = T), raster)|>sapply(cellStats,sum),
+                        foi_direct = Direct_FOI_mat[complete.cases(as.numeric(Direct_FOI_mat))],
+                        foi_hr = HR_FOI[complete.cases(as.numeric(HR_FOI))])
+
+# Bhattacharya coefficient overlap metric. This served to build a network
+# similar to that of HR overlap with the areas, but the units are different
+# overlap_BC = overlap(FITS)$CI[,,2][lower.tri(overlap(FITS)$CI[,,2]) | upper.tri(overlap(FITS)$CI[,,2])]
+
+### Visualize networks
+library(igraph)
+grf <- graph_from_data_frame(totfoisdf[,c(1,2)])
+grfdirect <- graph_from_data_frame(totfoisdf[,c(1,2,4)])
+grfhro <- graph_from_data_frame(totfoisdf[,c(1,2,5)])
+par(mfrow = c(1,3))
+# Specify layout customly
+tkplot(grf)
+custom_grf_coords <- tk_coords(1)
+custom_grf_coords
+# hr95_centroids <- t(sapply(hr95,centroid)[c(2,5),])
+
+co <- layout_with_fr(grf,coords = custom_grf_coords,niter = 1)
+pdf("../docs/figures/networks.pdf", width = 8,height = 4, family = "sans")
+x11(width = 8, height = 4,family = "HersheySans")
+par(mfrow = c(1,3), mar = c(0,1,0,1),oma=c(0,0,0,0))
+plot(grf, layout = co, 
+     vertex.label.dist = 2, vertex.label.degree = pi/2, vertex.label.color = "black",vertex.label.family = "sans",
+     edge.width = 15*totfoisdf[,3]/max(totfoisdf[,3:5]), edge.arrow.size=0, 
+     vertex.color=hcl.colors(5,"Dark 3"))
+text(-1,1,"a)", cex=2)
+plot(grf, layout = co, 
+     vertex.label.dist = 2, vertex.label.degree = pi/2, vertex.label.color = "black",vertex.label.family = "sans",
+     edge.width = 15*totfoisdf[,4]/max(totfoisdf[,3:5]), edge.arrow.size=0,
+     vertex.color=hcl.colors(5,"Dark 3"))
+text(-1,1,"b)", cex=2)
+plot(delete.edges(grf,which(totfoisdf$foi_hr==0)), layout = co, 
+     vertex.label.dist = 2, vertex.label.degree = pi/2, vertex.label.color = "black",vertex.label.family = "sans",
+     edge.width = 15*totfoisdf[,5]/max(totfoisdf[,3:5]), edge.arrow.size=0,
+     vertex.color=hcl.colors(5,"Dark 3"))
+text(-1,1,"c)", cex=2)
+dev.off()
+####---- VISUALIZATION ----####
+
+# Pairwise FOI plot (relative to minimum FOI)
+ggplot(totfoisdf)+geom_raster(aes(ind1,ind2,fill=as.numeric(foi)/min(as.numeric(foi))))+
+  coord_equal()+
+  theme_minimal(base_size = 16)+
+  labs(x = "", y="", fill = "Relative FOI")+
+  scale_fill_gradientn(colors = hcl.colors(10, "Plasma"))
+# The FOI for the pair with highly correlated movement is more than 9000 times
+# greater than the lowest observed FOI
+
 # Plot deer FOI
 pdf("../outputs/deer_FOI.pdf", width = 11)
 par(mfrow = c(2,2))
@@ -499,9 +624,6 @@ fois %>% mutate(dfoi = (foicor-foiud)/foiud) %>%
   labs(x = "Time to decay (days) ",
        y = "Relative contribution",
        color = "Individuals")
-# How much does FOI vary?
-fois %>% #filter(nu == 1/(3600*24)|nu == 1/(3600*24*14)) %>% # select two decay rates
-  group_by(pair) %>% mutate(doi = foicor/min(foicor)) %>% view()
 
 # Combined figure
 p1 <- ggplot(dat1)+geom_point(aes(x_,y_, color = factor(animal_id)), shape=1)+
@@ -536,10 +658,5 @@ plot_grid(p1,plot_grid(p3,p2, labels = c("b", "c"), ncol=1, axis = "lr", align =
 dev.off()
 
 ## Plot UDs
-deer_uds <- lapply(list.files("../outputs/", "X(.*).tif$", full.names = T), raster)
 plot(telemetries, error = F, UD = deer_uds,
      col = hcl.colors(5, "Dark 3"), col.grid = NA)
-plot(uds[[2]], col.grid=NA, DF = "PDF", level=0,
-     col.level = hcl.colors(2, palette = "Dark 3"),
-     col.DF = hcl.colors(2, palette = "Dark 3"), 
-     xaxt="n", yaxt="n",labels=c("","0.95",""))
