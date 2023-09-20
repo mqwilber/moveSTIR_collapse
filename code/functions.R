@@ -167,7 +167,7 @@ getFOI <- function(xy, uds, beta = 1, lambda = 1/24, nu = 1/(24*7)) {
     if (is.array(gridcors2[[i]])) {
       corcells <- as.numeric(colnames(gridcors2[[i]]))
       corrast <- udp
-      values(corrast) <- NA
+      values(corrast) <- 0
       # corvals <- numeric(length(uds[[1]][[i]])) # to remove
       # get lags
       lags <- 0:(nrow(gridcors2[[i]])-1)
