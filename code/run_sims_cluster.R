@@ -28,15 +28,18 @@ for (i in seq_along(trajs)) {
       uds <- getUDs(A, gr)
       prods <- getUDprod(uds)
       cors <- getCorrs(A, uds[[2]])
-      test <- getFOI(A,prods, nu = nu)
+      fois <- getFOI(A,prods, nu = nu)
       cellarea <- prod(res(test[[1]]))
+      totarea <- length(fois[[1]])*cellarea
       
-      c(nu, 
-        gr,
-        cellStats(1/nu*prods[[1]][[1]], sum), 
-        sapply(test, cellStats,sum)[1], 
-        sapply(test, cellStats,sum)[2], 
-        overlap(uds[[2]])$CI[,,2][1,2] )
+      c(i,
+        nu, 
+        cellarea,
+        totarea,
+        cellStats(1*1/24/cellarea*1/nu*prods[[1]][[1]], sum), 
+        cellStats(fois[[1]],sum), 
+        cellStats(fois[[2]],sum), 
+        overlap(uds[[2]])$CI[,,2][1,2])
     }
 } 
 
