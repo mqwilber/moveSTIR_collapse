@@ -45,7 +45,7 @@ for (i in seq_along(trajs)) {
 
 stopCluster(cl)
 outdf <- as.data.frame(do.call(rbind, out))
-names(outdf) <- c("sim", "nu", "Ax","Atot" "foi_ud", "foi_full1", "foi_full2", "overlap")
+names(outdf) <- c("sim", "nu", "Ax","Atot", "foi_ud", "foi_full1", "foi_full2", "overlap")
 outdf$social <- rep(social, each = length(nus)*length(gridres))
 outname <- paste0("sim_res_", format(Sys.time(), "%y%m%d-%H%M"), ".csv")
 write.csv(outdf,outname, quote = F, row.names = F)
