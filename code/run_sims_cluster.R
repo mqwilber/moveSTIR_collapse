@@ -29,7 +29,7 @@ for (i in seq_along(trajs)) {
       prods <- getUDprod(uds)
       cors <- getCorrs(A, uds[[2]])
       fois <- getFOI(A,prods, nu = nu)
-      cellarea <- prod(res(test[[1]]))
+      cellarea <- prod(res(fois[[1]]))
       totarea <- length(fois[[1]])*cellarea
       
       c(i,
