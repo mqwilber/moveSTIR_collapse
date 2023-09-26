@@ -141,7 +141,8 @@ getCorrs <- function(xy, r) {
       for (j in seq_along(ovlpcells)) {
         cell <- ovlpcells[j]
         a <- b <- numeric(nsteps)
-        a[match(cell, pos1)] <- b[match(cell, pos2)]<- 1
+        # a[match(cell, pos1)] <- b[match(cell, pos2)]<- 1
+        a[cell==pos1] <- b[cell==pos2]<- 1
         xcorr <- ccf(a,b,lag.max = maxlag, plot = F)
         xcorr_vals <- as.numeric(xcorr$acf)
         cormat_ab[,j] <- rev(xcorr_vals[1:nsteps])
