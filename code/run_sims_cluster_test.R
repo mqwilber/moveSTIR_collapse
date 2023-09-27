@@ -18,19 +18,19 @@ nus <- 1/2
 gridres <- 10
 iterations <- 5
 
-trajs <- (replicate(iterations, lapply(social, \(x) simulate_tracks(tau = 5, dp = 2, social = x))))
+trajs <- (replicate(iterations, lapply(social, \(x) simulate_tracks(steps = 100,tau = 5, dp = 2, social = x))))
 ### New version, edited to have only 3 grid sizes for the same sim.
 UDout <- foreach(i = seq_along(trajs), .packages = c("move","ctmm")) %:% foreach(gr = gridres) %dopar% {
   list(SIM = i,
-       TRAJS = trajs[[i]],
-       UDS = getUDs(trajs[[i]],res = gr))
+  TRAJS = trajs[[i]],
+  UDS = getUDs(trajs[[i]],res = gr))
 }
 
 out <- foreach(i = seq_along(UDout), .packages = c("move", "ctmm"), .combine = 'rbind', .inorder = FALSE) %:% 
   foreach(nu = nus, .combine = 'rbind', .inorder = FALSE) %dopar% {
-    A <- UDout[[i]]$TRAJS
-    UDS <- UDout[[i]]$UDS
-    SIM <- UDout[[i]]$SIM
+    A <- UDout[[i]][[1]]$TRAJS
+    UDS <- UDout[[i]][[1]]$UDS
+    SIM <- UDout[[i]][[1]]$SIM
     prods <- getUDprod(UDS)
     # cors <- getCorrs(A, uds[[i]][[2]])
     fois <- getFOI(A, prods, nu = nu)
