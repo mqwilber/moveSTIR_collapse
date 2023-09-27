@@ -26,7 +26,7 @@ UDout <- foreach(i = seq_along(trajs), .packages = c("move","ctmm")) %:% foreach
        UDS = getUDs(trajs[[i]],res = gr))
 }
 
-out <- foreach(i = seq_along(uds), .packages = c("move", "ctmm"), .combine = 'rbind', .inorder = FALSE) %:% 
+out <- foreach(i = seq_along(UDout), .packages = c("move", "ctmm"), .combine = 'rbind', .inorder = FALSE) %:% 
   foreach(nu = nus, .combine = 'rbind', .inorder = FALSE) %dopar% {
     A <- UDout[[i]]$TRAJS
     UDS <- UDout[[i]]$UDS
@@ -46,7 +46,7 @@ out <- foreach(i = seq_along(uds), .packages = c("move", "ctmm"), .combine = 'rb
       cellStats(1*1/24/cellarea*1/nu*prods[[1]][[1]], sum), 
       cellStats(fois[[1]],sum), 
       cellStats(fois[[2]],sum), 
-      overlap(uds[[2]])$CI[,,2][1,2])
+      overlap(UDS[[2]])$CI[,,2][1,2])
   }
 ### Delete if the above works as expected
 # out <- list()
