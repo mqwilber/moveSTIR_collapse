@@ -76,7 +76,7 @@ out <- foreach(i = seq_along(UDout), .packages = c("move", "ctmm"), .combine = '
 # } 
 
 stopCluster(cl)
-outdf <- as.data.frame(do.call(rbind, out))
+outdf <- as.data.frame(out)
 names(outdf) <- c("sim", "nu", "Ax","Atoti","Atotj", "foi_ud", "foi_full1", "foi_full2", "overlap")
 outdf$social <- rep(social, each = length(nus)*length(gridres))
 outname <- paste0("sim_res_", format(Sys.time(), "%y%m%d-%H%M"), ".csv")

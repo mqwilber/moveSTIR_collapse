@@ -22,8 +22,8 @@ trajs <- (replicate(iterations, lapply(social, \(x) simulate_tracks(steps = 100,
 ### New version, edited to have only 3 grid sizes for the same sim.
 UDout <- foreach(i = seq_along(trajs), .packages = c("move","ctmm")) %:% foreach(gr = gridres) %dopar% {
   list(SIM = i,
-  TRAJS = trajs[[i]],
-  UDS = getUDs(trajs[[i]],res = gr))
+       TRAJS = trajs[[i]],
+       UDS = getUDs(trajs[[i]],res = gr))
 }
 
 out <- foreach(i = seq_along(UDout), .packages = c("move", "ctmm"), .combine = 'rbind', .inorder = FALSE) %:% 
@@ -76,7 +76,7 @@ out <- foreach(i = seq_along(UDout), .packages = c("move", "ctmm"), .combine = '
 # } 
 
 stopCluster(cl)
-outdf <- as.data.frame(do.call(rbind, out))
+outdf <- as.data.frame(out)
 names(outdf) <- c("sim", "nu", "Ax","Atoti","Atotj", "foi_ud", "foi_full1", "foi_full2", "overlap")
 outdf$social <- rep(social, each = length(nus)*length(gridres))
 outname <- paste0("sim_res_", format(Sys.time(), "%y%m%d-%H%M"), "_test.csv")
