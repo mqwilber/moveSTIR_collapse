@@ -50,7 +50,9 @@
 \begin{document}
 
 \doublespacing
-\section*{PMoveSTIR in continuous space}
+\linenumbers
+
+\section{PMoveSTIR in continuous space}
 
 In the main text, we derive PMoveSTIR assuming that hosts are moving and contacting each other within some area $A_x$, which we can conceptually think about as a grid cell on a gridded landscape.  While this conceptually simplifies the problem, it is more general to consider the case of continuous space where we define contact as potentially happening when present or past host $j$ is (was) within some distance $r$ of host $i$ at its present location \citep{Wilber2022}.  The output we want from this alternative version of PMoveSTIR is the function $\hat{h^*}(x, t)$, which is the force of infection \emph{per unit area} at point $x$ on the landscape (e.g., $\hat{h^*}(x, t)$ might have units day$^{-1}\text{m}^{-2}$).  Integrating this function over different areas will yield estimates of force of infection felt by host $i$ from host $j$ for any area of interest on the landscape.
 
@@ -69,7 +71,7 @@ As we did in the main text, we can envision simulating many different movement t
     \label{eq:prob_foi}
 \end{equation} 
 
-As we do in the main text, we can rewrite equation \ref{eq:prob_foi} as
+We can rewrite equation \ref{eq:prob_foi} as
 
 \begin{equation}
     \begin{aligned}
@@ -77,9 +79,9 @@ As we do in the main text, we can rewrite equation \ref{eq:prob_foi} as
     \end{aligned}
     \label{eq:correlated_movement}
 \end{equation}
-where the force of infection felt by host $i$ from host $j$ is the related to the utilization distributions of the two hosts and their covariance within an area [really two nested areas]. 
+where the force of infection felt by host $i$ from host $j$ is the related to the utilization distributions of the two hosts and their covariance within an area (in actuality, two nested areas).  
 
-If hosts are moving independently, we can write
+For simplicity, let's consider hosts moving independently. In this case, we can write
 
 \begin{equation}
     h^*_{i \leftarrow j}(t, A_{x, \rho}) = \beta' \lambda \int_{-\infty}^{t} [p_i(A_{x, \rho}, t) p_j(A_{x, \rho + r}, u)] e^{-\nu(t - u)} du
@@ -87,20 +89,15 @@ If hosts are moving independently, we can write
 \end{equation}
 where $p_i(A_{x, \rho}, t)$ is the probability of host $i$ being in area $A_{x, \rho}$ at time $t$ and $p_j(A_{x, \rho + r}, u)$ is the probability of host $j$ being in area $A_{x, \rho + r}$ at time $u$.
 
-Now we want to calculate $h^*_{i \leftarrow j}(t, A_{x, \rho})$ in the limit as $\rho \rightarrow 0$. For equation \ref{eq:ind_movement}, we can divide both sides by $A_{x, \rho}$ and take the limit as $\rho \rightarrow 0$ (such that $A_{x, \rho} \rightarrow 0$). Doing this we obtain [I think...] 
+Now we want to calculate $h^*_{i \leftarrow j}(t, A_{x, \rho})$ in the limit as $\rho \rightarrow 0$. For equation \ref{eq:ind_movement}, we can divide both sides by $A_{x, \rho}$ and take the limit as $\rho \rightarrow 0$ (such that $A_{x, \rho} \rightarrow 0$). Doing this we obtain
 
 \begin{equation}
     \hat{h}^*_{i \leftarrow j}(t, x) = \beta' \lambda \int_{-\infty}^{t} [f_i(x, t) p_j(A_{x, r}, u)] e^{-\nu(t - u)} du = \beta' \lambda \int_{-\infty}^{t} [f_i(x, t) \int_{s \in A_{x, r}} f_j(s, u) ds] e^{-\nu(t - u)} du
     \label{eq:limit}
 \end{equation}
-where $f_i(x, t)$ and $f_j(x, t)$ are the probability density functions of space use for host $i$ and host $j$, respectively.  Note that the units on $f_i(x, t)$ or $f_j(x, t)$ are per area, such that the force of infection $\hat{h}^*_{i \leftarrow j}(t, x)$ has units per time per area as opposed to $h^*_{i \leftarrow j}(t, A_{x, \rho})$ which has units per time. Conceptually, for $h^*_{i \leftarrow j}(t, A_{x, \rho})$ we have already integrated over area in $h^*_{i \leftarrow j}(t, A_{x, \rho})$ so we cancel out the per area units.  
+where $f_i(x, t)$ and $f_j(x, t)$ are the probability density functions of space use for host $i$ and host $j$, respectively.  Note that the units on $f_i(x, t)$ or $f_j(x, t)$ are per area, such that the force of infection $\hat{h}^*_{i \leftarrow j}(t, x)$ has units per time per area as opposed to $h^*_{i \leftarrow j}(t, A_{x, \rho})$ which has units per time. Conceptually, for $h^*_{i \leftarrow j}(t, A_{x, \rho})$ we have already integrated over area so we cancel out the per area units.  
 
-
-\textcolor{red}{
-[This is where I am stuck.  How do you take the equivalent limit of equation \ref{eq:correlated_movement}? In particular, any suggestions on what happens to the Covariance term after you divide by $A_{x, \rho}$ and take the limit?  Before you take the limit you are looking at the covariance of two Bernoulli random variables at different time lags. But as you take the limit, $\delta'_{x_i(t)}(A_{x, \rho})$ isn't really a Bernoulli random variable anymore.  It seems to me that this term should converge to something in the limit (i.e., it shouldn't explode or go to zero), but I am not sure what that something is.  My intuition (perhaps faulty) is that if you have two hosts exactly together on a landscape, then their correlation should always be one at a short time lag (i.e., host 1 at time $t$ is always in the same location as host 2 at time $t$) and letting $\rho$ go to zero doesn't change this.  But I am not seeing how this emerges from equation \ref{eq:correlated_movement} after dividing by $A_{x, \rho}$ and taking the limit as $\rho \rightarrow 0$.]
-}
-
-Assuming a stationary process, we can write equation \ref{eq:limit}
+Assuming a stationary process, we can write equation \ref{eq:limit} as
 
 \begin{equation}
     \hat{h}^*_{i \leftarrow j}(t, x) =  \frac{\beta' \lambda}{\nu} [f_i(x) \int_{s \in A_{x, r}} f_j(s) ds]
@@ -118,13 +115,63 @@ Remembering that $\beta' = \tilde{\beta} / A_{x, r} = \tilde{\beta} / \pi r^2$, 
     \hat{h}^*_{i \leftarrow j}(t, x) =  \frac{\tilde{\beta} \lambda}{\nu} [f_i(x) f_j(x)]
 \end{equation}
 
-Integrating $\hat{h}^*_{i \leftarrow j}(t, x)$ over some area of interest centered at $x$ would yield  $h^*_{i \leftarrow j}(t, A_{x, d}) = \frac{\tilde{\beta} \lambda}{\nu} \int_{A_{x, d}} [f_i(s) f_j(s) ds] $. This is reminiscent of the equation 17 in [Martinez-Garcia 2020] where a limiting case of the mean encounter rate of two individuals moving according to an Ornstein-Uhlenbeck movement process is proportional to the inner product of their probability density functions of space use. 
+Integrating $\hat{h}^*_{i \leftarrow j}(t, x)$ over some area of interest centered at $x$ would yield  $h^*_{i \leftarrow j}(t, A_{x, d}) = \frac{\tilde{\beta} \lambda}{\nu} \int_{A_{x, d}} [f_i(s) f_j(s) ds] $. This is reminiscent of the equation 17 in \cite{Martinez-Garcia2020} where a limiting case of the mean encounter rate of two individuals moving according to an Ornstein-Uhlenbeck movement process is proportional to the inner product of their utilization distributions. 
+
+Including correlation in movement into this formulation of PMoveSTIR is more theoretically and empirically challenging, and we leave this task for a later paper.
+
+\section{Deriving PMoveSTIR given an assumption of statistical stationarity}
+
+To derive equation 6 in the main text that assumes stationarity in utilization distributions, we start with equation 4 in the main text
+
+\begin{equation}
+    \begin{aligned}
+        h^*_{i \leftarrow j}(t, x) = \frac{\tilde{\beta}}{A_x} \lambda \int_{-\infty}^{t} [p_i(x, t) p_j(x, u) + Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x))] S(t - u) du.
+    \end{aligned}
+    \label{eq:foi_cov}
+\end{equation}
+Here, $p_i(x, t)$ and $p_j(x, u)$ represent the probabilities of host $i$ and $j$ using location $x$ at time $t$ and $u$, respectively. The parameters $\tilde{\beta}$ and $\lambda$ are the acquisition and deposition rates respectively, and $A_x$ is the area of location $x$.  $Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x))$ gives the covariance in how host $i$ and $j$ at time $t$ and $u$ are using area $x$.  Finally, $S(t - u)$  gives the survival probability of a pathogen at time $t$ that was deposited at time $u$. 
+
+If we now assume a stationary utilization distribution, the time indexes on $p_i(x, t)$ and $p_j(x, u)$ are irrelevant -- the logic here is that, by definition, the mean of a stationary distribution is independent of time so $p_i(x, t) = p_i(x)$ and $p_j(x, u) = p_j(x)$. Therefore, we can write  
+
+$$
+h^*_{i \leftarrow j}(t, x) = \frac{\tilde{\beta}}{A_x} \lambda \left[p_i(x) p_j(x) \int_0^\infty S(\tau) d\tau  + \int_{-\infty}^t Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x)) S(t - u) du\right].
+$$
+
+In addition, given stationarity, $h^*_{i \leftarrow j}(t, x)$ does not depend on time, such that 
+
+$$
+h^*_{i \leftarrow j}(x) = \frac{\tilde{\beta}}{A_x} \lambda \left[p_i(x) p_j(x) \int_0^\infty S(\tau) d\tau  + \int_{-\infty}^t Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x)) S(t - u) du\right].
+$$
+
+Moreover, given stationarity, we know that $Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x))$ just depends on the time lag $\tau = t - u$ and not specific time stamps. Thus, we can write
+
+\begin{equation}
+    \begin{aligned}
+   h^*_{i \leftarrow j}(x) = \frac{\tilde{\beta}}{A_x} \lambda \left[p_i(x)p_j(x) \int_0^\infty S(\tau) d\tau + \int_{0}^{\infty} Cov(\delta_{i \in x}, \delta_{j \in x} | \tau) S(\tau) d\tau\right].
+    \end{aligned}
+    \label{eq:foi_stationary}
+\end{equation}
+
+By replacing $S(\tau)$ with the exponential survival function $e^{-\nu \tau}$ we obtain equation 6 in the main text.
+
+\section*{Analytical example of how correlated movement and indirect transmission can alter FOI}
+
+The effects of correlated movement on FOI relative to habitat overlap become analytically more difficult to generalize when we consider pathogens with indirect transmission.  This is because the correlation function $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ can be highly non-trivial even in the simple case when two hosts are moving together.  
+While determining the analytical form of $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ for common movement models is beyond the scope of this study, we can use a relatively simple movement scenario to get an analytical sense of how indirect transmission and correlated movements can interact to affect transmission risk.
+
+The scenario is two hosts moving back and forth between two patches, and spending $\eta$ time units in each patch.  As with the example of direct transmission, we assume that the hosts are moving together. If we plot $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ of this movement scenario, we get the saw-tooth pattern observed in Fig. \ref{fig:xcorrs}d.  
+Correlation in movement is 1 at lag 0 (because hosts are together constantly) and decreases to approximately -1 by time $\eta$ before increasing close to 1 by time $2\eta$, etc. 
+We assume that the pathogen cannot survive longer than $\eta$ in the environment (i.e., $\pi \leq 1$), then we can ignore all correlations after lag $s = \eta$ and we can approximate $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) \approx (-2 / \eta)s + 1$.  With this approximation, we can write our FOI equation as (derivation in Appendix X)
 
 
-
-% Revisiting correlation...as area decreases, the importance of the correlation term goes to zero? That doesn't seem intuitively correct on one hand, but it does on the other hand...
-%[Note, might be useful to mention that $\beta'$ is a function of $r$ and $\rho$]. 
-
+\begin{equation}
+    h^*_{i \leftarrow j}(x) = \beta' \lambda \pi \eta \left[ \underbrace{\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}}}_{\substack{\text{Contribution due} \\ \text{to habitat overlap}}} + \underbrace{\frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) (1 - \pi)}_{\substack{\text{Contribution due} \\ \text{to correlated movement}}} \right].
+    \label{eq:uniform_indirect}
+\end{equation}
+As $\pi$ gets small, note that we recover equation \ref{eq:uniform_direct}.  Equation \ref{eq:uniform_indirect} shows that the degree of contribution of correlated movement to FOI depends on the relative persistence time of the pathogen compared to the residence time of the host.  
+When the pathogen persists from $\eta$ time units (i.e. $\pi = 1$) the contribution of correlation to FOI is zero.  This is because negative and positive correlations in $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ cancel out as we integrate from zero to $\eta$.  
+When $\pi < 1$, the contribution of correlated movements to FOI will be positive, and the relative contribution of correlated movements compared to habitat overlap will approach unity (i.e., an equal contribution) as $\pi$ approaches 0. 
+This example illustrates three important points: the contributions of correlated movement to indirect transmission risk will depend strongly on 1) the movement dynamics as reflected in $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ and 2) the rate of pathogen decay relative to host movement rates.  Third, the contribution due to correlated movements could potentially increase, decrease, or have no effect on local FOI depending on the lag considered.  
 
 
 \bibliography{references}

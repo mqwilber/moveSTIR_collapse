@@ -16,3 +16,4 @@ docs/prob_movestir_theory.out
 *.Rhistory
 .Rproj.user
 *.qgz
+outputs
