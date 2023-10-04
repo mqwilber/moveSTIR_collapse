@@ -68,16 +68,16 @@ dat_move <- move(x = dat1$x_,y = dat1$y_,
 
 # Create telemetry object and plot positions
 telemetries <- as.telemetry(dat_move)
-plot(telemetries, col = hcl.colors(5, "Dark 3"), ann=F, units=F)
+plot(telemetries, col = hcl.colors(5, "Dark 3"), ann=F, units=F,xaxt='n',yaxt='n')
 grid()
-legend("bottomright", col = hcl.colors(length(ids), "Dark 3"), legend = ids, pch=1)
+legend("bottomright", col = hcl.colors(length(ids), "Dark 3"), legend = paste("Ov",1:5), pch=1, cex=0.8)
+axis(1, cex.axis=0.8)
+axis(2, cex.axis=0.8)
 
 #### CTMM and AKDE ####
 # Fit a CTMM model to the trajectories
-GUESS <- lapply(telemetries, ctmm.guess, CTMM = ctmm(error = TRUE), interactive = F)
-cl <- makeCluster(4)
-clusterEvalQ(cl, library(ctmm))
-FITS <- clusterMap(cl=cl, ctmm.select, telemetries, GUESS, SIMPLIFY = FALSE)
+GUESS <- lapply(telemetries, ctmm.guess, interactive = F)
+FITS <- mapply(ctmm.select, telemetries, GUESS, SIMPLIFY = FALSE)
 # export
 saveRDS(FITS, "outputs/deer_ctmm_fits.rds")
 
@@ -87,7 +87,6 @@ saveRDS(FITS, "outputs/deer_ctmm_fits.rds")
 
 UD <- akde(telemetries, FITS,grid = list(dr = c(contact_dist,contact_dist), align.to.origin = T))
 # clusterMap(cl, akde, telemetries,FITS, grid = list(dr = c(contact_dist,contact_dist), align.to.origin = T))
-stopCluster(cl)
 outnames <- paste0("outputs/UD_", names(FITS), ".tif")
 # Export UD PMFs
 mapply(writeRaster,UD,outnames, DF = "PMF", overwrite = TRUE)
@@ -125,14 +124,14 @@ for (i in seq_len(ncol(combs))) {
   # export outputs
   writeRaster(udprod, paste0("outputs/UDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
   writeRaster(sdprod, paste0("outputs/SDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
-
   ### CORRELATIONS
+  
   # to estimate the correlation, I have to put the tracks in a common time
   # frame. For this, I interpolate the positions for a regular set of times
   tr1 <- range(telemetries[[ind1]]$timestamp)
   tr2 <- range(telemetries[[ind2]]$timestamp)
-  
-  if(max(tr1[1],tr2[1])>min(min(tr1[2],tr2[2]))) {# Check if there is temporal overlap
+  # Check if there is temporal overlap
+  if(max(tr1[1],tr2[1])>min(min(tr1[2],tr2[2]))) {
     cat("There is no temporal overlap between", ids[ind1], "and", ids[ind2], "\n")
     foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
   } else {
@@ -169,40 +168,123 @@ for (i in seq_len(ncol(combs))) {
       write.csv(cormat_ab, paste0("outputs/correlations_10min_",ids[ind1],"-",ids[ind2],".csv"))
       write.csv(cormat_ba, paste0("outputs/correlations_10min_",ids[ind2],"-",ids[ind1],".csv"))
       
-      ## FOI
-      # scale and integrate correlation at every cell
-      corcells <- ovlpcells
-      corvals_ab <- corvals_ba <- numeric(length(udprod))
-      corvals_ab[corcells] <- colSums(cormat_ab*exp(-nu*lags)*unique(diff(lags)))
-      corvals_ba[corcells] <- colSums(cormat_ba*exp(-nu*lags)*unique(diff(lags)))
-      corrast_ab <- corrast_ba <- udprod
-      values(corrast_ab) <- corvals_ab
-      values(corrast_ba) <- corvals_ba
-      # Export scaled cross-corr rasters
-      writeRaster(corrast_ab, paste0("outputs/Corrast_10min_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
-      writeRaster(corrast_ba, paste0("outputs/Corrast_10min_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
-      
-      # Calculate FOI
-      foi_ab <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ab)
-      foi_ba <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ba)
-      
-      # Keep only positive values
-      foi_ab <- foi_ab*(foi_ab>=0)
-      foi_ba <- foi_ba*(foi_ba>=0)
+  #     # ## FOI
+  #     # # scale and integrate correlation at every cell
+  #     # corcells <- ovlpcells
+  #     # corvals_ab <- corvals_ba <- numeric(length(udprod))
+  #     # corvals_ab[corcells] <- colSums(cormat_ab*exp(-nu*lags)*unique(diff(lags)))
+  #     # corvals_ba[corcells] <- colSums(cormat_ba*exp(-nu*lags)*unique(diff(lags)))
+  #     # corrast_ab <- corrast_ba <- udprod
+  #     # values(corrast_ab) <- corvals_ab
+  #     # values(corrast_ba) <- corvals_ba
+  #     # # Export scaled cross-corr rasters
+  #     # writeRaster(corrast_ab, paste0("outputs/Corrast_10min_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+  #     # writeRaster(corrast_ba, paste0("outputs/Corrast_10min_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
+  #     # 
+  #     # Calculate FOI
+  #     foi_ab <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ab)
+  #     foi_ba <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ba)
+  #     
+  #     # Keep only positive values
+  #     foi_ab <- foi_ab*(foi_ab>=0)
+  #     foi_ba <- foi_ba*(foi_ba>=0)
     }
   }
-  # export
-  writeRaster(foi_ab, paste0("outputs/FOI_10min_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
-  writeRaster(foi_ba, paste0("outputs/FOI_10min_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
+  # # export
+  # writeRaster(foi_ab, paste0("outputs/FOI_10min_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+  # writeRaster(foi_ba, paste0("outputs/FOI_10min_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
 }
 
+# There is no spatial overlap (at the cell scale) between 151583 and 151571, 83
+# and 75, 83 and 89, and 71 with 75
+
+####  Calculate FOI with different decay rates #### 
+
+#The effect of correlation on FOI is highly dependent on the decay parameter.
+#Here we calculate FOI for a set of different decay rates. Deer in
+#our study area have two parasites of interest, SARS-CoV-2, which is transmitted
+#in close proximity over short periods, and Chronic Wasting Disease, which is a
+#transmitted through a prion that can survive long times in the environment. We
+#will recalculate the FOIs for the deer in our study for these two cases. For
+#SARS-CoV-2 we assume transmission occurs within one hour, through saliva
+#droplets. For CWD, the probability of persistence from one year to the next has
+#been estimated as 0.91 (Cook et al. 2022), which translates to a decay rate of
+#nu = 0.096/yr, or 3.04e-9/s. Analyzing this requires to use the exact expression
+#of the decay function rather than assuming integrating over infinite lags. In
+#practice it is virtually the same as assuming no decay over the study period
+
+udprodfiles <- list.files("outputs/", "UDprod(.*).tif$", full.names = T) 
+sdprodfiles <- list.files("outputs/", "SDprod(.*).tif$", full.names = T) 
+deer_FOIs_nus <- data.frame()
+for (i in 1:ncol(combs)) {
+  ind1 = combs[1,i]
+  ind2 = combs[2,i]
+  id1 = ids[ind1]
+  id2 = ids[ind2]
+  
+  udprod <- raster(udprodfiles[grepl(id1, udprodfiles) & grepl(id2, udprodfiles)])
+  sdprod <- raster(sdprodfiles[grepl(id1, sdprodfiles) & grepl(id2, sdprodfiles)])
+  corfiles <- c(paste0("outputs/correlations_10min_",id1,"-",id2,".csv"),
+                paste0("outputs/correlations_10min_",id2,"-",id1,".csv"))
+  nus <- c(SARS = 1/3600, CWD = 3.04e-9) # decay rates in seconds^-1
+  Area <- prod(res(udprod))
+  lagt <- 60*24*3600
+  foiudsars <- beta*lam/Area*1/nus[1]*udprod
+  foiudcwd <- beta*lam/Area*(1-exp(-nus[2]*lagt))/nus[2]*udprod
+  foidirect <- beta*lam/Area*udprod
+  for (j in 1:2) {
+    if (file.exists(corfiles[j])) {
+      corrs <- read.csv(corfiles[j], row.names = 1)
+      lags <- as.numeric(row.names(corrs))
+      dtau <- unique(diff(lags))
+      corrintSARS <- colSums(exp(-nus[1]*lags)*corrs*dtau)
+      corrintCWD <- colSums(exp(-nus[2]*lags)*corrs*dtau)
+      corrastCWD <- corrastSARS <- udprod
+      values(corrastCWD) <- values(corrastSARS) <- 0
+      corcells <- as.numeric(substring(names(corrs),2))
+      corrastCWD[corcells] <- corrintCWD
+      corrastSARS[corcells] <- corrintSARS
+      foiCWDrast <- beta*lam/prod(res(udprod))*(udprod*(1-exp(-nus[2]*lagt))/nus[2]+sdprod*corrastCWD)
+      foiSARSrast <- beta*lam/prod(res(udprod))*(udprod*1/nus[1]+sdprod*corrastSARS)
+    }else {
+      foiCWDrast <- foiudcwd
+      foiSARSrast <- foiudsars
+    }
+    foiCWDrast <- max(foiCWDrast,0)
+    foiSARSrast <- max(foiSARSrast,0)
+    idi <- ifelse(j == 1, id1,id2)
+    idj <- ifelse(j == 1, id2,id1)
+    deer_FOIs_nus <- rbind(deer_FOIs_nus, c(idi,idj, file.exists(corfiles[j]),
+                                            cellStats(foiCWDrast, sum),
+                                            cellStats(foiSARSrast, sum),
+                                            cellStats(foiudcwd, sum),
+                                            cellStats(foiudsars, sum),
+                                            cellStats(foidirect, sum)
+                                            )
+                           )
+  }
+}
+
+names(deer_FOIs_nus) <- c("ind1", "ind2", "correlation","FOI_CWD","FOI_SARS", 
+                          "FOI_UD_CWD", "FOI_UD_SARS", "FOI_direct")
+deer_FOIs_nus
+
+# The FOI experienced by deer differs orders of magnitude depending on the
+# parasite of interest and its respective decay rate. For parasites that persist
+# for longer in the environment like CWD, the FOI is three orders of magnitude
+# higher than for a parasite with fast decay rates. 
+
+
 #### Correlation analysis ####
-cors <- lapply(list.files("../outputs/","correlations_10m", full.names = T), read.csv, row.names = 1)
+corfiles <- list.files("outputs/","correlations_10m", full.names = T)
+corfiles <- corfiles[!grepl("151564",corfiles)]
+corfiles <- corfiles[!grepl("151592",corfiles)]
+corfiles
 # Check the length of all correlations
-lapply(list.files("../outputs/","correlations_10m", full.names = T), read.csv, row.names = 1)|>
+lapply(corfiles, read.csv, row.names = 1)|>
   sapply(ncol)
 # There is variation in spatial overlap, between only 1 cells with
-# overlap, and up to 1064 cells
+# overlap, and up to 1365 cells
 
 # Find the maximum correlation and corresponding lag
 data.frame(name = list.files("../outputs/","corr"),
@@ -242,44 +324,7 @@ sapply(cors, function(x) {
 # the FOI, but by how much?
 
 #### FOI with and without correlation ####
-corrastfiles <- list.files("outputs/", "Corrast_10min(.*).tif$", full.names = T)
-udprodfiles <- list.files("outputs/", "UDprod(.*).tif$", full.names = T) 
-sdprodfiles <- list.files("outputs/", "SDprod(.*).tif$", full.names = T) 
 
-pdf("../docs/figures/Cov_contrib.pdf")
-for (i in seq_along(corrastfiles)) {
-  ind1 = substr(basename(corrastfiles[i]),9,14)
-  ind2 = substr(basename(corrastfiles[i]),16,21)
-  corrast <- raster(corrastfiles[i])
-  Area <- prod(res(corrast))
-  ud <- 1/nu*raster(udprodfiles[grepl(ind1, udprodfiles) & grepl(ind2, udprodfiles)])
-  sd <- raster(sdprodfiles[grepl(ind1, sdprodfiles) & grepl(ind2, sdprodfiles)])
-  covrast <- sd*corrast
-  plot((covrast+ud)/ud, main = paste("(Covariance+UD)/UD",ind1,ind2))
-}
-dev.off()
-
-# The approach below calculates only total FOI, not by cell
-corpairs <- data.frame(ind1 = list.files("../outputs/", "corr") |> substr(14,19),
-           ind2 = list.files("../outputs/", "corr") |> substr(21,26),
-           foi_cor = 0,
-           foi_ud = 0,
-           dif = 0)
-
-
-for (i in seq_len(nrow(corpairs))) {
-  ind1 <- corpairs[i,1]
-  ind2 <- corpairs[i,2]
-  f <- raster(paste0("../outputs/FOI_",ind1,"-",ind2,".tif"))
-  ud <- beta*lam/nu*raster(uds[grepl(ind1, uds) & grepl(ind2, uds)])
-  corpairs[i,"foi_cor"] <- cellStats(f,sum)
-  corpairs[i,"foi_ud"] <- cellStats(ud,sum)
-  corpairs[i,"dif"] <- corpairs[i,"foi_cor"]-corpairs[i,"foi_ud"]
-}
-corpairs <- left_join(totfoisdf,corpairs)
-corpairs
-corpairs$foi_cor/corpairs$foi_ud
-# The covariance contribution is in the order of 2e-3 at the highest.
 
 
 
@@ -399,70 +444,6 @@ foidistcomp %>% pivot_wider(names_from = d, values_from = foi,names_prefix = "d"
   summary()
 
 
-
-####  FOI with different decay rates #### 
-
-#The effect of correlation on FOI is highly dependent on the decay parameter.
-#Here we recalculate FOI for a set of different decay rates. Deer in
-#our study area have two parasites of interest, SARS-CoV-2, which is transmitted
-#in close proximity over short periods, and Chronic Wasting Disease, which is a
-#transmitted through a prion that can survive long times in the environment. We
-#will recalculate the FOIs for the deer in our study for these two cases. For
-#SARS-CoV-2 we assume transmission occurs within one hour, through saliva
-#droplets. For CWD, the probability of persistence from one year to the next has
-#been estimated as 0.91 (Cook et al. 2022), which translates to a decay rate of
-#nu = 0.096/yr, or 3.04e-9/s. Analyzing this requires to use the exact expression
-#of the decay function rather than assuming integrating over infinite lags. In
-#practice it is virtually the same as assuming no decay over the study period
-udprodfiles <- list.files("outputs/", "UDprod(.*).tif$", full.names = T) 
-sdprodfiles <- list.files("outputs/", "SDprod(.*).tif$", full.names = T) 
-deer_FOIs_nus <- data.frame()
-for (i in 1:ncol(combs)) {
-  ind1 = combs[1,i]
-  ind2 = combs[2,i]
-  id1 = ids[ind1]
-  id2 = ids[ind2]
-  
-  udprod <- raster(udprodfiles[grepl(id1, udprodfiles) & grepl(id2, udprodfiles)])
-  sdprod <- raster(sdprodfiles[grepl(id1, sdprodfiles) & grepl(id2, sdprodfiles)])
-  corfiles <- c(paste0("outputs/correlations_10min_",id1,"-",id2,".csv"),
-                paste0("outputs/correlations_10min_",id2,"-",id1,".csv"))
-  nus <- c(SARS = 1/3600, CWD = 3.04e-9) # decay rates in seconds^-1
-  for (j in 1:2) {
-    if (file.exists(corfiles[j])) {
-      corrs <- read.csv(corfiles[j], row.names = 1)
-      lags <- as.numeric(row.names(corrs))
-      dtau <- unique(diff(lags))
-      corrintSARS <- colSums(exp(-nus[1]*lags)*corrs*dtau)
-      corrintCWD <- colSums(exp(-nus[2]*lags)*corrs*dtau)
-      corrastCWD <- corrastSARS <- udprod
-      values(corrastCWD) <- values(corrastSARS) <- 0
-      corcells <- as.numeric(substring(names(corrs),2))
-      corrastCWD[corcells] <- corrintCWD
-      corrastSARS[corcells] <- corrintSARS
-      foiCWDrast <- beta*lam/prod(res(udprod))*(udprod*(1-exp(-nus[2]*30*24*3600))/nus[2]+sdprod*corrastCWD)
-      foiSARSrast <- beta*lam/prod(res(udprod))*(udprod*1/nus[1]+sdprod*corrastSARS)
-    }else {
-      foiCWDrast <- beta*lam/prod(res(udprod))*(udprod*(1-exp(-nus[2]*30*24*3600))/nus[2]) # need to deal with the lags, here I am assuming the lag is integrated over 100 days only
-      foiSARSrast <- beta*lam/prod(res(udprod))*(udprod*1/nus[1])
-    }
-    foiCWDrast <- max(foiCWDrast,0)
-    foiSARSrast <- max(foiSARSrast,0)
-    idi <- ifelse(j == 1, id1,id2)
-    idj <- ifelse(j == 1, id2,id1)
-    deer_FOIs_nus <- rbind(deer_FOIs_nus, c(idi,idj, file.exists(corfiles[j]),
-                                            cellStats(foiCWDrast,sum),
-                                            cellStats(foiSARSrast, sum)))
-  }
-}
-
-names(deer_FOIs_nus) <- c("ind1", "ind2", "correlation","FOI_CWD","FOI_SARS")
-deer_FOIs_nus
-
-# The FOI experienced by deer differs orders of magnitude depending on the
-# parasite of interest and its respective decay rate. For parasites that persist
-# for longer in the environment like CWD, the FOI is three orders of magnitude
-# higher than for a parasite with fast decay rates. 
 
 ####---- Other FOI estimates ----####
 ### Home Range overlap
