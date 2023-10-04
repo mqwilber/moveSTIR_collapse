@@ -335,17 +335,16 @@ FITS <- readRDS("../outputs/deer_ctmm_fits.rds")
 UDSdeer20 <- list()
 for (i in seq_along(FITS)) {
   # file output name
-  outname <- paste0("../outputs/UD_", names(FITS)[i], "_20m.tif")
+  outname <- paste0("outputs/UD_", names(FITS)[i], "_20m.tif")
   # create UD
   UD <- UDSdeer20[[i]] <- akde(data = telemetries[[i]], CTMM = FITS[[i]], 
              grid = list(dr = c(2*contact_dist, 2*contact_dist), 
                          align.to.origin = TRUE))
   # save to disk. This saves the probability mass, not the density 
   writeRaster(UD, outname, DF = "PMF")
-  rm(UD)
-}
-fnames <- paste0("../outputs/UD_X", ids, "_20m.tif")
-# Get FOIS
+}; rm(UD, outname)
+fnames <- paste0("outputs/UD_X", ids, "_20m.tif")
+# Get UD prods, SD prods, and correlations at 20 m
 for (i in seq_len(ncol(combs))) {
   # read in UDs, two at a time
   ind1 <- combs[1,i]
@@ -355,8 +354,8 @@ for (i in seq_len(ncol(combs))) {
   r2 <- raster(fnames[ind2])
   
   # Check whether the grids overlap/extend to a common grid for both, or all
-  r1 <- extend(r1, extent(merge(r1,r2)))
-  r2 <- extend(r2, extent(merge(r1,r2)))
+  r1 <- extend(r1, extent(merge(r1,r2)), value = 0)
+  r2 <- extend(r2, extent(merge(r1,r2)), value = 0)
   
   # cell area
   Area <- prod(res(r1))
@@ -364,20 +363,20 @@ for (i in seq_len(ncol(combs))) {
   udprod <- r1*r2
   sdprod <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))
   # export outputs
-  writeRaster(udprod, paste0("../outputs/UDprod_",ids[ind1],"-",ids[ind2],"_20m.tif"))
-  writeRaster(sdprod, paste0("../outputs/SDprod_",ids[ind1],"-",ids[ind2],"_20m.tif"))
+  writeRaster(udprod, paste0("outputs/UDprod_",ids[ind1],"-",ids[ind2],"_20m.tif"))
+  writeRaster(sdprod, paste0("outputs/SDprod_",ids[ind1],"-",ids[ind2],"_20m.tif"))
   
   ### CORRELATIONS
   # to estimate the correlation, I have to put the tracks in a common time
   # frame. For this, I interpolate the positions for a regular set of times
   tr1 <- range(telemetries[[ind1]]$timestamp)
   tr2 <- range(telemetries[[ind2]]$timestamp)
-  
-  if(max(tr1[1],tr2[1])>min(min(tr1[2],tr2[2]))) {# Check if there is temporal overlap
+  # Check if there is temporal overlap
+  if(max(tr1[1],tr2[1])>min(min(tr1[2],tr2[2]))) {
     cat("There is no temporal overlap between", ids[ind1], "and", ids[ind2])
     foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
   } else {
-    tseq <- seq(max(tr1[1],tr2[1]),min(tr1[2],tr2[2]), "30 mins")
+    tseq <- seq(max(tr1[1],tr2[1]),min(tr1[2],tr2[2]), "10 mins")
     lags <- as.numeric(tseq-min(tseq))
     nsteps <- length(tseq)
     # Interpolate trajectories
@@ -394,46 +393,26 @@ for (i in seq_len(ncol(combs))) {
       cat("There are no overlap cells between", ids[ind1], "and", ids[ind2])
       foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
     } else {
-      maxlag <- nsteps-1
+      maxlag <- nsteps
       cormat_ab <- cormat_ba <- matrix(0, nrow = nsteps, ncol = length(ovlpcells))
       for (j in seq_along(ovlpcells)) {
         cell <- ovlpcells[j]
-        cellx <- xFromCell(r1,cell)
-        celly <- yFromCell(r1,cell)
+        # cellx <- xFromCell(r1,cell)
+        # celly <- yFromCell(r1,cell)
         a <- b <- numeric(nsteps)
-        a[match(cell, pos1)] <- b[match(cell, pos2)]<- 1
+        # a[match(cell, pos1)] <- b[match(cell, pos2)]<- 1
         xcorr <- ccf(a,b,lag.max = maxlag, plot = F)
         xcorr_vals <- as.numeric(xcorr$acf)
-        cormat_ab[,j] <- rev(xcorr_vals[1:nsteps])
+        cormat_ab[,j] <- (xcorr_vals[nsteps:1])
         cormat_ba[,j] <- xcorr_vals[nsteps:length(xcorr_vals)]
       }
-      dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(lag = tseq-min(tseq), cell = ovlpcells)
+      dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(lag = lags, cell = ovlpcells)
       # Export 
-      write.csv(cormat_ab, paste0("../outputs/correlations_",ids[ind1],"-",ids[ind2],"_20m.csv"))
-      write.csv(cormat_ba, paste0("../outputs/correlations_",ids[ind2],"-",ids[ind1],"_20m.csv"))
-      
-      ## FOI
-      # scale and integrate correlation at every cell
-      corcells <- ovlpcells
-      corvals_ab <- corvals_ba <- numeric(length(udprod))
-      corvals_ab[corcells] <- colSums(cormat_ab*exp(-nu*lags))
-      corvals_ba[corcells] <- colSums(cormat_ba*exp(-nu*lags))
-      corrast_ab <- corrast_ba <- udprod
-      values(corrast_ab) <- corvals_ab
-      values(corrast_ba) <- corvals_ba
-      # Calculate FOI
-      foi_ab <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ab)
-      foi_ba <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ba)
-      
-      # Keep only positive values
-      foi_ab <- foi_ab*(foi_ab>=0)
-      foi_ba <- foi_ba*(foi_ba>=0)
+      write.csv(cormat_ab, paste0("outputs/correlations_",ids[ind1],"-",ids[ind2],"_20m.csv"))
+      write.csv(cormat_ba, paste0("outputs/correlations_",ids[ind2],"-",ids[ind1],"_20m.csv"))
     }
   }
-  # export
-  writeRaster(foi_ab, paste0("../outputs/FOI_",ids[ind1],"-",ids[ind2],"_20m.tif"))
-  writeRaster(foi_ba, paste0("../outputs/FOI_",ids[ind2],"-",ids[ind1],"_20m.tif"))
-}
+}; rm(fnames,cormat_ab,cormat_ba,nsteps,maxlag,a,b,Area,interp_traj_1,interp_traj_2)
 # compare with 10 m
 foidistcomp <- data.frame(foi = sapply(list.files("../outputs/","FOI(.*).tif$", full.names = T), raster)|>sapply(cellStats,sum),
                           d = ifelse(grepl("20m",list.files("../outputs/","FOI(.*).tif$")),20,10),
