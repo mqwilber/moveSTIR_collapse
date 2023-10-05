@@ -141,7 +141,6 @@ getCorrs <- function(xy, r) {
       for (j in seq_along(ovlpcells)) {
         cell <- ovlpcells[j]
         a <- b <- numeric(nsteps)
-        # a[match(cell, pos1)] <- b[match(cell, pos2)]<- 1
         a[cell==pos1] <- b[cell==pos2]<- 1
         xcorr <- ccf(a,b,lag.max = maxlag, plot = F)
         xcorr_vals <- as.numeric(xcorr$acf)
@@ -173,7 +172,7 @@ getFOI <- function(xy, uds, beta = 1, lambda = 1/24, nu = 1/(24*7)) {
       # get lags
       lags <- 0:(nrow(gridcors2[[i]])-1)
       # scale and integrate correlation at every cell
-      corrast[corcells] <- colSums(gridcors2[[i]]*exp(-nu*lags))
+      corrast[corcells] <- colSums(gridcors2[[i]]*exp(-nu*lags)*unique(diff(lags)))
       foi <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
     } else {
       foi <- beta/cellarea*lambda*(1/nu*udp)
