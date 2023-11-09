@@ -52,7 +52,7 @@
 \doublespacing
 \linenumbers
 
-\section{PMoveSTIR in continuous space}
+\section*{Appendix 1: PMoveSTIR in continuous space}
 
 In the main text, we derive PMoveSTIR assuming that hosts are moving and contacting each other within some area $A_x$, which we can conceptually think about as a grid cell on a gridded landscape.  While this conceptually simplifies the problem, it is more general to consider the case of continuous space where we define contact as potentially happening when present or past host $j$ is (was) within some distance $r$ of host $i$ at its present location \citep{Wilber2022}.  The output we want from this alternative version of PMoveSTIR is the function $\hat{h^*}(x, t)$, which is the force of infection \emph{per unit area} at point $x$ on the landscape (e.g., $\hat{h^*}(x, t)$ might have units day$^{-1}\text{m}^{-2}$).  Integrating this function over different areas will yield estimates of force of infection felt by host $i$ from host $j$ for any area of interest on the landscape.
 
@@ -119,7 +119,7 @@ Integrating $\hat{h}^*_{i \leftarrow j}(t, x)$ over some area of interest center
 
 Including correlation in movement into this formulation of PMoveSTIR is more theoretically and empirically challenging, and we leave this task for a later paper.
 
-\section{Deriving PMoveSTIR given an assumption of statistical stationarity}
+\section*{Appendix 2: Deriving PMoveSTIR given an assumption of statistical stationarity}
 
 To derive equation 6 in the main text that assumes stationarity in utilization distributions, we start with equation 4 in the main text
 
@@ -154,7 +154,30 @@ Moreover, given stationarity, we know that $Cov(\delta'_{x_i(t)}(x), \delta'_{x_
 
 By replacing $S(\tau)$ with the exponential survival function $e^{-\nu \tau}$ we obtain equation 6 in the main text.
 
-\section*{Analytical example of how correlated movement and indirect transmission can alter FOI}
+\section*{Appendix 3: Beyond the corners of PMoveSTIR}
+
+PMoveSTIR also accounts for other useful cases regarding how heterogeneity in space and time relate to the expected FOI. For example, home range overlap is an intermediate case of of PMoveSTIR (Fig. 1 in the main text), where time is stationary, space use is uniform within a home range, and the area of contact is the home range overlap.  
+Transmission networks commonly assume that this overlap is proportional to the edge weight between host $i$ and host $j$ \citep[e.g.][]{Springer2017a}. 
+Given an area of overlap $A_{hro}$ between two individual home ranges with areas $A_{tot, i}$ and $A_{tot, j}$, we can write
+\begin{equation}
+    \begin{aligned}
+    h^*_{i \leftarrow j}(A_{hro}) = \frac{\tilde{\beta}}{A_{hro}} \lambda \left[\frac{A_{hro}}{A_{tot, i}} \frac{A_{hro}}{A_{tot, j}}  \frac{1}{\nu} + \int_{0}^{\infty} Cov(\delta_{i \in A_{hro}}, \delta_{j \in A_{hro}} | s) e^{-\nu s} ds\right]
+    \end{aligned}
+    \label{eq:home_range}
+\end{equation}
+which gives us an explicit equation for how home range overlap determines FOI and how correlation in use of the overlap area affects FOI. 
+
+In many cases, animals shift their home range seasonally \citep{Viana2018,Richard2014} such that assuming a constant UD is biologically unrealistic. This can be accounted for in PMoveSTIR as a special case of temporal heterogeneity (Fig. 1 in the main text).  Specifically, consider equation 3 in the main text. The expected FOI over the time interval 0 to $t$ in location $x$ is $\bar{h}^*_{i \leftarrow j}(x) = \frac{\int_0^t h^*_{i \leftarrow j}(\tau, x) d\tau}{t}$ \citep{Wilber2022}.  One could approximate this as $\sum_{k = 0}^{n_t} h^*_{i \leftarrow j}(t_k, x) \frac{\Delta \tau}{t}$ where $n_t$ is the number of bins that comprise the interval 0 to $t$, $t_k$ is the midpoint of the $k$th time interval, and $\Delta \tau$ is the width of a time interval.  The equation is a weighted sum where each component is a constant FOI within a time interval multiplied by the length of the time interval relative to the total interval length $t$.  
+
+The summation perspective helps us frame PMoveSTIR in a seasonal context.  For example, consider that hosts use two primary movement patterns that repeat on a period of $T$ (e.g., over the course of a year).  The first movement pattern lasts for $\tau_1$ time units and the second lasts for $\tau_2$ time units where $\tau_1 + \tau_2 = T$.  Assuming stationarity within each time interval, the average FOI felt by host $i$ from host $j$ in location $x$ over period $T$ is 
+\begin{equation}
+\bar{h}^*_{i \leftarrow j}(x) = \frac{\tau_1}{T} h^*_{\tau_1, i \leftarrow j}(x) + \frac{\tau_2}{T} h^*_{\tau_2, i \leftarrow j}(x)
+\label{eq:seasonal}
+\end{equation}
+This could be generalized to any number of intervals within the period $T$, depending on the biology of the system.  Importantly, when considering the epidemiological implications of these seasonally shifting movement patterns, one should consider each seasonal FOI component separately to build dynamic contact networks with time-varying edges \citep{Wilber2022}.
+
+
+\section*{Appendix 4: Analytical example of how correlated movement and indirect transmission can alter FOI}
 
 The effects of correlated movement on FOI relative to habitat overlap become analytically more difficult to generalize when we consider pathogens with indirect transmission.  This is because the correlation function $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ can be highly non-trivial even in the simple case when two hosts are moving together.  
 While determining the analytical form of $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ for common movement models is beyond the scope of this study, we can use a relatively simple movement scenario to get an analytical sense of how indirect transmission and correlated movements can interact to affect transmission risk.
@@ -168,12 +191,18 @@ We assume that the pathogen cannot survive longer than $\eta$ in the environment
     h^*_{i \leftarrow j}(x) = \beta' \lambda \pi \eta \left[ \underbrace{\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}}}_{\substack{\text{Contribution due} \\ \text{to habitat overlap}}} + \underbrace{\frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) (1 - \pi)}_{\substack{\text{Contribution due} \\ \text{to correlated movement}}} \right].
     \label{eq:uniform_indirect}
 \end{equation}
-As $\pi$ gets small, note that we recover equation \ref{eq:uniform_direct}.  Equation \ref{eq:uniform_indirect} shows that the degree of contribution of correlated movement to FOI depends on the relative persistence time of the pathogen compared to the residence time of the host.  
+As $\pi$ gets small, note that we recover equation 9 in the main text.  Equation \ref{eq:uniform_indirect} shows that the degree of contribution of correlated movement to FOI depends on the relative persistence time of the pathogen compared to the residence time of the host.  
 When the pathogen persists from $\eta$ time units (i.e. $\pi = 1$) the contribution of correlation to FOI is zero.  This is because negative and positive correlations in $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ cancel out as we integrate from zero to $\eta$.  
 When $\pi < 1$, the contribution of correlated movements to FOI will be positive, and the relative contribution of correlated movements compared to habitat overlap will approach unity (i.e., an equal contribution) as $\pi$ approaches 0. 
 This example illustrates three important points: the contributions of correlated movement to indirect transmission risk will depend strongly on 1) the movement dynamics as reflected in $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ and 2) the rate of pathogen decay relative to host movement rates.  Third, the contribution due to correlated movements could potentially increase, decrease, or have no effect on local FOI depending on the lag considered.  
 
-
 \bibliography{references}
+
+\begin{figure}
+    \includegraphics[width=\textwidth]{figures/example_xcorrs.pdf}
+    \caption{Variation in cross-correlation values for different combinations of position histories. }
+    \label{fig:xcorrs}
+\end{figure}
+
 
 \end{document}
