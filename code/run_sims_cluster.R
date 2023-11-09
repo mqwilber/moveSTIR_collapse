@@ -25,12 +25,13 @@ UDout <- foreach(i = seq_along(trajs), .packages = c("move","ctmm")) %:% foreach
        TRAJS = trajs[[i]],
        UDS = getUDs(trajs[[i]],res = gr))
 }
+UDout<-unlist(UDout,recursive=FALSE)
 
-out <- foreach(i = seq_along(UDout), .packages = c("move", "ctmm"), .combine = 'rbind', .inorder = FALSE) %:% 
+out <- foreach(i = seq_along(UDout), .packages = c("move", "ctmm")) %:% 
   foreach(nu = nus, .combine = 'rbind', .inorder = FALSE) %dopar% {
-    A <- UDout[[i]][[1]]$TRAJS
-    UDS <- UDout[[i]][[1]]$UDS
-    SIM <- UDout[[i]][[1]]$SIM
+    A <- UDout[[i]]$TRAJS
+    UDS <- UDout[[i]]$UDS
+    SIM <- UDout[[i]]$SIM
     prods <- getUDprod(UDS)
     # cors <- getCorrs(A, uds[[i]][[2]])
     fois <- getFOI(A, prods, nu = nu)
@@ -76,7 +77,7 @@ out <- foreach(i = seq_along(UDout), .packages = c("move", "ctmm"), .combine = '
 # } 
 
 stopCluster(cl)
-outdf <- as.data.frame(out)
+outdf <- as.data.frame(do.call(rbind,out))
 names(outdf) <- c("sim", "nu", "Ax","Atoti","Atotj", "foi_ud", "foi_full1", "foi_full2", "overlap")
 outdf$social <- rep(social, each = length(nus)*length(gridres))
 outname <- paste0("sim_res_", format(Sys.time(), "%y%m%d-%H%M"), ".csv")
