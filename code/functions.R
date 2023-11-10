@@ -156,7 +156,7 @@ getCorrs <- function(xy, r) {
 }
 # function to calculate the per-cell FOI. Calculates correlation within. Output
 # is list with each element a FOI raster
-getFOI <- function(xy, uds, beta = 1, lambda = 1/24, nu = 1/(24*7)) {
+getFOI <- function(xy, uds, beta = 1, lambda = 1, nu = 1/(24*7)) {
   foirasts2 <- list()
   gridcors2 <- getCorrs(xy,uds[[1]])
   for (i in seq_along(gridcors2)) {
