@@ -121,9 +121,12 @@ for (i in seq_len(ncol(combs))) {
   # get the UD and sd products
   udprod <- r1*r2
   sdprod <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))
-  # export outputs
-  writeRaster(udprod, paste0("outputs/UDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
-  writeRaster(sdprod, paste0("outputs/SDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+  # if(export) {
+  #   # export outputs
+  #   writeRaster(udprod, paste0("outputs/UDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+  #   writeRaster(sdprod, paste0("outputs/SDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
+  # }
+
   ### CORRELATIONS
   
   # to estimate the correlation, I have to put the tracks in a common time
@@ -190,8 +193,8 @@ for (i in seq_len(ncol(combs))) {
           # Cross-correlation calculation, with prewhitening step to deal with autocorrelation
           xcorr <- TSA::prewhiten(a,b,lag.max = lagmax, plot = F)
           # keep only significant correlations (assessed by confidence intervals)
-          CI_THRESH <- 1.96/sqrt(nsteps)
-          xcorr_vals <- xcorr$ccf$acf*(xcorr$ccf$acf>= CI_THRESH | xcorr$ccf$acf<= -CI_THRESH)
+          # CI_THRESH <- 1.96/sqrt(nsteps)
+          xcorr_vals <- xcorr$ccf$acf#*(xcorr$ccf$acf>= CI_THRESH | xcorr$ccf$acf<= -CI_THRESH)
           # xcorr_vals <- as.numeric(xcorr$acf)
           cormat_ab[,j] <- xcorr_vals[(lagmax+1):1]
           cormat_ba[,j] <- xcorr_vals[(lagmax+1):length(xcorr_vals)]
@@ -272,9 +275,9 @@ for (i in seq_len(ncol(combs))) {
 #of the decay function rather than assuming integrating over infinite lags. In
 #practice it is virtually the same as assuming no decay over the study period
 
-udprodfiles <- list.files("outputs/", "UDprod(.*).tif$", full.names = T) 
-sdprodfiles <- list.files("outputs/", "SDprod(.*).tif$", full.names = T) 
-deer_FOIs_nus <- data.frame()
+udprodfiles <- list.files("outputs/", "UDprod(.*)[[:digit:]].tif$", full.names = T) 
+sdprodfiles <- list.files("outputs/", "SDprod(.*)[[:digit:]].tif$", full.names = T) 
+deer_FOIs_nus_prewt <- data.frame()
 for (i in 1:ncol(combs)) {
   ind1 = combs[1,i]
   ind2 = combs[2,i]
@@ -283,17 +286,33 @@ for (i in 1:ncol(combs)) {
   
   udprod <- raster(udprodfiles[grepl(id1, udprodfiles) & grepl(id2, udprodfiles)])
   sdprod <- raster(sdprodfiles[grepl(id1, sdprodfiles) & grepl(id2, sdprodfiles)])
-  corfiles <- c(paste0("outputs/correlations_10min_",id1,"-",id2,".csv"),
-                paste0("outputs/correlations_10min_",id2,"-",id1,".csv"))
+  corfiles <- c(paste0("outputs/correlations_10min_",id1,"-",id2,"_1109.csv"),
+                paste0("outputs/correlations_10min_",id2,"-",id1,"_1109.csv"))
   nus <- c(SARS = 1/3600, CWD = 3.04e-9) # decay rates in seconds^-1
-  Area <- prod(res(udprod))
-  lagt <- 60*24*3600
+  Area <- prod(res(udprod)) # cell area in m^2
+  lagt <- 60*24*3600 # period to consider for exact integral scaling UD product
   foiudsars <- beta*lam/Area*1/nus[1]*udprod
   foiudcwd <- beta*lam/Area*(1-exp(-nus[2]*lagt))/nus[2]*udprod
   foidirect <- beta*lam/Area*udprod
   for (j in 1:2) {
     if (file.exists(corfiles[j])) {
+      cat("using correlations for", id1, id2,"\n")
       corrs <- read.csv(corfiles[j], row.names = 1)
+      # keep only correlations at cells with non-spurious correlations. Which
+      # ones are spurious is determined based on a CI threshold equal to
+      # 0+-1.96/sqrt(n), where n is the length of the series. If the number of
+      # correlations that exceed the threshold is greater than 5% of the series
+      # then the correlations are kept for the whole cell. Alternatively, only
+      # those specific values are kept, and the rest discarded.
+      nlags <- nrow(corrs*2) # times 2 because I only used up to half the maximum lag
+      CI_THRESH <- 1.96/sqrt(nlags) 
+      # index of which cells have more "significant" correlations than expected
+      # by chance if series were independent
+      sigCells <- colSums(abs(corrs)>CI_THRESH)>=(0.05*nlags) # 0.05 is the signif. threshold corresponding to 1.96
+      cat(sum(sigCells),"/",length(sigCells), "(",100*sum(sigCells)/length(sigCells), "%) cells have non spurious correlations\n")
+      # replace values in cells that did not have more than 5% of correlations beyond threshold.
+      corrs[,!sigCells] <- 0
+      # lags <- (as.numeric(row.names(corrs))-1)*600
       lags <- as.numeric(row.names(corrs))
       dtau <- unique(diff(lags))
       corrintSARS <- colSums(exp(-nus[1]*lags)*corrs*dtau)
@@ -305,7 +324,9 @@ for (i in 1:ncol(combs)) {
       corrastSARS[corcells] <- corrintSARS
       foiCWDrast <- beta*lam/Area*(udprod*(1-exp(-nus[2]*lagt))/nus[2]+sdprod*corrastCWD)
       foiSARSrast <- beta*lam/Area*(udprod*1/nus[1]+sdprod*corrastSARS)
+      raster::plot(foiSARSrast)
     }else {
+      cat("using UD only for",id1, "and", id2,"\n")
       foiCWDrast <- foiudcwd
       foiSARSrast <- foiudsars
     }
@@ -313,7 +334,7 @@ for (i in 1:ncol(combs)) {
     foiSARSrast <- max(foiSARSrast,0)
     idi <- ifelse(j == 1, id1,id2)
     idj <- ifelse(j == 1, id2,id1)
-    deer_FOIs_nus <- rbind(deer_FOIs_nus, c(idi,idj, file.exists(corfiles[j]),
+    deer_FOIs_nus_prewt <- rbind(deer_FOIs_nus_prewt, c(idi,idj, file.exists(corfiles[j]),
                                             cellStats(foiCWDrast, sum),
                                             cellStats(foiSARSrast, sum),
                                             cellStats(foiudcwd, sum),
@@ -324,9 +345,9 @@ for (i in 1:ncol(combs)) {
   }
 }
 
-names(deer_FOIs_nus) <- c("ind1", "ind2", "correlation","FOI_CWD","FOI_SARS", 
+names(deer_FOIs_nus_prewt) <- c("ind1", "ind2", "correlation","FOI_CWD","FOI_SARS", 
                           "FOI_UD_CWD", "FOI_UD_SARS", "FOI_direct")
-deer_FOIs_nus
+deer_FOIs_nus_prewt
 
 # The FOI experienced by deer differs orders of magnitude depending on the
 # parasite of interest and its respective decay rate. For parasites that persist
