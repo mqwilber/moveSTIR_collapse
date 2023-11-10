@@ -136,16 +136,16 @@ getCorrs <- function(xy, r) {
       gridcors2[[paste(ind1,ind2,sep = "-")]] <- NA
       gridcors2[[paste(ind2,ind1,sep = "-")]] <- NA
     } else {
-      maxlag <- nsteps-1
-      cormat_ab <- cormat_ba <- matrix(0,nrow = nsteps, ncol = length(ovlpcells))
+      maxlag <- ceiling(nsteps/2)
+      cormat_ab <- cormat_ba <- matrix(0,nrow = maxlag+1, ncol = length(ovlpcells))
       for (j in seq_along(ovlpcells)) {
         cell <- ovlpcells[j]
         a <- b <- numeric(nsteps)
         a[cell==pos1] <- b[cell==pos2]<- 1
-        xcorr <- ccf(a,b,lag.max = maxlag, plot = F)
-        xcorr_vals <- as.numeric(xcorr$acf)
-        cormat_ab[,j] <- rev(xcorr_vals[1:nsteps])
-        cormat_ba[,j] <- xcorr_vals[nsteps:length(xcorr_vals)]
+        xcorr <- TSA::prewhiten(a,b,lag.max = maxlag, plot = F)
+        xcorr_vals <- as.numeric(xcorr$ccf$acf)
+        cormat_ab[,j] <- xcorr_vals[(maxlag+1):1]
+        cormat_ba[,j] <- xcorr_vals[(maxlag+1):length(xcorr_vals)]
       }
       dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = ovlpcells)
       gridcors2[[paste(ind1,ind2,sep = "-")]] <- cormat_ab
