@@ -70,7 +70,7 @@ getUDs <- function(X, res = 10, ctmm = TRUE) {
     FITS <- lapply(seq_along(telemetries), \(x) ctmm.select(telemetries[[x]], GUESS[[x]]))
     # AKDE
     UDS <- akde(telemetries, FITS, res = res)
-    return(list(FITS,UDS, method = "AKDE"))
+    return(list(FITS, UDS, method = "AKDE"))
   } else {
     # Create SpatialPoints object
     dat_sp <- sp::SpatialPointsDataFrame(coords = data.frame(x=xs,y=ys), 
@@ -94,7 +94,8 @@ getUDprod <- function(X) {
   # extend all rasters to have the same extent. 
   rs <- lapply(rs, extend, y = extent(do.call(merge,rs)), value = 0)
   # Create lists to store objects
-  UDprods <- UDsds <- list()
+  # UDprods <- UDsds <- list()
+  OUT <- list()
   # Possible combinations
   combs <- combn(length(uds), 2)
   # Calculate UD and SD products from UD pair values
@@ -105,11 +106,13 @@ getUDprod <- function(X) {
     r2 <- rs[[ind2]]
     # product of probabilities, divided by area
     udprob <- r1*r2
-    UDprods[[paste(ind1,ind2,sep = "-")]] <- UDprods[[paste(ind2,ind1,sep = "-")]] <- udprob
+    # UDprods[[paste(ind1,ind2,sep = "-")]] <- UDprods[[paste(ind2,ind1,sep = "-")]] <- udprob
     sdprob <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))
-    UDsds[[paste(ind1,ind2,sep = "-")]] <- UDsds[[paste(ind2,ind1,sep = "-")]] <- sdprob
+    # UDsds[[paste(ind1,ind2,sep = "-")]] <- UDsds[[paste(ind2,ind1,sep = "-")]] <- sdprob
+    OUT[[paste(ind1,ind2,sep = "-")]] <- list(UD = udprob, SD = sdprob)
   }
-  return(list(UD = UDprods, SD = UDsds))
+  # return(list(UD = UDprods, SD = UDsds))
+  OUT
 }
 # function to calculate the correlations. Output is a list, where every element
 # is a lags by cells matrix of correlation between two individuals
@@ -121,7 +124,7 @@ getCorrs <- function(xy, r, prewt = TRUE) {
   nsteps <- nrow(xs)
   combs <- combn(nind,2)
   for (i in 1:ncol(combs)) {
-    r1 <- raster(r[[i]])
+    r1 <- raster(r[[2]][[i]])
     ind1 <- combs[1,i]
     ind2 <- combs[2,i]
     # get position histories (i.e. which cell was each individual in at every time
@@ -143,8 +146,7 @@ getCorrs <- function(xy, r, prewt = TRUE) {
         cell <- ovlpcells[j]
         a <- b <- numeric(nsteps)
         a[cell==pos1] <- b[cell==pos2]<- 1
-        xcorr <- if(prewt) TSA::prewhiten(a,b,lag.max = maxlag, plot = F)$ccf 
-          else ccf(a,b,lag.max = maxlag, plot = F)
+        xcorr <- if(prewt) TSA::prewhiten(a,b,lag.max = maxlag, plot = F)$ccf else ccf(a,b,lag.max = maxlag, plot = F)
         xcorr_vals <- as.numeric(xcorr$acf)
         sigcells[j] <- mean(abs(xcorr_vals)>(1.96/sqrt(xcorr$n.used)))
         cormat_ab[,j] <- xcorr_vals[(maxlag+1):1]
@@ -158,31 +160,40 @@ getCorrs <- function(xy, r, prewt = TRUE) {
   return(gridcors2)
 }
 # function to calculate the per-cell FOI. Calculates correlation within. Output
-# is list with each element a FOI raster
-getFOI <- function(xy, uds, beta = 1, lambda = 1, nu = 1/(24*7)) {
+# is list with each element 2 FOI rasters (one for each direction)
+getFOI <- function(xy, ud = NULL, beta = 1, lambda = 1, nu = 1/(24*7)) {
   foirasts2 <- list()
-  gridcors2 <- getCorrs(xy,uds[[1]])
+  UDS <- if(is.null(ud)) getUDs(xy) else ud
+  PRODS <- getUDprod(UDS)
+  gridcors2 <- getCorrs(xy,PRODS)
   for (i in seq_along(gridcors2)) {
-    udp <- uds[[1]][[i]]
-    sdp <- uds[[2]][[i]]
+    udp <- PRODS[[i]][[1]]
+    sdp <- PRODS[[i]][[2]]
     cellarea <- prod(res(udp))
     
-    if (is.array(gridcors2[[i]])) {
-      corcells <- as.numeric(colnames(gridcors2[[i]]))
+    if (all(sapply(gridcors2[[i]][c(1,2)],is.array))) {
+      corcells <- as.numeric(colnames(gridcors2[[i]][[1]]))
       corrast <- udp
-      values(corrast) <- 0
+      lapply(corrast,setValues,0)
+      # values(corrast) <- 0
       # corvals <- numeric(length(uds[[1]][[i]])) # to remove
       # get lags
-      lags <- 0:(nrow(gridcors2[[i]])-1)
+      lags <- 0:(nrow(gridcors2[[i]][[1]])-1)
+      dtau <- unique(diff(lags))
       # scale and integrate correlation at every cell
-      corrast[corcells] <- colSums(gridcors2[[i]]*exp(-nu*lags)*unique(diff(lags)))
-      foi <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
+      # corrast[corcells] <- colSums(gridcors2[[i]]*exp(-nu*lags)*dtau)
+      for (j in 1:2) {
+        corrast[corcells] <- colSums(gridcors2[[i]][[j]]*exp(-nu*lags)*dtau)
+        FOI <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
+        foirasts2[[i]][[j]] <- FOI*(FOI>=0)
+      }
+      
+      # foi <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
     } else {
-      foi <- beta/cellarea*lambda*(1/nu*udp)
+      foirasts2[[i]] <- replicate(2, beta/cellarea*lambda*(1/nu*udp), simplify = F)
     }
-    foi <- foi*(foi>=0)
-    
-    foirasts2[[i]] <- foi
+    # to delete
+    # foi <- foi*(foi>=0)
   }
   return(foirasts2)
 }
