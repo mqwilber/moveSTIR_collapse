@@ -161,12 +161,13 @@ getCorrs <- function(xy, r, prewt = TRUE) {
 }
 # function to calculate the per-cell FOI. Calculates correlation within. Output
 # is list with each element 2 FOI rasters (one for each direction)
-getFOI <- function(xy, ud = NULL, beta = 1, lambda = 1, nu = 1/(24*7)) {
+getFOI <- function(xy, uds = NULL, spr.rm = TRUE, beta = 1, lambda = 1, nu = 1/(24*7)) {
   foirasts2 <- list()
-  UDS <- if(is.null(ud)) getUDs(xy) else ud
+  UDS <- if(is.null(ud)) getUDs(xy) else uds
   PRODS <- getUDprod(UDS)
   gridcors2 <- getCorrs(xy,PRODS)
   for (i in seq_along(gridcors2)) {
+    foirasts2[[i]] <- list()
     udp <- PRODS[[i]][[1]]
     sdp <- PRODS[[i]][[2]]
     cellarea <- prod(res(udp))
@@ -174,8 +175,6 @@ getFOI <- function(xy, ud = NULL, beta = 1, lambda = 1, nu = 1/(24*7)) {
     if (all(sapply(gridcors2[[i]][c(1,2)],is.array))) {
       corcells <- as.numeric(colnames(gridcors2[[i]][[1]]))
       corrast <- udp
-      lapply(corrast,setValues,0)
-      # values(corrast) <- 0
       # corvals <- numeric(length(uds[[1]][[i]])) # to remove
       # get lags
       lags <- 0:(nrow(gridcors2[[i]][[1]])-1)
@@ -183,11 +182,11 @@ getFOI <- function(xy, ud = NULL, beta = 1, lambda = 1, nu = 1/(24*7)) {
       # scale and integrate correlation at every cell
       # corrast[corcells] <- colSums(gridcors2[[i]]*exp(-nu*lags)*dtau)
       for (j in 1:2) {
+        values(corrast) <- 0
         corrast[corcells] <- colSums(gridcors2[[i]][[j]]*exp(-nu*lags)*dtau)
         FOI <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
         foirasts2[[i]][[j]] <- FOI*(FOI>=0)
       }
-      
       # foi <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
     } else {
       foirasts2[[i]] <- replicate(2, beta/cellarea*lambda*(1/nu*udp), simplify = F)
