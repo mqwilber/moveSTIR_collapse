@@ -124,7 +124,7 @@ getCorrs <- function(xy, r, prewt = TRUE) {
   nsteps <- nrow(xs)
   combs <- combn(nind,2)
   for (i in 1:ncol(combs)) {
-    r1 <- raster(r[[2]][[i]])
+    r1 <- raster(r[[i]]$UD)
     ind1 <- combs[1,i]
     ind2 <- combs[2,i]
     # get position histories (i.e. which cell was each individual in at every time
