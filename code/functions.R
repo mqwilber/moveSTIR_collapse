@@ -113,7 +113,7 @@ getUDprod <- function(X) {
 }
 # function to calculate the correlations. Output is a list, where every element
 # is a lags by cells matrix of correlation between two individuals
-getCorrs <- function(xy, r) {
+getCorrs <- function(xy, r, prewt = TRUE) {
   gridcors2 <- list()
   xs <- xy[[1]]
   ys <- xy[[2]]
@@ -131,6 +131,7 @@ getCorrs <- function(xy, r) {
     
     # keep only cells that both visited at some point
     ovlpcells <- unique(pos1)[unique(pos1) %in% unique(pos2)]
+    sigcells <- numeric(length = length(ovlpcells))
     if(length(ovlpcells)==0) {
       # Still fill in an item in the list, but write just NA. 
       gridcors2[[paste(ind1,ind2,sep = "-")]] <- NA
@@ -142,14 +143,17 @@ getCorrs <- function(xy, r) {
         cell <- ovlpcells[j]
         a <- b <- numeric(nsteps)
         a[cell==pos1] <- b[cell==pos2]<- 1
-        xcorr <- TSA::prewhiten(a,b,lag.max = maxlag, plot = F)
-        xcorr_vals <- as.numeric(xcorr$ccf$acf)
+        xcorr <- ifelse(prewt, 
+                        TSA::prewhiten(a,b,lag.max = maxlag, plot = F)$ccf,
+                        ccf(a,b,lag.max = maxlag, plot = F))
+        xcorr_vals <- as.numeric(xcorr$acf)
+        sigcells[j] <- mean(abs(xcorr_vals)>(1.96/sqrt(xcorr$n.used)))
         cormat_ab[,j] <- xcorr_vals[(maxlag+1):1]
         cormat_ba[,j] <- xcorr_vals[(maxlag+1):length(xcorr_vals)]
       }
       dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = ovlpcells)
-      gridcors2[[paste(ind1,ind2,sep = "-")]] <- cormat_ab
-      gridcors2[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
+      gridcors2[[paste(ind1,ind2,sep = "-")]] <- list(cormat_ab, cormat_ba, sigcells)
+      # gridcors2[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
     }
   }
   return(gridcors2)
