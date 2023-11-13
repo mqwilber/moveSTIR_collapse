@@ -143,9 +143,8 @@ getCorrs <- function(xy, r, prewt = TRUE) {
         cell <- ovlpcells[j]
         a <- b <- numeric(nsteps)
         a[cell==pos1] <- b[cell==pos2]<- 1
-        xcorr <- ifelse(prewt, 
-                        TSA::prewhiten(a,b,lag.max = maxlag, plot = F)$ccf,
-                        ccf(a,b,lag.max = maxlag, plot = F))
+        xcorr <- if(prewt) TSA::prewhiten(a,b,lag.max = maxlag, plot = F)$ccf 
+          else ccf(a,b,lag.max = maxlag, plot = F)
         xcorr_vals <- as.numeric(xcorr$acf)
         sigcells[j] <- mean(abs(xcorr_vals)>(1.96/sqrt(xcorr$n.used)))
         cormat_ab[,j] <- xcorr_vals[(maxlag+1):1]
