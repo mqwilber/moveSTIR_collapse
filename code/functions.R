@@ -174,6 +174,8 @@ getFOI <- function(xy, uds = NULL, spr.rm = TRUE, beta = 1, lambda = 1, nu = 1/(
     
     if (all(sapply(gridcors2[[i]][c(1,2)],is.array))) {
       corcells <- as.numeric(colnames(gridcors2[[i]][[1]]))
+      sig.indx <- gridcors2[[i]][[3]]>0.05
+      if(spr.rm) corcells <- corcells[sig.indx]
       corrast <- udp
       # corvals <- numeric(length(uds[[1]][[i]])) # to remove
       # get lags
@@ -183,7 +185,7 @@ getFOI <- function(xy, uds = NULL, spr.rm = TRUE, beta = 1, lambda = 1, nu = 1/(
       # corrast[corcells] <- colSums(gridcors2[[i]]*exp(-nu*lags)*dtau)
       for (j in 1:2) {
         values(corrast) <- 0
-        corrast[corcells] <- colSums(gridcors2[[i]][[j]]*exp(-nu*lags)*dtau)
+        corrast[corcells] <- colSums(gridcors2[[i]][[j]][,sig.indx]*exp(-nu*lags)*dtau)
         FOI <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
         foirasts2[[i]][[j]] <- FOI*(FOI>=0)
       }
