@@ -116,7 +116,7 @@ getUDprod <- function(X) {
 }
 # function to calculate the correlations. Output is a list, where every element
 # is a lags by cells matrix of correlation between two individuals
-getCorrs <- function(xy, r, prewt = TRUE) {
+getCorrs <- function(xy, prods, prewt = TRUE) {
   gridcors2 <- list()
   xs <- xy[[1]]
   ys <- xy[[2]]
@@ -124,7 +124,7 @@ getCorrs <- function(xy, r, prewt = TRUE) {
   nsteps <- nrow(xs)
   combs <- combn(nind,2)
   for (i in 1:ncol(combs)) {
-    r1 <- raster(r[[i]]$UD)
+    r1 <- raster(prods[[i]]$UD)
     ind1 <- combs[1,i]
     ind2 <- combs[2,i]
     # get position histories (i.e. which cell was each individual in at every time
@@ -137,8 +137,7 @@ getCorrs <- function(xy, r, prewt = TRUE) {
     sigcells <- numeric(length = length(ovlpcells))
     if(length(ovlpcells)==0) {
       # Still fill in an item in the list, but write just NA. 
-      gridcors2[[paste(ind1,ind2,sep = "-")]] <- NA
-      gridcors2[[paste(ind2,ind1,sep = "-")]] <- NA
+      gridcors2[[paste(ind1,ind2,sep = "-")]] <- list(CAB = NA, CBA = NA, psig = NA)
     } else {
       maxlag <- ceiling(nsteps/2)
       cormat_ab <- cormat_ba <- matrix(0,nrow = maxlag+1, ncol = length(ovlpcells))
@@ -153,7 +152,7 @@ getCorrs <- function(xy, r, prewt = TRUE) {
         cormat_ba[,j] <- xcorr_vals[(maxlag+1):length(xcorr_vals)]
       }
       dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = ovlpcells)
-      gridcors2[[paste(ind1,ind2,sep = "-")]] <- list(cormat_ab, cormat_ba, sigcells)
+      gridcors2[[paste(ind1,ind2,sep = "-")]] <- list(CAB = cormat_ab, CBA = cormat_ba, psig = sigcells)
       # gridcors2[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
     }
   }
@@ -163,36 +162,38 @@ getCorrs <- function(xy, r, prewt = TRUE) {
 # is list with each element 2 FOI rasters (one for each direction)
 getFOI <- function(xy, uds = NULL, spr.rm = TRUE, beta = 1, lambda = 1, nu = 1/(24*7)) {
   foirasts2 <- list()
-  UDS <- if(is.null(ud)) getUDs(xy) else uds
+  UDS <- if(is.null(uds)) getUDs(xy) else uds
   PRODS <- getUDprod(UDS)
   gridcors2 <- getCorrs(xy,PRODS)
-  for (i in seq_along(gridcors2)) {
-    foirasts2[[i]] <- list()
-    udp <- PRODS[[i]][[1]]
-    sdp <- PRODS[[i]][[2]]
+  for (gi in seq_along(gridcors2)) {
+    foirasts2[[gi]] <- list()
+    udp <- PRODS[[gi]]$UD
+    sdp <- PRODS[[gi]]$SD
     cellarea <- prod(res(udp))
     
-    if (all(sapply(gridcors2[[i]][c(1,2)],is.array))) {
-      corcells <- as.numeric(colnames(gridcors2[[i]][[1]]))
-      sig.indx <- gridcors2[[i]][[3]]>0.05
+    if (all(sapply(gridcors2[[gi]][c(1,2)],is.array))) {
+      corcells <- as.numeric(colnames(gridcors2[[gi]][[1]]))
+      sig.indx <- gridcors2[[gi]][[3]]>0.05
       if(spr.rm) corcells <- corcells[sig.indx]
       corrast <- udp
       # corvals <- numeric(length(uds[[1]][[i]])) # to remove
       # get lags
-      lags <- 0:(nrow(gridcors2[[i]][[1]])-1)
+      lags <- 0:(nrow(gridcors2[[gi]][[1]])-1)
       dtau <- unique(diff(lags))
       # scale and integrate correlation at every cell
       # corrast[corcells] <- colSums(gridcors2[[i]]*exp(-nu*lags)*dtau)
       for (j in 1:2) {
         values(corrast) <- 0
-        corrast[corcells] <- colSums(gridcors2[[i]][[j]][,sig.indx]*exp(-nu*lags)*dtau)
+        corrast[corcells] <- if (sum(sig.indx)>1) colSums(gridcors2[[gi]][[j]][,sig.indx]*exp(-nu*lags)*dtau) else sum(gridcors2[[gi]][[j]][,sig.indx]*exp(-nu*lags)*dtau)
         FOI <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
-        foirasts2[[i]][[j]] <- FOI*(FOI>=0)
+        foirasts2[[gi]][[j]] <- FOI*(FOI>=0)
       }
       # foi <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
     } else {
-      foirasts2[[i]] <- replicate(2, beta/cellarea*lambda*(1/nu*udp), simplify = F)
+      foirasts2[[gi]] <- replicate(2, beta/cellarea*lambda*(1/nu*udp), simplify = F)
     }
+    # add UD-only output to all FOIs
+    foirasts2[[gi]][[3]] <- beta/cellarea*lambda*(1/nu*udp)
     # to delete
     # foi <- foi*(foi>=0)
   }
