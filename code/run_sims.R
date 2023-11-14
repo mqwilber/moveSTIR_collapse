@@ -15,9 +15,9 @@ clusterCall(cl, source,"./functions.R")
 # pars <- expand.grid(#nu = 1/(24*c(1/12, 1/6, 1/3, 1,3,7)), 
 #                     social = c(0.7,0.9, 0.925,0.95, 0.975,1), 
 #                     replicate = 1:10)
-social <- 0.8#c(0.7, 0.9, 0.95, 1)
-nus <- 1/(24*c(1/12, 1/6, 1/3, 1, 3, 7))
-gridres <- 20# c(5, 10, 20)
+social <- c(0,0.5, 0.7, 0.9,0.93, 0.96, 1)
+nus <- 1/(24*3)#1/(24*c(1/12, 1/6, 1/3, 1, 3, 7))
+gridres <- 10# c(5, 10, 20)
 iterations <- 10
 
 trajs <- (replicate(iterations, lapply(social, \(x) simulate_tracks(tau = 5, dp = 2, social = x))))
@@ -46,5 +46,5 @@ stopCluster(cl)
 outdf <- as.data.frame(do.call(rbind, out))
 names(outdf) <- c("nu", "res", "foi_ud", "foi_full1", "foi_full2", "overlap")
 outdf$social <- rep(social, each = length(nus)*length(gridres))
-outname <- paste0("sim_res_nu", Sys.Date(), "2.csv")
-write.csv(outdf,outname, quote = F, row.names = F)
+# outname <- paste0("sim_res_nu", Sys.Date(), ".csv")
+write.csv(outdf,"sim_res_soc_3d_10m.csv", quote = F, row.names = F)

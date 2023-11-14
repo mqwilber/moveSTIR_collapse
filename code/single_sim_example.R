@@ -65,10 +65,10 @@ raster::plot(prods[[1]]$SD, col = hcl.colors(25, "Plasma"), bty = "n",xaxt="n", 
 dev.off()
 
 # get correlation vector at cells with overlap
-cors <- getCorrs(A, uds)
+cors <- getCorrs(A, prods)
 
 # Plot correlation raster
-corrast <- prods$UD[[1]]
+corrast <- prods[[1]]$UD
 values(corrast) <- NA
 corvals <- with(list(nu = 1/24/7), colSums(cors[[1]]*exp(-nu*(0:(nrow(cors[[1]])-1)))))
 corrast[as.numeric(names(corvals))] <- corvals
@@ -94,18 +94,18 @@ sapply(1:2, \(i) lines(A$x[,i],A$y[,i], col = hcl.colors(2, palette = "Pastel 1"
 points(corrcoords, pch = 21, bg = pcols)
 
 # calculate cell FOI
-testFOI <- getFOI(A,prods)
+testFOI <- getFOI(A,uds)
 
 # Plot FOI rasters
 x11(width = 4.5,height = 3.5)
 par(fin = c(4,3),pin=c(3,3),ann=F, mai=c(0,0,0,1))
-raster::plot(extent(test[[1]]),type='n',xaxt='n',yaxt='n')
-raster::plot(test[[1]], col = hcl.colors(25,"Reds 3", rev = T), add=T)
-raster::plot(1e-20+log10(test[[1]]), col = hcl.colors(25,"Reds 3", rev = T), add=T)
+raster::plot(extent(testFOI[[1]][[1]]),type='n',xaxt='n',yaxt='n')
+raster::plot(testFOI[[1]][[1]], col = hcl.colors(25,"Reds 3", rev = T), add=T)
+raster::plot(1e-20+log10(testFOI[[1]]), col = hcl.colors(25,"Reds 3", rev = T), add=T)
 # plot(log(test[[1]]), col = hcl.colors(255,"Plasma"), xaxt = "n", yaxt = "n")
 # add points with higher values
-corrcoords <- xyFromCell(test[[1]],Which(test[[1]]>1e-6,T))
-corvals <- test[[1]][test[[1]]>1e-6]/cellStats(test[[1]],max)
+corrcoords <- xyFromCell(testFOI[[1]][[1]],Which(testFOI[[1]][[1]]>1e-6,T))
+corvals <- testFOI[[1]][[1]][testFOI[[1]][[1]]>1e-6]/cellStats(testFOI[[1]][[1]],max)
 pcols <- rgb(colorRamp(hcl.colors(25, "Reds 3",rev=T))(scale(corvals,center=-max(abs(corvals)),scale = 2*max(abs(corvals)))), maxColorValue = 255)
 points(corrcoords, pch = 21, bg = pcols)
 

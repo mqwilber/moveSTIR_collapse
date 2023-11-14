@@ -311,7 +311,7 @@ for (i in 1:ncol(combs)) {
       sigCells <- colSums(abs(corrs)>CI_THRESH)>=(0.05*nlags) # 0.05 is the signif. threshold corresponding to 1.96
       cat(sum(sigCells),"/",length(sigCells), "(",100*sum(sigCells)/length(sigCells), "%) cells have non spurious correlations\n")
       # replace values in cells that did not have more than 5% of correlations beyond threshold.
-      corrs[,!sigCells] <- 0
+      # corrs[,!sigCells] <- 0
       # lags <- (as.numeric(row.names(corrs))-1)*600
       lags <- as.numeric(row.names(corrs))
       dtau <- unique(diff(lags))

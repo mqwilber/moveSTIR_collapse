@@ -9,7 +9,7 @@ registerDoParallel(cl)
 # Load functions
 source("code/functions.R")
 # Load functions in each node
-clusterCall(cl, source,"./functions.R")
+clusterCall(cl, source,"code/functions.R")
 
 
 social <- c(0,0.5, 0.7, 0.9,0.93, 0.96, 1)
