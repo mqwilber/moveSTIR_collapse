@@ -132,22 +132,8 @@ for (i in seq_len(ncol(combs))) {
   # to estimate the correlation, I have to put the tracks in a common time
   # frame. For this, I interpolate the positions for a regular set of times
 # new code... works
-  interp_trajs <- do.call(function(x,y) {
-    tr1 <- range(x$timestamp)
-    tr2 <- range(y$timestamp)
-    # Check if there is temporal overlap
-    if(max(tr1[1],tr2[1])>min(min(tr1[2],tr2[2]))) {
-      cat("There is no temporal overlap \n")
-      # foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
-    } else {
-      tseq <- seq(max(tr1[1],tr2[1]),min(tr1[2],tr2[2]), "10 mins")
-      lags <- as.numeric(tseq-min(tseq))
-      nsteps <- length(tseq)
-      # Interpolate trajectories
-      interp_traj_1 <- predict(telemetries[[ind1]], FITS[[ind1]], t = tseq)
-      interp_traj_2 <- predict(telemetries[[ind2]], FITS[[ind2]], t = tseq)
-      list(interp_traj_1,interp_traj_2)
-    }}, list(x = telemetries[[ind1]], y = telemetries[[ind2]]))
+  interp_trajs <- interpTrajs(telemetries[[ind1]], telemetries[[ind2]])
+
   ### old code, to delete###
   # tr1 <- range(telemetries[[ind1]]$timestamp)
   # tr2 <- range(telemetries[[ind2]]$timestamp)
@@ -765,23 +751,21 @@ getCorrs <- function(XY, grd, write = FALSE) {
   }
 }
 
-
-interpTrajs <- function(tms = telemetries, ind1, ind2, lag = "10 mins") {
-  tr1 <- range(tms[[ind1]]$timestamp)
-  tr2 <- range(tms[[ind2]]$timestamp)
+interpTrajs <- function(x,y, lag = "10 min") {
+  tr1 <- range(x$timestamp)
+  tr2 <- range(y$timestamp)
   # Check if there is temporal overlap
   if(max(tr1[1],tr2[1])>min(min(tr1[2],tr2[2]))) {
-    cat("There is no temporal overlap between", ids[ind1], "and", ids[ind2], "\n")
+    cat("There is no temporal overlap \n")
     # foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
-    NA
   } else {
     tseq <- seq(max(tr1[1],tr2[1]),min(tr1[2],tr2[2]), lag)
     lags <- as.numeric(tseq-min(tseq))
     nsteps <- length(tseq)
     # Interpolate trajectories
-    interp_traj_1 <- predict(telemetries[[ind1]], FITS[[ind1]], t = tseq) 
+    interp_traj_1 <- predict(telemetries[[ind1]], FITS[[ind1]], t = tseq)
     interp_traj_2 <- predict(telemetries[[ind2]], FITS[[ind2]], t = tseq)
-    list(interp_traj_1, interp_traj_2)
+    list(interp_traj_1,interp_traj_2)
   }
 }
 
