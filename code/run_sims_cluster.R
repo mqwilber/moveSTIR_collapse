@@ -2,14 +2,14 @@
 # Register a parallel backend
 library(doParallel)
 # Detect the number of available cores and create cluster
-cl <- makeCluster(future::availableWorkers())
+cl <- makeCluster(length(future::availableWorkers()))
 # Activate cluster for foreach library
 registerDoParallel(cl)
 
 # Load functions
 source("code/functions.R")
 # Load functions in each node
-clusterCall(cl, source,"code/functions.R")
+clusterEvalQ(cl, source("code/functions.R"))
 
 
 social <- c(0,0.5, 0.7, 0.9,0.93, 0.96, 1)
