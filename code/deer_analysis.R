@@ -134,30 +134,11 @@ for (i in seq_len(ncol(combs))) {
 # new code... works
   interp_trajs <- interpTrajs(telemetries[[ind1]], telemetries[[ind2]])
 
-  ### old code, to delete###
-  # tr1 <- range(telemetries[[ind1]]$timestamp)
-  # tr2 <- range(telemetries[[ind2]]$timestamp)
-  # # Check if there is temporal overlap
-  # if(max(tr1[1],tr2[1])>min(min(tr1[2],tr2[2]))) {
-  #   cat("There is no temporal overlap between", ids[ind1], "and", ids[ind2], "\n")
-  #   # foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
-  # } else {
-  #   tseq <- seq(max(tr1[1],tr2[1]),min(tr1[2],tr2[2]), "10 mins")
-  #   lags <- as.numeric(tseq-min(tseq))
-  #   nsteps <- length(tseq)
-  #   # Interpolate trajectories
-  #   interp_traj_1 <- predict(telemetries[[ind1]], FITS[[ind1]], t = tseq) 
-  #   interp_traj_2 <- predict(telemetries[[ind2]], FITS[[ind2]], t = tseq)
-    
-    # get position histories ... works
-    positions <- getPositions(X = interp_trajs, R = list(r1,r2))
-  # old code to delete ##
-    # pos1 <- cellFromXY(r1, xy = as.matrix(interp_traj_1[,c("x","y")], ncol = 2))
-    # pos2 <- cellFromXY(r2, xy = as.matrix(interp_traj_2[,c("x","y")], ncol = 2))
-    
-    # keep only cells that both visited at some point
-    # new code ... works
-    cormats <- getCorrs(X = positions) 
+  # get position histories ... works
+  positions <- getPositions(X = interp_trajs, R = list(r1,r2))
+  
+  # new code ... works
+  cormats <- getCorrs(X = positions,) 
 # old code to delete ###
         # ovlpcells <- unique(pos1)[unique(pos1) %in% unique(pos2)]
     # if(length(ovlpcells)==0) {
@@ -697,15 +678,11 @@ getCorrs <- function(X, export = T, ci = c("none", "prewt", "bs")) {
       a <- b <- numeric(nsteps)
       a[cell==pos1] <- 1
       b[cell==pos2] <- 1
-      # Cross-correlation calculation, with prewhitening step to deal with autocorrelation
       xcorr <- switch (ci[1],
                        none = ccf(a, b, lag.max = maxlag, plot = F),
                        pw = TSA::prewhiten(a,b,lag.max = maxlag, plot = F)$ccf,
                        bs = ccf(a, b, lag.max = maxlag, plot = F)
       )
-      # keep only significant correlations (assessed by confidence intervals)
-      # CI_THRESH <- 1.96/sqrt(nsteps)
-      # xcorr_vals <- xcorr$ccf$acf#*(xcorr$ccf$acf>= CI_THRESH | xcorr$ccf$acf<= -CI_THRESH)
       xcorr_vals <- as.numeric(xcorr$acf)
       sigcells[j] <- switch(ci[1], 
                             none = 1,
