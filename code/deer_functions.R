@@ -75,6 +75,7 @@ interpTrajs <- function(x,y, lag = "10 min") {
 }
 
 corboot <- function(AB, cors, n = 1000) {
+  maxlag <- (length(cors$acf)-1)/2
   M <- replicate(n, {
     a2 <- sample(AB[,1])
     b2 <- sample(AB[,2])
