@@ -116,7 +116,7 @@ getUDprod <- function(X) {
 }
 # function to calculate the correlations. Output is a list, where every element
 # is a lags by cells matrix of correlation between two individuals
-getCorrs <- function(xy, prods, ci = c("none", "pw","bs")) {
+getCorrs <- function(xy, prods, prewt = TRUE, ci.method = c("reg", "bs")) {
   gridcors2 <- list()
   xs <- xy[[1]]
   ys <- xy[[2]]
@@ -145,26 +145,21 @@ getCorrs <- function(xy, prods, ci = c("none", "pw","bs")) {
         cell <- ovlpcells[j]
         a <- b <- numeric(nsteps)
         a[cell==pos1] <- b[cell==pos2]<- 1
-        xcorr <- switch (ci[1],
-          none = ccf(a, b, lag.max = maxlag, plot = F),
-          pw = TSA::prewhiten(a,b,lag.max = maxlag, plot = F)$ccf,
-          bs = ccf(a, b, lag.max = maxlag, plot = F)
-        )
+        xcorr <- if(prewt) TSA::prewhiten(a,b,lag.max = maxlag, plot = F)$ccf else ccf(a, b, lag.max = maxlag, plot = F)
         xcorr_vals <- as.numeric(xcorr$acf)
         
-        sigcells[j] <- switch(ci[1], 
-                              none = 1,
-                              pw = mean(abs(xcorr_vals)>(1.96/sqrt(xcorr$n.used))),
-                              bs = do.call(function(AB, cors, n = 1000) {
+        sigcells[j] <- switch(ci.method[1], 
+                              reg = mean(abs(xcorr_vals)>(1.96/sqrt(xcorr$n.used))),
+                              bs = do.call(function(a,b, cors, n = 1000) {
+                                maxlag = ceiling(nsteps/2)
                                 M <- replicate(n, {
-                                  a2 <- sample(AB[,1])
-                                  b2 <- sample(AB[,2])
+                                  a2 <- sample(a, length(a), T)
+                                  b2 <- sample(b, length(b), T)
                                   ccf(a2,b2,lag.max = maxlag, plot = F)$acf
                                 })
                                 Q <- apply(M, 1, quantile,probs = c(0.025, 0.975))
                                 mean(cors$acf<Q[1,] | cors$acf>Q[2,])
-                              }, list(AB = cbind(a,b), cors = xcorr)))
-          # if(prewt) TSA::prewhiten(a,b,lag.max = maxlag, plot = F)$ccf else ccf(a,b,lag.max = maxlag, plot = F)
+                              }, list(a = a, b = b, cors = xcorr)))
         # sigcells[j] <- if(bs) do.call(function(AB, cors, n = 1000) {
         #   M <- replicate(n, {
         #     a2 <- sample(a)
@@ -179,7 +174,6 @@ getCorrs <- function(xy, prods, ci = c("none", "pw","bs")) {
       }
       dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = ovlpcells)
       gridcors2[[paste(ind1,ind2,sep = "-")]] <- list(CAB = cormat_ab, CBA = cormat_ba, psig = sigcells)
-      # gridcors2[[paste(ind2,ind1,sep = "-")]] <- cormat_ba
     }
   }
   return(gridcors2)
