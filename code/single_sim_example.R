@@ -44,9 +44,9 @@ plot(uds[[2]], col.grid=NA, DF = "PDF", level=0,
      col.DF = hcl.colors(2, palette = "Dark 3"), 
      xaxt="n", yaxt="n",labels=c("","0.95",""),add=T)
 dev.off()
-# Plot UDs separately
-image(raster(uds[[2]][[1]], DF="PMF"), asp=1, col = colorRampPalette(c("white",hcl.colors(2,"Dark 3")[1]))(18), bty = "o", xlim = range(A[[1]]),ylim = range(A[[2]]))
-image(raster(uds[[2]][[2]], DF="PMF"), asp=1, col = colorRampPalette(c("white",hcl.colors(2,"Dark 3")[2]))(18), bty = "o", xlim = range(A[[1]]),ylim = range(A[[2]]))
+# # Plot UDs separately
+# image(raster(uds[[2]][[1]], DF="PMF"), asp=1, col = colorRampPalette(c("white",hcl.colors(2,"Dark 3")[1]))(18), bty = "o", xlim = range(A[[1]]),ylim = range(A[[2]]))
+# image(raster(uds[[2]][[2]], DF="PMF"), asp=1, col = colorRampPalette(c("white",hcl.colors(2,"Dark 3")[2]))(18), bty = "o", xlim = range(A[[1]]),ylim = range(A[[2]]))
 
 # Get the product of the UDs, p_i(x) and p_j(x), as well as the product of their
 # standard deviations sqrt(p_i(x)(1-p_i(x)))*sqrt(p_j(x)(1-p_j(x)))
@@ -55,7 +55,7 @@ prods <- getUDprod(uds)
 zrng <- range(unlist(lapply(prods,lapply,cellStats,range)))
 # pdf("../docs/figures/example_UDprod.pdf", width = 4, height = 3,family = "sans")
 par(mar = c(0.5,0.5,0.5,4))
-with(list(nu = 1/(24*7)), raster::plot(prods[[1]]$UD/nu, col = hcl.colors(25, "Plasma"), bty = "n",ann=F,add=T))
+with(list(nu = 1/(24*7)), raster::plot(prods[[1]]$UD/nu, col = hcl.colors(25, "Plasma"), bty = "n",ann=F))
 # dev.off()
 
 pdf("../docs/figures/example_SDprod.pdf", width = 4, height = 3,family = "sans")
@@ -65,18 +65,55 @@ raster::plot(prods[[1]]$SD, col = hcl.colors(25, "Plasma"), bty = "n",xaxt="n", 
 dev.off()
 
 # get correlation vector at cells with overlap
-cors <- getCorrs(A, prods)
+cors <- getCorrs(A, prods, prewt = T, ci.method = 'reg')
+
+#' Most correlation values are small and would come up even if the series were independent, 
+#' we need to filter out those values and keep only the ones that are actually meaningful
+#' (i.e. significant). The criterion of significance at 95% for independent data is 1.96/sqrt(n), 
+#' where n is the length of the series. In addition to this filtering, we need to account for
+#' potential correlations that appear due to the autocorrelation in the data. 
+#' One way to do this is to prewhiten the series before calculating the cross-correlation. 
+#' This is, to fit an autoregressive model to one of the series, and filter
+#' both of them using the autocorrelation coefficients.
+length(raster(uds[[2]][[1]]))
+ncol(cors$`1-2`$CBA)
+
+#' There are 39270 cells overall, but only 36 that both individuals visited. For all others the
+#' correlation component of FOI is null. 
+#' Assuming a step survival function of parasites in the environment, where the parasites last for 10
+#' time units, the cumulative correlation component for unfiltered data would be
+DF <- data.frame(udp = prods[[1]]$UD[as.numeric(colnames(cors[[1]]$CAB))],
+           sdp = prods[[1]]$SD[as.numeric(colnames(cors[[1]]$CAB))], 
+           cor1 = colSums(cors[[1]]$CAB[1:10,]),
+           cor2 = colSums(cors[[1]]$CBA[1:10,]))
+hist((DF$udp+DF$sdp*DF$cor1)/DF$udp, main = "ratio FOI with/without correlation")
+
+#' Most of the cumulative correlations are negative, so the effect on FOI is to decrease it. 
+#' However, there are some values where there are high correlations that bring the estimate way
+#' up. 
+#' Now let's do the same but keeping only the correlation values that are significant
+corsf <- cors[[1]]$CAB*(abs(cors[[1]]$CAB)>(1.96/sqrt(500)))
+DF <- data.frame(udp = prods[[1]]$UD[as.numeric(colnames(cors[[1]]$CAB))],
+                 sdp = prods[[1]]$SD[as.numeric(colnames(cors[[1]]$CAB))], 
+                 cor1 = colSums(corsf[1:10,]))
+hist((DF$udp+DF$sdp*DF$cor1)/DF$udp, main = "ratio FOI with/without correlation")
+
+#' The effect here is that the small, negative correlations go away, but large 
+#' correlations stay. The local effect on FOI is thus largely the same.
+
 
 # Plot correlation raster
 corrast <- prods[[1]]$UD
-values(corrast) <- NA
-corvals <- with(list(nu = 1/24/7), colSums(cors[[1]]*exp(-nu*(0:(nrow(cors[[1]])-1)))))
-corrast[as.numeric(names(corvals))] <- corvals
+values(corrast) <- 0
+# corvals <- with(list(nu = 1/24/7), colSums(cors[[1]]$CAB*exp(-nu*(0:(nrow(cors[[1]])-1)))))
+corvals <- DF$cor1
+corrast[as.numeric(colnames(cors[[1]]$CAB))] <- corvals
 zlim = c(-max(abs(cellStats(corrast,range))),max(abs(cellStats(corrast,range))))
-pdf("../docs/figures/example_corrRast.pdf",width = 4, height = 3, family = "sans")
-raster::plot(corrast, col = hcl.colors(25, "Blue-Red 3") ,  yaxt="n",xaxt="n", zlim = zlim)
-grid()
-dev.off()
+# pdf("../docs/figures/example_corrRast.pdf",width = 4, height = 3, family = "sans")
+raster::plot(corrast, col = hcl.colors(25, "Blue-Red 3") ,  yaxt="n",xaxt="n")
+# dev.off()
+
+# There are three random cells where there is some correlation
 
 
 # A better way to visualize this is to plot the locations of the cells with correlations
@@ -92,6 +129,23 @@ grid()
 sapply(1:2, \(i) lines(A$x[,i],A$y[,i], col = hcl.colors(2, palette = "Pastel 1")[i]))
 # points with correlation
 points(corrcoords, pch = 21, bg = pcols)
+
+# Do the same without prewhitening
+cors2 <- getCorrs(A, prods, prewt = F, ci.method = 'reg')
+corsf <- cors2[[1]]$CAB*(abs(cors2[[1]]$CAB)>(1.96/sqrt(500)))
+corrast <- prods[[1]]$UD
+values(corrast) <- 0
+corvals <- DF$cor1
+corrast[as.numeric(colnames(cors[[1]]$CAB))] <- colSums(corsf[1:10,])
+corrcoords <- xyFromCell(corrast[[1]],Which(corrast[[1]]!=0, T))
+pcols <- rgb(colorRamp(hcl.colors(25, "Blue-Red 3"))(scale(corvals,center=-max(abs(corvals)),scale = 2*max(abs(corvals)))), maxColorValue = 255)
+plot(A$x,A$y,type = 'n',asp=1,xlab = "", ylab = "",xaxt="n", yaxt="n")
+raster::plot(corrast, col = hcl.colors(25, "Blue-Red 3") ,  yaxt="n",xaxt="n", zlim = zlim,add=T)
+grid()
+sapply(1:2, \(i) lines(A$x[,i],A$y[,i], col = hcl.colors(2, palette = "Pastel 1")[i]))
+points(corrcoords, pch = 21, bg = pcols)
+
+# The result is practically the same without prewhitening
 
 # calculate cell FOI
 testFOI <- getFOI(A,uds)
