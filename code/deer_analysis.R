@@ -104,6 +104,7 @@ combs <- combn(length(ids), 2)
 
 # Calculate UD and SD products from UD pair values, the correlations, and
 # corresponding FOIs
+deer_corrs_pw_flt <- list()
 for (i in seq_len(ncol(combs))) {
   # read in UDs, two at a time
   ind1 <- combs[1,i]
@@ -112,15 +113,12 @@ for (i in seq_len(ncol(combs))) {
   r1 <- raster(fnames[ind1]) 
   r2 <- raster(fnames[ind2])
   
-  # Check whether the grids overlap/extend to a common grid for both, or all
-  r1 <- extend(r1, extent(merge(r1,r2)), value=0)
-  r2 <- extend(r2, extent(merge(r1,r2)), value=0)
-  
+
+  # get UD and SD products
+  prods <- getProds(r1,r2)
   # cell area
   Area <- prod(res(r1))
-  # get the UD and sd products
-  udprod <- r1*r2
-  sdprod <- sqrt(r1*(1-r1))*sqrt(r2*(1-r2))
+  
   # if(export) {
   #   # export outputs
   #   writeRaster(udprod, paste0("outputs/UDprod_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
@@ -128,65 +126,21 @@ for (i in seq_len(ncol(combs))) {
   # }
 
   ### CORRELATIONS
-  
   # to estimate the correlation, I have to put the tracks in a common time
   # frame. For this, I interpolate the positions for a regular set of times
 # new code... works
   interp_trajs <- interpTrajs(telemetries[[ind1]], telemetries[[ind2]])
-
+  
   # get position histories ... works
-  positions <- getPositions(X = interp_trajs, R = list(r1,r2))
+  positions <- getPositions(X = interp_trajs, R = prods)
   
   # new code ... works
-  cormats <- pairCorrs(X = positions, ci = "prewt") 
-# old code to delete ###
-        # ovlpcells <- unique(pos1)[unique(pos1) %in% unique(pos2)]
-    # if(length(ovlpcells)==0) {
-    #   cat("There are no overlap cells between", ids[ind1], "and", ids[ind2], "\n")
-    #   # foi_ab <- foi_ba <- beta/Area*lam*(1/nu*udprod)
-    # } else {
-    #   maxlag <- nsteps
-    #   cormat_ab <- cormat_ba <- matrix(0, nrow = nsteps, ncol = length(ovlpcells))
-    #   for (j in seq_along(ovlpcells)) {
-    #     cell <- ovlpcells[j]
-    #     a <- b <- numeric(nsteps)
-    #     a[cell==pos1] <- b[cell==pos2]<- 1
-    #     xcorr <- ccf(a,b,lag.max = maxlag, plot = F)
-    #     xcorr_vals <- as.numeric(xcorr$acf)
-    #     cormat_ab[,j] <- xcorr_vals[nsteps:1]
-    #     cormat_ba[,j] <- xcorr_vals[nsteps:length(xcorr_vals)]
-    #   }
-    #   dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(lag = lags, cell = ovlpcells)
-    #   # Export 
-    #   write.csv(cormat_ab, paste0("outputs/correlations_10min_",ids[ind1],"-",ids[ind2],".csv"))
-    #   write.csv(cormat_ba, paste0("outputs/correlations_10min_",ids[ind2],"-",ids[ind1],".csv"))
-      
-  #     # ## FOI
-  #     # # scale and integrate correlation at every cell
-  #     # corcells <- ovlpcells
-  #     # corvals_ab <- corvals_ba <- numeric(length(udprod))
-  #     # corvals_ab[corcells] <- colSums(cormat_ab*exp(-nu*lags)*unique(diff(lags)))
-  #     # corvals_ba[corcells] <- colSums(cormat_ba*exp(-nu*lags)*unique(diff(lags)))
-  #     # corrast_ab <- corrast_ba <- udprod
-  #     # values(corrast_ab) <- corvals_ab
-  #     # values(corrast_ba) <- corvals_ba
-  #     # # Export scaled cross-corr rasters
-  #     # writeRaster(corrast_ab, paste0("outputs/Corrast_10min_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
-  #     # writeRaster(corrast_ba, paste0("outputs/Corrast_10min_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
-  #     # 
-  #     # Calculate FOI
-  #     foi_ab <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ab)
-  #     foi_ba <- beta/Area*lam*(1/nu*udprod+sdprod*corrast_ba)
-  #     
-  #     # Keep only positive values
-  #     foi_ab <- foi_ab*(foi_ab>=0)
-  #     foi_ba <- foi_ba*(foi_ba>=0)
-    }
-  # }
-  # # export
-  # writeRaster(foi_ab, paste0("outputs/FOI_10min_",ids[ind1],"-",ids[ind2],".tif"), overwrite = T)
-  # writeRaster(foi_ba, paste0("outputs/FOI_10min_",ids[ind2],"-",ids[ind1],".tif"), overwrite = T)
+  cormats <- pairCorrs(X = positions, prewt = T, fltr = "reg")
+  deer_corrs_pw_flt[[paste0(ind1,"-",ind2)]] <- cormats
 }
+
+saveRDS(deer_corrs_pw_flt,"outputs/deer_corrs_prewht_flt.rds")
+
 
 # There is no spatial overlap (at the cell scale) between 151583 and 151571, 83
 # and 75, 83 and 89, and 71 with 75
@@ -217,8 +171,10 @@ for (i in 1:ncol(combs)) {
   
   udprod <- raster(udprodfiles[grepl(id1, udprodfiles) & grepl(id2, udprodfiles)])
   sdprod <- raster(sdprodfiles[grepl(id1, sdprodfiles) & grepl(id2, sdprodfiles)])
-  corfiles <- c(paste0("outputs/correlations_10min_",id1,"-",id2,"_1109.csv"),
-                paste0("outputs/correlations_10min_",id2,"-",id1,"_1109.csv"))
+  cors <- deer_corrs_pw_flt[[i]]
+
+  # corfiles <- c(paste0("outputs/correlations_10min_",id1,"-",id2,"_1109.csv"),
+  #               paste0("outputs/correlations_10min_",id2,"-",id1,"_1109.csv"))
   nus <- c(SARS = 1/3600, CWD = 3.04e-9) # decay rates in seconds^-1
   Area <- prod(res(udprod)) # cell area in m^2
   lagt <- 60*24*3600 # period to consider for exact integral scaling UD product
@@ -226,37 +182,32 @@ for (i in 1:ncol(combs)) {
   foiudcwd <- beta*lam/Area*(1-exp(-nus[2]*lagt))/nus[2]*udprod
   foidirect <- beta*lam/Area*udprod
   for (j in 1:2) {
-    if (file.exists(corfiles[j])) {
+    # if (file.exists(corfiles[j])) {
+    if(!all(is.na(cors))) {
       cat("using correlations for", id1, id2,"\n")
-      corrs <- read.csv(corfiles[j], row.names = 1)
-      # keep only correlations at cells with non-spurious correlations. Which
+      # corrs <- read.csv(corfiles[j], row.names = 1)
+      # keep only non-spurious correlations. Which
       # ones are spurious is determined based on a CI threshold equal to
-      # 0+-1.96/sqrt(n), where n is the length of the series. If the number of
-      # correlations that exceed the threshold is greater than 5% of the series
-      # then the correlations are kept for the whole cell. Alternatively, only
-      # those specific values are kept, and the rest discarded.
+      # 0+-1.96/sqrt(n), where n is the length of the series. This has already been done in the correlation calculation
       nlags <- nrow(corrs*2) # times 2 because I only used up to half the maximum lag
       CI_THRESH <- 1.96/sqrt(nlags) 
       # index of which cells have more "significant" correlations than expected
       # by chance if series were independent
-      sigCells <- colSums(abs(corrs)>CI_THRESH)>=(0.05*nlags) # 0.05 is the signif. threshold corresponding to 1.96
-      cat(sum(sigCells),"/",length(sigCells), "(",100*sum(sigCells)/length(sigCells), "%) cells have non spurious correlations\n")
-      # replace values in cells that did not have more than 5% of correlations beyond threshold.
-      # corrs[,!sigCells] <- 0
-      # lags <- (as.numeric(row.names(corrs))-1)*600
-      lags <- as.numeric(row.names(corrs))
+      lags <- (as.numeric(row.names(cors[[j]]))-1)*600
+      # lags <- as.numeric(row.names(corrs))
       dtau <- unique(diff(lags))
-      corrintSARS <- colSums(exp(-nus[1]*lags)*corrs*dtau)
-      corrintCWD <- colSums(exp(-nus[2]*lags)*corrs*dtau)
+      corrintSARS <- colSums(exp(-nus[1]*lags)*cors[[j]]*dtau)
+      corrintCWD <- colSums(exp(-nus[2]*lags)*cors[[j]]*dtau)
       corrastCWD <- corrastSARS <- udprod
       values(corrastCWD) <- values(corrastSARS) <- 0
-      corcells <- as.numeric(substring(names(corrs),2))
+      # corcells <- as.numeric(substring(names(corrs),2))
+      corcells <- as.numeric(dimnames(cors[[j]])$cell)
       corrastCWD[corcells] <- corrintCWD
       corrastSARS[corcells] <- corrintSARS
       foiCWDrast <- beta*lam/Area*(udprod*(1-exp(-nus[2]*lagt))/nus[2]+sdprod*corrastCWD)
       foiSARSrast <- beta*lam/Area*(udprod*1/nus[1]+sdprod*corrastSARS)
       raster::plot(foiSARSrast)
-    }else {
+    } else {
       cat("using UD only for",id1, "and", id2,"\n")
       foiCWDrast <- foiudcwd
       foiSARSrast <- foiudsars
