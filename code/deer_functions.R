@@ -20,7 +20,7 @@ getPositions <- function(X,R) {
 # correlation from a->b, from b->a, and the proportion of "significant"
 # correlations within the cell, assessed by confidence intervals. There is an
 # option to prewhiten, or to estimate CI using bootstrapping
-pairCorrs <- function(X, prewt = TRUE, ci = c("reg", "bs"), export = F, niter = 20) {
+pairCorrs <- function(X, prewt = TRUE, fltr = NULL, export = F, niter = 20) {
   pos1 <- X[[1]]
   pos2 <- X[[2]]
   ovlpcells <- unique(pos1)[unique(pos1) %in% unique(pos2)]
@@ -29,6 +29,8 @@ pairCorrs <- function(X, prewt = TRUE, ci = c("reg", "bs"), export = F, niter = 
     cat("\nThere are no overlap cells")
     NA
   } else {
+    nvisits <- matrix(nrow = length(ovlpcells), ncol = 2)
+    nsiglags <- numeric(length(ovlpcells))
     nsteps <- length(pos1)
     maxlag <- ceiling(nsteps/2)
     cormat_ab <- cormat_ba <- matrix(0, nrow = maxlag+1, ncol = length(ovlpcells))
@@ -37,21 +39,36 @@ pairCorrs <- function(X, prewt = TRUE, ci = c("reg", "bs"), export = F, niter = 
       a <- b <- numeric(nsteps)
       a[cell==pos1] <- 1
       b[cell==pos2] <- 1
+      nvisits[j,] <- c(sum(a),sum(b))
       xcorr <- if(prewt) TSA::prewhiten(a,b,lag.max = maxlag, plot = F)$ccf else ccf(a, b, lag.max = maxlag, plot = F)
       xcorr_vals <- as.numeric(xcorr$acf)
-      sigcells[j] <- switch(ci[1], 
-                            reg = mean(abs(xcorr_vals)>(1.96/sqrt(xcorr$n.used))),
-                            bs = corboot(AB = cbind(a,b), cors = xcorr,n = niter))
+      FILT <- fltr
+      if(FILT == "reg") {
+        xcorr_vals <- xcorr_vals*(abs(xcorr_vals)>1.96/sqrt(xcorr$n.used))
+        nsiglags[j] <- sum(abs(xcorr_vals)>1.96/sqrt(xcorr$n.used))
+      } else if(FILT == "bs") {
+        BSC <- funtimes::ccf_boot(a,b,lag.max = maxlag)
+        xcorr_vals <- BSC$r_P
+        siglags <- as.numeric(xcorr_vals<BSC$lower_P | xcorr_vals>BSC$upper_P)
+        nsiglags[j] <- sum(siglags)
+        xcorr_vals <- xcorr_vals*siglags
+      }
+
+      # sigcells[j] <- switch(fltr[1], 
+      #                       reg = mean(abs(xcorr_vals)>(1.96/sqrt(xcorr$n.used))),
+      #                       bs = corboot(AB = cbind(a,b), cors = xcorr,n = niter))
       cormat_ab[,j] <- xcorr_vals[(maxlag+1):1]
       cormat_ba[,j] <- xcorr_vals[(maxlag+1):length(xcorr_vals)]
     }
     dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(lag = 0:maxlag, cell = ovlpcells)
+    dimnames(nvisits) <- list(cell = ovlpcells,NULL)
+    dimnames(siglags) <- ovlpcells
     # Export
     if(export) {
       write.csv(cormat_ab, paste0("outputs/correlations_10min_",ids[ind1],"-",ids[ind2],"_",format(Sys.Date(), "%m%d"), ".csv"))
       write.csv(cormat_ba, paste0("outputs/correlations_10min_",ids[ind2],"-",ids[ind1],"_",format(Sys.Date(), "%m%d"), ".csv"))
     }
-    return(list(CAB = cormat_ab, CBA = cormat_ba, psig = sigcells))
+    return(list(CAB = cormat_ab, CBA = cormat_ba, nvisits = nvisits, nsiglags = nsiglags))
   }
 }
 
@@ -74,16 +91,16 @@ interpTrajs <- function(x,y, lag = "10 min") {
   }
 }
 
-corboot <- function(AB, cors, n = 1000) {
-  maxlag <- (length(cors$acf)-1)/2
-  M <- replicate(n, {
-    a2 <- sample(AB[,1])
-    b2 <- sample(AB[,2])
-    ccf(a2,b2,lag.max = maxlag, plot = F)$acf
-  })
-  Q <- apply(M, 1, quantile,probs = c(0.025, 0.975))
-  mean(cors$acf<Q[1,] | cors$acf>Q[2,])
-}
-calcFOI <- function() {
-  
-}
+# corboot <- function(AB, cors, n = 1000) {
+#   maxlag <- (length(cors$acf)-1)/2
+#   M <- replicate(n, {
+#     a2 <- sample(AB[,1])
+#     b2 <- sample(AB[,2])
+#     ccf(a2,b2,lag.max = maxlag, plot = F)$acf
+#   })
+#   Q <- apply(M, 1, quantile,probs = c(0.025, 0.975))
+#   mean(cors$acf<Q[1,] | cors$acf>Q[2,])
+# }
+# calcFOI <- function() {
+#   
+# }
