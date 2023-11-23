@@ -116,7 +116,7 @@ getUDprod <- function(X) {
 }
 # function to calculate the correlations. Output is a list, where every element
 # is a lags by cells matrix of correlation between two individuals
-getCorrs <- function(xy, prods, prewt = TRUE, ci.method = c("reg", "bs")) {
+getCorrs <- function(xy, prods, prewt = TRUE, fltr = "none") {
   gridcors2 <- list()
   xs <- xy[[1]]
   ys <- xy[[2]]
@@ -147,33 +147,33 @@ getCorrs <- function(xy, prods, prewt = TRUE, ci.method = c("reg", "bs")) {
         a[cell==pos1] <- b[cell==pos2]<- 1
         xcorr <- if(prewt) TSA::prewhiten(a,b,lag.max = maxlag, plot = F)$ccf else ccf(a, b, lag.max = maxlag, plot = F)
         xcorr_vals <- as.numeric(xcorr$acf)
-        
-        sigcells[j] <- switch(ci.method[1], 
-                              reg = mean(abs(xcorr_vals)>(1.96/sqrt(xcorr$n.used))),
-                              bs = do.call(function(a,b, cors, n = 1000) {
-                                maxlag = ceiling(nsteps/2)
-                                M <- replicate(n, {
-                                  a2 <- sample(a, length(a), T)
-                                  b2 <- sample(b, length(b), T)
-                                  ccf(a2,b2,lag.max = maxlag, plot = F)$acf
-                                })
-                                Q <- apply(M, 1, quantile,probs = c(0.025, 0.975))
-                                mean(cors$acf<Q[1,] | cors$acf>Q[2,])
-                              }, list(a = a, b = b, cors = xcorr)))
-        # sigcells[j] <- if(bs) do.call(function(AB, cors, n = 1000) {
-        #   M <- replicate(n, {
-        #     a2 <- sample(a)
-        #     b2 <- sample(b)
-        #     ccf(a2,b2,lag.max = maxlag, plot = F)$acf
-        #   })
-        #   Q <- apply(M, 1, quantile(probs = c(0.025, 0.975)))
-        #   mean(cors$acf<Q[1,] | cors$acf>Q[2,])
-        # }, list(AB = cbind(a,b), cors = xcorr)) else mean(abs(xcorr_vals)>(1.96/sqrt(xcorr$n.used)))
+        FILT <- fltr
+        if(FILT == "bs") {
+          BSC <- funtimes::ccf_boot(a,b,lag.max = maxlag, plot = "none")
+          xcorr_vals <- BSC$r_P
+          xcorr_vals <- xcorr_vals*(xcorr_vals<BSC$lower_P | xcorr_vals>BSC$upper_P)
+        } else if(FILT == "reg") {
+          xcorr_vals <- xcorr_vals*(abs(xcorr_vals)>1.96/sqrt(xcorr$n.used))
+        }
+
+        # sigcells[j] <- switch(ci.method[1], 
+        #                       reg = mean(abs(xcorr_vals)>(1.96/sqrt(xcorr$n.used))),
+        #                       bs = do.call(function(a,b, cors, n = 1000) {
+        #                         maxlag = ceiling(nsteps/2)
+        #                         M <- replicate(n, {
+        #                           a2 <- sample(a, length(a), T)
+        #                           b2 <- sample(b, length(b), T)
+        #                           ccf(a2,b2,lag.max = maxlag, plot = F)$acf
+        #                         })
+        #                         Q <- apply(M, 1, quantile,probs = c(0.025, 0.975))
+        #                         mean(cors$acf<Q[1,] | cors$acf>Q[2,])
+        #                       }, list(a = a, b = b, cors = xcorr)))
+
         cormat_ab[,j] <- xcorr_vals[(maxlag+1):1]
         cormat_ba[,j] <- xcorr_vals[(maxlag+1):length(xcorr_vals)]
       }
       dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(NULL, cell = ovlpcells)
-      gridcors2[[paste(ind1,ind2,sep = "-")]] <- list(CAB = cormat_ab, CBA = cormat_ba, psig = sigcells)
+      gridcors2[[paste(ind1,ind2,sep = "-")]] <- list(CAB = cormat_ab, CBA = cormat_ba, N = nsteps)
     }
   }
   return(gridcors2)
@@ -186,31 +186,42 @@ getFOI <- function(xy, uds = NULL, spr.rm = TRUE, beta = 1, lambda = 1, nu = 1/(
   PRODS <- getUDprod(UDS)
   gridcors2 <- getCorrs(xy,PRODS)
   for (gi in seq_along(gridcors2)) {
-    foirasts2[[gi]] <- list()
     udp <- PRODS[[gi]]$UD
     sdp <- PRODS[[gi]]$SD
+    CORRS <- gridcors2[[gi]]
     cellarea <- prod(res(udp))
     
-    if (all(sapply(gridcors2[[gi]][c(1,2)],is.array))) {
-      corcells <- as.numeric(colnames(gridcors2[[gi]][[1]]))
-      sig.indx <- gridcors2[[gi]][[3]]>0.05
-      if(spr.rm) corcells <- corcells[sig.indx]
-      corrast <- udp
-      # corvals <- numeric(length(uds[[1]][[i]])) # to remove
+    if (all(sapply(CORRS[c(1,2)],is.array))) {
+      corcells <- as.numeric(colnames(CORRS[[1]]))
+      corrastAB <- corrastBA <- udp
+      values(corrastAB) <- values(corrastBA) <- 0
       # get lags
-      lags <- 0:(nrow(gridcors2[[gi]][[1]])-1)
+      lags <- 0:(nrow(CORRS[[1]])-1)
       dtau <- unique(diff(lags))
-      # scale and integrate correlation at every cell
-      # corrast[corcells] <- colSums(gridcors2[[i]]*exp(-nu*lags)*dtau)
-      for (j in 1:2) {
-        values(corrast) <- 0
-        corrast[corcells] <- if (sum(sig.indx)>1) colSums(gridcors2[[gi]][[j]][,sig.indx]*exp(-nu*lags)*dtau) else sum(gridcors2[[gi]][[j]][,sig.indx]*exp(-nu*lags)*dtau)
-        FOI <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
-        foirasts2[[gi]][[j]] <- FOI*(FOI>=0)
-      }
+      # scale and integrate correlation at every cell. In simulations we will
+      # use a step function of 10 time steps
+      if(spr.rm) {
+        CORRS$CAB <- CORRS$CAB*(abs(CORRS$CAB)>(1.96/sqrt(CORRS$N)))
+        CORRS$CBA <- CORRS$CBA*(abs(CORRS$CBA)>(1.96/sqrt(CORRS$N)))
+        }
+      corrastAB[corcells] <- colSums(CORRS$CAB[1:10,]*dtau)
+      corrastBA[corcells] <- colSums(CORRS$CBA[1:10,]*dtau)
+      FOIAB <- beta/cellarea*lambda*(1/nu*udp+sdp*corrastAB)
+      FOIAB <- FOIAB*(FOIAB>=0)
+      FOIBA <- beta/cellarea*lambda*(1/nu*udp+sdp*corrastBA)
+      FOIBA <- FOIBA*(FOIBA>=0)
+      foirasts2[[gi]] <- list(FAB = FOIAB, FBA = FOIBA, FUD = beta/cellarea*lambda*(1/nu*udp))
+      
+      # for (j in 1:2) {
+      #   values(corrast) <- 0
+      #   corrast[corcells] <- if (sum(sig.indx)>1) colSums(gridcors2[[gi]][[j]][,sig.indx]*exp(-nu*lags)*dtau) else sum(gridcors2[[gi]][[j]][,sig.indx]*exp(-nu*lags)*dtau)
+      #   FOI <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
+      #   foirasts2[[gi]][[j]] <- FOI*(FOI>=0)
+      # }
       # foi <- beta/cellarea*lambda*(1/nu*udp+sdp*corrast)
     } else {
-      foirasts2[[gi]] <- replicate(2, beta/cellarea*lambda*(1/nu*udp), simplify = F)
+      foirasts2[[gi]] <- replicate(3, beta/cellarea*lambda*(1/nu*udp), simplify = F)
+      names(foirasts2[[gi]]) <- c("FAB", "FBA", "FUD")
     }
     # add UD-only output to all FOIs
     foirasts2[[gi]][[3]] <- beta/cellarea*lambda*(1/nu*udp)
