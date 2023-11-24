@@ -204,8 +204,8 @@ getFOI <- function(xy, uds = NULL, spr.rm = TRUE, beta = 1, lambda = 1, nu = 1/(
         CORRS$CAB <- CORRS$CAB*(abs(CORRS$CAB)>(1.96/sqrt(CORRS$N)))
         CORRS$CBA <- CORRS$CBA*(abs(CORRS$CBA)>(1.96/sqrt(CORRS$N)))
         }
-      corrastAB[corcells] <- colSums(CORRS$CAB[1:10,]*dtau)
-      corrastBA[corcells] <- colSums(CORRS$CBA[1:10,]*dtau)
+      corrastAB[corcells] <- if(dim(CORRS$CAB)[2]>1) colSums(CORRS$CAB[1:10,]*dtau) else sum(CORRS$CAB[1:10,]*dtau)
+      corrastBA[corcells] <- if(dim(CORRS$CBA)[2]>1) colSums(CORRS$CBA[1:10,]*dtau) else sum(CORRS$CBA[1:10,]*dtau)
       FOIAB <- beta/cellarea*lambda*(1/nu*udp+sdp*corrastAB)
       FOIAB <- FOIAB*(FOIAB>=0)
       FOIBA <- beta/cellarea*lambda*(1/nu*udp+sdp*corrastBA)
