@@ -181,10 +181,13 @@ sapply(test, cellStats,sum)
 # I can run simulations for multiple scenarios, changing the decay rate nu, the
 # grid resolution d, as well as the interaction strength. I run this through the
 # run_sims_cluster code in the UTK HPC, and import the results here
-outdf <- read.csv("C:/Users/juans/Downloads/sim_res_230930-0942.csv")
-
-head(outdf)                            
-
+outdf <- read.csv("outputs/231124_sims_out.txt",header = F)[,-10]
+social <- c(0,0.5, 0.7, 0.9,0.93, 0.96, 1)
+nus <- 1/(24*c(1/12, 1/3, 1, 3, 7))
+gridres <- c(5, 10, 20)
+names(outdf) <- c("sim", "nu", "Ax","Atoti","Atotj", "foi_ud", "foi_full1", "foi_full2", "overlap")
+outdf$social <- rep(social, each = 15)                           
+head(outdf)
 ### Visualization ####
 
 # FOI relative to minimum value, with and without covariance term. This plot
