@@ -20,11 +20,10 @@ getPositions <- function(X,R) {
 # correlation from a->b, from b->a, and the proportion of "significant"
 # correlations within the cell, assessed by confidence intervals. There is an
 # option to prewhiten, or to estimate CI using bootstrapping
-pairCorrs <- function(X, prewt = TRUE, fltr = NULL, export = F, niter = 20) {
+pairCorrs <- function(X, prewt = TRUE, fltr = NULL, export = F) {
   pos1 <- X[[1]]
   pos2 <- X[[2]]
   ovlpcells <- unique(pos1)[unique(pos1) %in% unique(pos2)]
-  sigcells <- numeric(length = length(ovlpcells))
   if(length(ovlpcells)==0) {
     cat("\nThere are no overlap cells")
     NA
@@ -62,7 +61,7 @@ pairCorrs <- function(X, prewt = TRUE, fltr = NULL, export = F, niter = 20) {
     }
     dimnames(cormat_ab) <- dimnames(cormat_ba) <- list(lag = 0:maxlag, cell = ovlpcells)
     dimnames(nvisits) <- list(cell = ovlpcells,NULL)
-    dimnames(siglags) <- ovlpcells
+    # dimnames(nsiglags) <- list(cell=ovlpcells)
     # Export
     if(export) {
       write.csv(cormat_ab, paste0("outputs/correlations_10min_",ids[ind1],"-",ids[ind2],"_",format(Sys.Date(), "%m%d"), ".csv"))
