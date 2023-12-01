@@ -90,6 +90,19 @@ interpTrajs <- function(x,y, lag = "10 min") {
   }
 }
 
+#' Calculate R_0 from the FOI pairwise matrix.
+#' @param X numeric matrix. pairwise FOI matrix
+#' @param g numeric. gamma parameter representing the recovery rate (units should match the units in FOI, usually 1/s)
+#' @returns a list with the R matrix, the R0 value, the FOI matrix and the gamma diagonal matrix.
+calcR0 <- function(X, g) {
+  n <- nrow(X)
+  U <- diag(-g, nrow = n)
+  invU <- solve(-U)
+  R <- X%*%invU
+  R0 <- max(abs(eigen(R)$values))
+  return(list(R = R, R0 = R0, Fmat = X, U = U))
+}
+
 # corboot <- function(AB, cors, n = 1000) {
 #   maxlag <- (length(cors$acf)-1)/2
 #   M <- replicate(n, {
