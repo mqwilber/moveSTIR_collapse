@@ -521,9 +521,11 @@ R0_HR <- calcR0(X = Fmat_HR, g = gSARS)
 ####---- VISUALIZATION ----####
 # Plot combined figure
 x11(width = 9, height = 6)
-pdf("docs/figures/deer_results.pdf", width = 9,height = 6)
+# pdf("docs/figures/deer_results.pdf", width = 9,height = 6)
+
 mycols <- c("#332288", "#117733", "#44AA99", "#88CCEE", "#DDCC77")
-par(omi = c(3,0,0,5.5),mar = c(1,2,0,0))
+png("docs/figures/deer_results.png", 9,6,"in",res = 300)
+par(omi = c(3,0.2,0.1,5.5),mar = c(1,2,0,0),new=T)
 #raster::plot(dat_move,type='n', xlab = "Easting (m)", ylab = "Northing (m)", cex.axis = 0.8, cex.lab = 0.8)
 plot.new()
 plot.window(c(299500,302600), c(3884500,3888900), asp = 1, xaxs = "i",yaxs = "i")
@@ -540,54 +542,46 @@ plot(telemetries, UD=deer_UDs,
      col.level = mycols,
      level=NA,lwd.level = 1.5, labels=NA,
      add=T)
-# mtext("a", 2,line=3,cex=2,padj=0,las=1,at = 3888500)
-
-
 # Network plots
-
 refwidth <- min(deer_FOIs_nus_prewt2[deer_FOIs_nus_prewt2$FOI_hr_sars>0,"FOI_hr_sars"])
 refsize <- min(tapply(deer_FOIs_nus_prewt2$FOI_SARS,deer_FOIs_nus_prewt2$ind2,sum))
-par(mar=c(2,2,2,2), omi = c(0.5,0.5,3,6),new=T)
+par(mar=c(2,2,2,2), omi = c(0.2,0.5,3.2,6),new=T)
 with(list(db = deer_FOIs_nus_prewt2, 
           Vsize = tapply(deer_FOIs_nus_prewt2$FOI_SARS, deer_FOIs_nus_prewt2$ind2,sum)),{
             plot(grf, layout = co, 
                  # vertex.label.dist = 2, vertex.label.degree = pi/2, vertex.label.color = "black",vertex.label.family = "sans",
                  edge.width = log(deer_FOIs_nus_prewt2$FOI_SARS/refwidth), edge.arrow.size=0, 
                  vertex.color=mycols, vertex.label = NA, vertex.size = 3*log(Vsize/refsize))
-            mtext("FOI with correlation", 3, 0.5, cex = 1.4)
+            mtext("FOI with correlation", 3, 0, cex = 1.3)
             mtext(bquote(R[0] == .(format(R0_SARS$R0,digits = 2))), 1,0.5)
             # mtext("c",2,at = 2, cex=2,las=1, line=2)
             })
 
 
-par(mar=c(2,2,2,2), omi = c(0.5,3.25,3,3.25),new=T)
+par(mar=c(2,2,2,2), omi = c(0.2,3.25,3.2,3.25),new=T)
 with(list(db = deer_FOIs_nus_prewt2, 
           Vsize = tapply(deer_FOIs_nus_prewt2$FOI_UD_SARS, deer_FOIs_nus_prewt2$ind2,sum)),{
             plot(grf, layout = co, 
                  # vertex.label.dist = 2, vertex.label.degree = pi/2, vertex.label.color = "black",vertex.label.family = "sans",
                  edge.width = log(deer_FOIs_nus_prewt2$FOI_UD_SARS/refwidth), edge.arrow.size=0, 
                  vertex.color=mycols, vertex.label = NA, vertex.size = 3*log(Vsize/refsize))
-            mtext("FOI without correlation", 3, 0.5, cex = 1.4)
+            mtext("FOI without correlation", 3, 0, cex = 1.3)
             mtext(bquote(R[0] == .(format(R0_UD$R0,digits = 2))), 1,0.5)
           })
-# text(-1,1,"d", cex=2)
 
-par(mar=c(2,2,2,2), omi = c(0.5,6,3,0.5),new=T)
+par(mar=c(2,2,2,2), omi = c(0.2,6,3.2,0.5),new=T)
 with(list(db = deer_FOIs_nus_prewt2, 
           Vsize = tapply(deer_FOIs_nus_prewt2$FOI_hr_sars, deer_FOIs_nus_prewt2$ind2,sum)),{
             plot(grf, layout = co, 
                  # vertex.label.dist = 2, vertex.label.degree = pi/2, vertex.label.color = "black",vertex.label.family = "sans",
                  edge.width = log(deer_FOIs_nus_prewt2$FOI_hr_sars/refwidth), edge.arrow.size=0, 
                  vertex.color=mycols, vertex.label = NA, vertex.size = 3*log(Vsize/refsize))
-            mtext("FOI HR overlap", 3, 0.5,cex=1.4)
+            mtext("FOI HR overlap", 3, 0,cex=1.3)
             mtext(bquote(R[0] == .(format(R0_HR$R0,digits = 2))), 1,0.5)
           })
-# text(-1,1,"e", cex=2)
-
-
-par(mar=c(1,1,1,2), omi = c(3,3.5,0,3),new=T)
 
 # plot FOI surface for 71-89 and 71-99
+par(omi = c(3,3.2,0.1,3),new=T, cex = 0.8)
 with(list(udprod = raster("outputs/UDprod_151571-151589.tif"),
           sdprod = raster("outputs/SDprod_151571-151589.tif")), {
             corrast <- udprod
@@ -602,8 +596,10 @@ with(list(udprod = raster("outputs/UDprod_151571-151589.tif"),
             foirast <- max(beta*lam/100*(udprod/nus[1]+sdprod*corrast),0)
             plot(dat1[dat1$animal_id %in% c(151571,151589),c("x_","y_")], 
                  ann = F, asp = 1, type = 'n', xaxt='n', yaxt='n', bty='n')
-            raster::plot(foirast*3600*24, col=hcl.colors(25,'Rocket',rev=T),
-                         legend.args = list(text = expression(FOI (days^-1)), side = 3, adj=0), add=T)
+            raster::plot(foirast*3600*24, col=hcl.colors(25,'Oranges', rev=T), legend.width = 1.5,
+                         legend.shrink = 0.5, lwd = 0,
+                         legend.args = list(text = expression(FOI (days^-1)), side = 3, adj=0), 
+                         add=T)
             sp::plot(polygons(hr95[[1]])[2], add = T, border = mycols[1], col = NA, lwd = 3)
             sp::plot(polygons(hr95[[4]])[2], add = T, border = mycols[4], col = NA, lwd = 3)
             # points(dat1[dat1$animal_id==151571,c('x_','y_')], col = mycols[1], cex = 0.5)
@@ -611,16 +607,25 @@ with(list(udprod = raster("outputs/UDprod_151571-151589.tif"),
           })
 
 
-par(mar=c(2,2,2,1), omi = c(3,6.5,0,0),new=T)
+par(mar=c(2,2,0,0), omi = c(3,6.6,0.5,0.3),new=T)
 with(list(db = deer_FOIs_nus_prewt2), {
-  plot(db$overlap, db$FOI_SARS/db$FOI_UD_SARS, log = "y",ann = F, xaxt = 'n',yaxt = 'n', 
-       col = pathcols[1], pch=16, xlim = c(0,1), cex.axis=0.8)
-  points(db$overlap, db$FOI_CWD/db$FOI_UD_CWD, col = pathcols[2], pch=16, cex=1.2)
+  plot(db$overlap, db$FOI_SARS/db$FOI_UD_SARS, xlim = c(0,1), type = 'n',log = "y",ann = F, xaxt = 'n',yaxt = 'n', cex.axis=0.8)
+  grid()
+  points(db$overlap, db$FOI_CWD/db$FOI_UD_CWD, bg = pathcols[2], pch=21)
+  points(db$overlap, db$FOI_SARS/db$FOI_UD_SARS, bg = pathcols[1], pch=21)
   axis(1,cex.axis = 0.8, tcl = -0.3, padj = -1.5)
-  axis(2,cex.axis = 0.8,  tcl = -0.3, hadj = 0.5,las=1)
+  axis(2,cex.axis = 0.8,  tcl = -0.3, hadj = 0.5, las=1)
   mtext("Home Range Overlap", 1,1.1)
-  mtext("FOI ratio",2, 1.1)
+  mtext("FOI ratio",2, 1.2)
 })
+
+# add labels
+par(oma = c(0,0,0,0), mar = c(0,0,0,0), new = T)
+plot.new()
+plot.window(c(0,1),c(0,1))
+text(x = c(0,0.4,0.77,0), 
+     y = c(0.97,0.97,0.97,0.43), 
+     labels = c("a","b","c","d"), cex = 1.4, font = 2)
 dev.off()
 
 
@@ -707,7 +712,4 @@ p2 <- ggplot(deer_FOIs_nus_prewt2)+geom_raster(aes(ind1,ind2,fill=FOI_SARS/FOI_U
   scale_fill_gradientn(colors = hcl.colors(25, "Plasma"),trans = "log10")#+
   theme(legend.key.size = unit(1/8,"inch"), legend.text = element_text(size = 6))
 
-pdf("../docs/figures/deer_results.pdf", width = 8,height = 6)
 plot_grid(p1,plot_grid(p3,p2, labels = c("b", "c"), ncol=1, axis = "lr", align = "v", rel_heights = c(0.8,1)), labels = "a", rel_widths = c(1,0.7))
-dev.off()
-
