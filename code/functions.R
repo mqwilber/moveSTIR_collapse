@@ -79,7 +79,7 @@ getUDs <- function(X, res = 10, ctmm = TRUE) {
     kde_grid <- sp::SpatialGrid(grid = GridTopology(cellcentre.offset =bbox(dat_sp)[,1]-bbox(dat_sp)[,1]%%10, cellsize = c(contact_dist,contact_dist), cells.dim = ceiling(apply(bbox(dat_sp), 1, diff)/contact_dist)))
     kde_grid_px <- sp::SpatialPixels(SpatialPoints(coordinates(kde_grid)))
     # Estimate UD
-    UDS <- adehabitatHR::kernelUD(dat_sp, grid = kde_grid_px)
+    UDS <- adehabitatHR::kernelUD(dat_sp)
     return(list(NA,UDS,method = "KDE"))
   }
 }
@@ -155,20 +155,6 @@ getCorrs <- function(xy, prods, prewt = TRUE, fltr = "none") {
         } else if(FILT == "reg") {
           xcorr_vals <- xcorr_vals*(abs(xcorr_vals)>1.96/sqrt(xcorr$n.used))
         }
-
-        # sigcells[j] <- switch(ci.method[1], 
-        #                       reg = mean(abs(xcorr_vals)>(1.96/sqrt(xcorr$n.used))),
-        #                       bs = do.call(function(a,b, cors, n = 1000) {
-        #                         maxlag = ceiling(nsteps/2)
-        #                         M <- replicate(n, {
-        #                           a2 <- sample(a, length(a), T)
-        #                           b2 <- sample(b, length(b), T)
-        #                           ccf(a2,b2,lag.max = maxlag, plot = F)$acf
-        #                         })
-        #                         Q <- apply(M, 1, quantile,probs = c(0.025, 0.975))
-        #                         mean(cors$acf<Q[1,] | cors$acf>Q[2,])
-        #                       }, list(a = a, b = b, cors = xcorr)))
-
         cormat_ab[,j] <- xcorr_vals[(maxlag+1):1]
         cormat_ba[,j] <- xcorr_vals[(maxlag+1):length(xcorr_vals)]
       }
