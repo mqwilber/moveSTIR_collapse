@@ -71,7 +71,15 @@ pairCorrs <- function(X, prewt = TRUE, fltr = NULL, export = F) {
   }
 }
 
-
+#' Interpolate trajectories
+#' 
+#' @description
+#' Interpolate trajectories using a constant time interval.
+#' 
+#' @param x,y telemetries objects describing the two trajectories
+#' @param lag character of the requested time interval. Default is 10 min. Should follow a format that can be interpreted by `seq`
+#' 
+#' @returns a list with two objects, the two interpolated trajectories (telemtries objects)
 interpTrajs <- function(x,y, lag = "10 min") {
   tr1 <- range(x$timestamp)
   tr2 <- range(y$timestamp)
@@ -90,9 +98,14 @@ interpTrajs <- function(x,y, lag = "10 min") {
   }
 }
 
+#' Calculate R_0
+#' 
+#' @description
 #' Calculate R_0 from the FOI pairwise matrix.
+#' 
 #' @param X numeric matrix. pairwise FOI matrix
 #' @param g numeric. gamma parameter representing the recovery rate (units should match the units in FOI, usually 1/s)
+#' 
 #' @returns a list with the R matrix, the R0 value, the FOI matrix and the gamma diagonal matrix.
 calcR0 <- function(X, g) {
   n <- nrow(X)
