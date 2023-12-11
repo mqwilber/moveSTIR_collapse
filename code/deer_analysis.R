@@ -525,9 +525,9 @@ x11(width = 9, height = 6)
 
 mycols <- c("#332288", "#117733", "#44AA99", "#88CCEE", "#DDCC77")
 png("docs/figures/deer_results.png", 9,6,"in",res = 300)
-par(omi = c(3,0.2,0.1,5.5),mar = c(1,2,0,0),new=T)
+
+par(omi = c(3,0.2,0.1,5.5),mar = c(1,2,0,0))
 #raster::plot(dat_move,type='n', xlab = "Easting (m)", ylab = "Northing (m)", cex.axis = 0.8, cex.lab = 0.8)
-plot.new()
 plot.window(c(299500,302600), c(3884500,3888900), asp = 1, xaxs = "i",yaxs = "i")
 plot(deer_UDs, col.level=NA, col.DF=NA,units=F, ann = F,xaxt = 'n',yaxt = 'n', bty='n')
 grid()
@@ -537,12 +537,13 @@ box()
 mtext("Easting (m)", 1, 1, cex = 0.8)
 mtext("Northing (m)", 2, 1, cex = 0.8)
 plot(telemetries, UD=deer_UDs, 
-     error=F, col=mycols,col.DF = mycols,
+     error=F, col=mycols,col.DF = NA,
      col.grid=NA,
      col.level = mycols,
      level=NA,lwd.level = 1.5, labels=NA,
      add=T)
 # Network plots
+R0scaled <- scale(c(cov = R0_SARS$R0, ud = R0_UD$R0, hr = R0_HR$R0), center = F)
 refwidth <- min(deer_FOIs_nus_prewt2[deer_FOIs_nus_prewt2$FOI_hr_sars>0,"FOI_hr_sars"])
 refsize <- min(tapply(deer_FOIs_nus_prewt2$FOI_SARS,deer_FOIs_nus_prewt2$ind2,sum))
 par(mar=c(2,2,2,2), omi = c(0.2,0.5,3.2,6),new=T)
@@ -553,7 +554,7 @@ with(list(db = deer_FOIs_nus_prewt2,
                  edge.width = log(deer_FOIs_nus_prewt2$FOI_SARS/refwidth), edge.arrow.size=0, 
                  vertex.color=mycols, vertex.label = NA, vertex.size = 3*log(Vsize/refsize))
             mtext("FOI with correlation", 3, 0, cex = 1.3)
-            mtext(bquote(R[0] == .(format(R0_SARS$R0,digits = 2))), 1,0.5)
+            mtext(bquote(paste("Relative ",R[0] == .(format(R0scaled[1],digits = 2)))), 1,0.5)
             # mtext("c",2,at = 2, cex=2,las=1, line=2)
             })
 
@@ -566,7 +567,7 @@ with(list(db = deer_FOIs_nus_prewt2,
                  edge.width = log(deer_FOIs_nus_prewt2$FOI_UD_SARS/refwidth), edge.arrow.size=0, 
                  vertex.color=mycols, vertex.label = NA, vertex.size = 3*log(Vsize/refsize))
             mtext("FOI without correlation", 3, 0, cex = 1.3)
-            mtext(bquote(R[0] == .(format(R0_UD$R0,digits = 2))), 1,0.5)
+            mtext(bquote(paste("Relative ",R[0] == .(format(R0scaled[2],digits = 2)))), 1,0.5)
           })
 
 par(mar=c(2,2,2,2), omi = c(0.2,6,3.2,0.5),new=T)
@@ -577,7 +578,7 @@ with(list(db = deer_FOIs_nus_prewt2,
                  edge.width = log(deer_FOIs_nus_prewt2$FOI_hr_sars/refwidth), edge.arrow.size=0, 
                  vertex.color=mycols, vertex.label = NA, vertex.size = 3*log(Vsize/refsize))
             mtext("FOI HR overlap", 3, 0,cex=1.3)
-            mtext(bquote(R[0] == .(format(R0_HR$R0,digits = 2))), 1,0.5)
+            mtext(bquote(paste("Relative ",R[0] == .(format(R0scaled[3],digits = 2)))), 1,0.5)
           })
 
 # plot FOI surface for 71-89 and 71-99
@@ -586,11 +587,9 @@ with(list(udprod = raster("outputs/UDprod_151571-151589.tif"),
           sdprod = raster("outputs/SDprod_151571-151589.tif")), {
             corrast <- udprod
             values(corrast) <- 0
-            # cors <- read.csv("outputs/correlations_10min_151571-151589.csv", row.names = 1)
             cors <- deer_corrs_pw_flt[[3]]$CAB
             lags <- as.numeric(rownames(cors))*600
             intcors <- colSums(cors*exp(-1/3600*lags)*600)
-            # corcells <- as.numeric(substring(names(cors), 2))
             corcells <- as.numeric(dimnames(cors)$cell)
             corrast[corcells] <- intcors
             foirast <- max(beta*lam/100*(udprod/nus[1]+sdprod*corrast),0)
@@ -611,7 +610,7 @@ par(mar=c(2,2,0,0), omi = c(3,6.6,0.5,0.3),new=T)
 with(list(db = deer_FOIs_nus_prewt2), {
   plot(db$overlap, db$FOI_SARS/db$FOI_UD_SARS, xlim = c(0,1), type = 'n',log = "y",ann = F, xaxt = 'n',yaxt = 'n', cex.axis=0.8)
   grid()
-  points(db$overlap, db$FOI_CWD/db$FOI_UD_CWD, bg = pathcols[2], pch=21)
+  points(db$overlap, db$FOI_CWD/db$FOI_UD_CWD, bg = pathcols[2], pch=24)
   points(db$overlap, db$FOI_SARS/db$FOI_UD_SARS, bg = pathcols[1], pch=21)
   axis(1,cex.axis = 0.8, tcl = -0.3, padj = -1.5)
   axis(2,cex.axis = 0.8,  tcl = -0.3, hadj = 0.5, las=1)
@@ -626,7 +625,10 @@ plot.window(c(0,1),c(0,1))
 text(x = c(0,0.4,0.77,0), 
      y = c(0.97,0.97,0.97,0.43), 
      labels = c("a","b","c","d"), cex = 1.4, font = 2)
-dev.off()
+
+
+###
+### plots of overall 
 
 
 with(list(db = deer_FOIs_nus_prewt2), {
@@ -639,20 +641,18 @@ with(list(db = deer_FOIs_nus_prewt2), {
 
 
 
-# link between UD product and correlation
-
 
 
 # Pairwise FOI plot
-ggplot(deer_FOIs_nus_prewt)+
-  geom_raster(aes(ind1,ind2,fill=FOI_SARS))+
+ggplot(deer_FOIs_nus_prewt2)+
+  geom_raster(aes(ind1,ind2,fill=FOI_SARS*24*3600))+
   coord_equal()+
   scale_x_discrete(labels = paste("Ov",1:5))+
   scale_y_discrete(labels = paste("Ov",1:5))+
   theme_classic(base_size = 14)+
   theme(axis.line = element_blank())+
-  labs(x = "", y="", fill = "FOI")+
-  scale_fill_gradientn(colors = hcl.colors(20, "Plasma"), trans = "log10")
+  labs(x = "", y="", fill = expression(paste(FOI," ",(days^-1))))+
+  scale_fill_gradientn(colors = hcl.colors(20, "Plasma"), trans = "log")
 
 # FOI w/cov/FOI/without for 2 pathogens
 cols2 <- hcl.colors(2,"Dynamic")
@@ -680,11 +680,12 @@ ggplot(deer_FOIs_nus_prewt2)+
 
 # FOI with and without correlation vs overlap
 deer_FOIs_nus_prewt2 %>% ggplot()+
-  geom_point(aes(overlap, FOI_SARS), col="darkred")+
-  geom_point(aes(overlap, FOI_UD_SARS), col="steelblue")+
+  geom_point(aes(overlap, FOI_SARS*3600*24), col=pathcols[1])+
+  geom_point(aes(overlap, FOI_UD_SARS*3600*24), col=pathcols[2])+
   scale_y_log10()+
+  xlim(0,1)+
   theme_pubclean(base_size = 14)+
-  labs(x = "Home Range Overlap", y="FOI")
+  labs(x = "Home Range Overlap", y=expression(paste(FOI," ",  (days^-1))))
 
 # FOI ratio wrt overlap
 pathcols <- hcl.colors(2, "Dynamic")
@@ -696,7 +697,6 @@ deer_FOIs_nus_prewt2 %>% ggplot()+
   labs(x = "Home Range Overlap", y="FOI ratio")
 
 
-# Combined figure
 # tracks
 p1 <- ggplot(dat1)+geom_point(aes(x_,y_, color = factor(animal_id)), size=0.5)+
   coord_equal()+
@@ -704,10 +704,10 @@ p1 <- ggplot(dat1)+geom_point(aes(x_,y_, color = factor(animal_id)), size=0.5)+
   labs(x = "Easting (m)", y = "Northing (m)", color = "Animal ID")+
   theme(legend.position = c(0.95,0.05), legend.justification = c(0.9,0.1))+
   scale_color_manual(values = mycols)
-# matrix plot
+# FOI ratio matrix plot
 p2 <- ggplot(deer_FOIs_nus_prewt2)+geom_raster(aes(ind1,ind2,fill=FOI_SARS/FOI_UD_SARS))+
   coord_equal()+
-  theme_minimal(base_size = 10)+
+  theme_minimal(base_size = 14)+
   labs(x = "", y="", fill = "FOI ratio")+
   scale_fill_gradientn(colors = hcl.colors(25, "Plasma"),trans = "log10")#+
   theme(legend.key.size = unit(1/8,"inch"), legend.text = element_text(size = 6))
