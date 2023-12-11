@@ -13,12 +13,14 @@ res_melt = melt(res, variable.name="corr", value.name="foi", id.var="prob")
 
 ggplot(data=res_melt) + geom_line(aes(x=prob, y=foi, color=corr)) +   
 			 geom_hline(aes(yintercept=1), linetype="dashed") +
-			 theme_classic() +
+			 theme_classic(base_size = 12) +
 			 labs(colour="Correlation") +
 			 annotate("text", x=0.5, y=10, label = "Correlation dominates FOI") +
 			 annotate("text", x=0.5, y=0.01, label = "Spatial overlap dominates FOI") +
 			 scale_color_manual(values=c('#fee5d9','#fcae91','#fb6a4a','#de2d26','#a50f15')) +
-			 ylab("FOI due to correlation / FOI due to spatial overlap") + xlab("Area of contact / Total area (A_x / A_tot)") +
+			 ylab("Relative contribution of correlation") + 
+  xlab(expression(paste("Area of contact / Total area ", (A[x] / A[tot])))) +
+  theme(legend.position = c(0,0.05), legend.justification = c(0,0), legend.background = element_rect(fill = NA))+
 			 scale_y_log10(breaks=c(0.001, 0.01, 0.1, 1, 10, 100))
 
 ggsave("../docs/figures/correlation_analytical_figure.pdf", width=6.5, height=5)
