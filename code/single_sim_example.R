@@ -15,10 +15,11 @@ library(ggdist)
 # their trajectories using the PMoveSTIR framework.
 
 set.seed(23)
+#### Import functions ####
 # the functions are defined in the functions.R script
 source("code/functions.R")
 
-
+#### Trajectories ####
 # simulate trajectories of two individuals
 A <- simulate_tracks(tau = 5, dp = 2, social = 0.9)
 # visualize
@@ -31,6 +32,7 @@ grid()
 sapply(1:2, \(i) lines(A$x[,i],A$y[,i], col = hcl.colors(2, palette = "Dark 3")[i]))
 # dev.off()
 
+#### UDs and products ####
 # get the utilization distributions of both individuals
 uds <- getUDs(A)
 
@@ -64,6 +66,7 @@ plot(extent(uds[[2]]), type='n', xaxt="n",yaxt='n', asp=1)
 raster::plot(prods[[1]]$SD, col = hcl.colors(25, "Plasma"), bty = "n",xaxt="n", yaxt="n", asp=1, xlab="", ylab = "")
 dev.off()
 
+#### Correlations ####
 # get correlation vector at cells with overlap
 cors <- getCorrs(A, prods, prewt = T, ci.method = 'reg')
 
@@ -147,6 +150,7 @@ points(corrcoords, pch = 21, bg = pcols)
 
 # The result is practically the same without prewhitening
 
+#### FOI ####
 # calculate cell FOI
 testFOI <- getFOI(A,uds)
 
@@ -188,7 +192,9 @@ gridres <- c(5, 10, 20)
 names(outdf) <- c("sim", "nu", "Ax","Atoti","Atotj", "foi_ud", "foi_full1", "foi_full2", "overlap")
 outdf$social <- rep(social, each = 15)                           
 head(outdf)
+
 ### Visualization ####
+colpal4 <- c("#75cee8", "#80a0b7", "#955464", "#9e2632")
 
 # FOI relative to minimum value, with and without covariance term. This plot
 # shows that greater interaction strength leads to greater FOI in general. This
@@ -197,21 +203,22 @@ head(outdf)
 # lead to a greater effect of covariance, with respect to UD-only grid
 
 p1 <- outdf %>% group_by(sim) %>% 
-  # slice_max(order_by = Ax,n=5) %>% 
-  # filter(near(nu, 1/(24*1))) %>% 
+  slice_max(order_by = Ax,n=5) %>%
+  filter(near(nu, 1/2)) %>%
   slice_head(n=1) %>%
   ggplot()+
-  # stat_halfeye(aes(social, foi_full1/mean(foi_ud)), .width=0, point_colour=NA, fill = "darkred")+
-  # stat_halfeye(aes(social, foi_ud/mean(foi_ud)), .width=0, point_colour=NA, fill = "steelblue")+
   geom_boxplot(aes(social, foi_full1/mean(foi_ud), group = social), width = 0.015, color = "darkred", position = position_nudge(0.01))+
   geom_boxplot(aes(social, foi_ud/mean(foi_ud), group = social), width=0.015, color = "steelblue", position = position_nudge(-0.01))+
   labs(x = "Interaction strength", y = "Relative FOI")+
   theme_minimal(base_size = 12)+
+  scale_color_manual(name='Correlation',
+                     values = c("darkred", "steelblue"), 
+                     breaks = c("With", "Without"))+
   # theme(panel.grid.major.y = element_line())+
-  scale_y_log10()
+  scale_y_log10(labels = scales::label_comma())
 p1
 
-p2 <- filter(outdf, social%in%c(0,0.5)) %>% slice_head(by=sim, n=1) %>% 
+p2 <- filter(outdf, social==0) %>% slice_head(by=sim, n=1) %>% 
   ggplot(aes(overlap, (foi_full1/foi_ud)))+
   geom_hline(yintercept = 1,linetype=2)+
   geom_point()+
@@ -219,6 +226,7 @@ p2 <- filter(outdf, social%in%c(0,0.5)) %>% slice_head(by=sim, n=1) %>%
   labs(x = "Home Range Overlap", y = "FOI ratio")
   # scale_y_log10()
 p2
+
 # Effects of epi parameters: nu and contact distance
 
 # To show how the FOI changes with respect to decay rate, I plot the change in
@@ -240,19 +248,6 @@ outdf %>% group_by(sim,nu) %>% slice_head(n=1) %>%
   labs(x = "Decay time (days)", y = expression(paste(Delta," FOI")), color = "Interaction")+
   theme(legend.position = c(0.9,0.2))
  
-
-# Another way to show this is to do something similar to b with the HR overlap,
-# where I plot the ratio of FOI with covariance over FOI without, wrt decay
-# time.
-outdf %>% group_by(sim, nu) %>% slice_max(order_by = Ax, n=1) %>% 
-  ggplot()+
-  geom_hline(yintercept = 1,linetype=2)+
-  geom_boxplot(aes(1/nu/24,foi_full1/foi_ud, color = factor(social),group = paste(nu,social)))+
-  # geom_point(aes(1/nu/24, foi_full1/foi_ud,color=factor(social)))+
-  scale_y_log10()+
-  theme_classic(base_size = 12)+
-  labs(x= "Decay time (days)", y = "FOI ratio")
-
 # Yet another way, boxplot with diff color for with and without (as in a.). This
 # show the increase in FOI, and how the relative difference decreases with
 # longer decay times. 
@@ -296,15 +291,15 @@ p3 <- outdf %>%  group_by(sim) %>%
   theme_minimal(base_size = 12)+
   labs(x = "Decay time (days)", y = "Relative FOI", color = "Interaction")+
   scale_color_discrete(type=hcl.colors(4, "BluGrn", rev=T))
+
 p3
-# covariance contribution, 4interaction values
+# covariance contribution, different nu, 4 interaction values
 p4 <- outdf %>%  group_by(sim) %>% 
   filter(Ax == max(Ax)) %>% 
   filter(social %in% c(0,0.7,0.96,1)) %>% 
   ggplot(aes(1/nu/24,(foi_full1)/foi_ud,color=factor(social)))+
-  # geom_hline(yintercept = 1, linetype=2)+
-  # geom_smooth(se=F)+
-  geom_point()+
+  geom_hline(yintercept = 1, linetype=2)+
+  geom_point(show.legend = F, position = position_dodge(width = 0.2))+
   scale_y_log10()+
   theme_minimal(base_size = 12)+
   labs(x = "Decay time (days)", y = "FOI ratio", color = "Interaction")+  
@@ -327,19 +322,19 @@ p4
 p5 <- outdf %>% filter(near(nu, 1/2), social %in% c(0,0.7,0.96,1)) %>% 
   group_by(sim) %>% 
   ggplot(aes(Ax/Atoti/1e4,foi_full1/mean(foi_full1), color = factor(social)))+
-  stat_smooth(method = "lm", se = F)+
-  geom_point()+
+  # stat_smooth(method = "lm", se = F)+
+  geom_point(show.legend = F)+
   theme_minimal(base_size = 12)+
   labs(x = expression(paste("Relative cell size (",A[x]/A[tot],")")), y = "Relative FOI", color = "Interaction")+
-  scale_color_discrete(type=hcl.colors(4, "BluGrn", rev=T))+
-  theme(legend.text = element_text(size = 10), legend.title = element_text(size=11))
+  scale_color_discrete(type=hcl.colors(4, "BluGrn", rev=T))
+# theme(legend.text = element_text(size = 10), legend.title = element_text(size=11))
 p5
 p6 <- outdf %>% filter(near(nu, 1/2), social %in% c(0,0.7,0.96,1)) %>% 
   group_by(sim) %>% 
   ggplot(aes(Ax/Atoti/1e4,foi_full1/foi_ud, color = factor(social)))+
-  # geom_hline(yintercept = 1, linetype=2)+
+  geom_hline(yintercept = 1, linetype=2)+
   # stat_smooth(method = "lm", se = F)+
-  geom_point()+
+  geom_point(show.legend = F)+
   theme_minimal(base_size = 12)+
   labs(x = expression(paste("Relative cell size (",A[x]/A[tot],")")), y = "FOI ratio", color = "Interaction")+
   scale_color_discrete(type=hcl.colors(4, "BluGrn", rev=T))+
@@ -350,12 +345,44 @@ p6
 # cells result in lower FOI. The opposite is true for slightly lower interaction
 # strength. Furthermore, low interaction strengths show no real effect of cell
 # size
+
+p.len <- lendb %>% ggplot(aes(nsteps,foi_full1/foi_ud))+
+  geom_point(aes(color = factor(social)), show.legend = F, position = position_dodge(width = 100))+
+  scale_y_log10()+
+  scale_color_manual(values = hcl.colors(4,"BluGrn", rev = T))+
+  labs(x = "Tracking time (steps)", y = "FOI ratio")+
+  geom_hline(yintercept = 1, linetype =2)+
+  theme_minimal(base_size = 12)
+p.len
+
+# Export combined figure
 pdf("docs/figures/sim_results.pdf", width = 9,height = 6)
-ggarrange(p1,p3,p5,p2,p4,p6, legend.grob = get_legend(p3), legend = "right", align = "hv", labels="auto")
+ggarrange(p1,p2,p5,p4,p.len,
+          legend.grob = get_legend(list(p1,p3)), legend = "right", align = "hv", labels="auto")
 dev.off()
 
+#### effect of length of tracking ####
+# I simulated trajectories of different lengths: 500 (outdf object), 1000, 2500, and 5000
+# steps, to see how this influences the correlation surface and estimated FOI
+
+# import the data and merge into a single df
+lendb <- do.call(rbind, c(lapply(list.files("outputs/", "231205", full.names = T), read.csv, head=F))) 
+lendb <- lendb[,-10]
+names(lendb) <- c("sim", "nu", "Ax","Atoti","Atotj", "foi_ud", "foi_full1", "foi_full2", "overlap")
+lendb$social <- rep(c(0,0.7,0.96,1),20)
+lendb500 <- outdf %>% group_by(sim) %>% filter(nu == 0.5, social %in% c(0,0.7,0.96,1)) %>% slice(2) %>% as.data.frame()
+lendb <- rbind(lendb500,lendb)
+lendb$nsteps <- rep(c(500,1000, 2500, 5000), each = 80)
+rm(lendb500)
+
+# plot effect of length
+lendb %>% ggplot(aes(nsteps,foi_full1))+geom_point(aes(color = factor(social)))
 
 
+
+
+
+#------------
 # FOIvs overlap
 filter(outdf, near(nu,1/24)) %>% slice_min()%>% pivot_longer(cols = starts_with("foi"), names_to = "calc", values_to = "foi") %>% 
   filter(social<1, calc == "foi_full1") %>% 
