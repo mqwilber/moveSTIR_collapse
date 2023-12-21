@@ -29,7 +29,7 @@ plot.new()
 par(mar = c(0.5,0.5,0.5,0.5))
 plot(A$x,A$y,type = 'n',asp=1,xlab = "", ylab = "",xaxt="n", yaxt="n")
 grid()
-sapply(1:2, \(i) lines(A$x[,i],A$y[,i], col = hcl.colors(2, palette = "Dark 3")[i]))
+sapply(1:2, \(i) lines(A$x[1:500,i],A$y[1:500,i], col = hcl.colors(2, palette = "Dark 3")[i]))
 # dev.off()
 
 #### UDs and products ####
@@ -68,7 +68,7 @@ dev.off()
 
 #### Correlations ####
 # get correlation vector at cells with overlap
-cors <- getCorrs(A, prods, prewt = T, ci.method = 'reg')
+cors <- getCorrs(A, prods, prewt = F, fltr = 'reg')
 
 #' Most correlation values are small and would come up even if the series were independent, 
 #' we need to filter out those values and keep only the ones that are actually meaningful
@@ -98,8 +98,9 @@ hist((DF$udp+DF$sdp*DF$cor1)/DF$udp, main = "ratio FOI with/without correlation"
 corsf <- cors[[1]]$CAB*(abs(cors[[1]]$CAB)>(1.96/sqrt(500)))
 DF <- data.frame(udp = prods[[1]]$UD[as.numeric(colnames(cors[[1]]$CAB))],
                  sdp = prods[[1]]$SD[as.numeric(colnames(cors[[1]]$CAB))], 
-                 cor1 = colSums(corsf[1:10,]))
-hist((DF$udp+DF$sdp*DF$cor1)/DF$udp, main = "ratio FOI with/without correlation")
+                 cor1 = colSums(corsf[1:10,]),
+                 cor2 = colSums(corsf*exp(-row(corsf))))
+hist((DF$udp+DF$sdp*DF$cor2)/DF$udp, main = "ratio FOI with/without correlation")
 
 #' The effect here is that the small, negative correlations go away, but large 
 #' correlations stay. The local effect on FOI is thus largely the same.
@@ -113,7 +114,7 @@ corvals <- DF$cor1
 corrast[as.numeric(colnames(cors[[1]]$CAB))] <- corvals
 zlim = c(-max(abs(cellStats(corrast,range))),max(abs(cellStats(corrast,range))))
 # pdf("../docs/figures/example_corrRast.pdf",width = 4, height = 3, family = "sans")
-raster::plot(corrast, col = hcl.colors(25, "Blue-Red 3") ,  yaxt="n",xaxt="n")
+raster::plot(corrast, col = hcl.colors(25) ,  yaxt="n",xaxt="n")
 # dev.off()
 
 # There are three random cells where there is some correlation
@@ -124,10 +125,10 @@ raster::plot(corrast, col = hcl.colors(25, "Blue-Red 3") ,  yaxt="n",xaxt="n")
 corrcoords <- xyFromCell(corrast[[1]],Which(corrast[[1]]!=0, T))
 x11(width = 4.5,height = 3.5)
 par(fin = c(4,3),pin=c(3,3),ann=F, mai=c(0,0,0,1))
-corvals <- corrast[!is.na(corrast)]
-pcols <- rgb(colorRamp(hcl.colors(25, "Blue-Red 3"))(scale(corvals,center=-max(abs(corvals)),scale = 2*max(abs(corvals)))), maxColorValue = 255)
+corvals <- corrasts[!is.na(corrast)]
+pcols <- rgb(colorRamp(hcl.colors(25))(scale(corvals,center=max(abs(corvals))/2,scale = max(abs(corvals))), maxColorValue = 255))
 plot(A$x,A$y,type = 'n',asp=1,xlab = "", ylab = "",xaxt="n", yaxt="n")
-raster::plot(corrast, col = hcl.colors(25, "Blue-Red 3") ,  yaxt="n",xaxt="n", zlim = zlim,add=T)
+raster::plot(corrast, col = hcl.colors(25) ,  yaxt="n",xaxt="n", zlim = zlim,add=T)
 grid()
 sapply(1:2, \(i) lines(A$x[,i],A$y[,i], col = hcl.colors(2, palette = "Pastel 1")[i]))
 # points with correlation
@@ -152,7 +153,7 @@ points(corrcoords, pch = 21, bg = pcols)
 
 #### FOI ####
 # calculate cell FOI
-testFOI <- getFOI(A,uds)
+testFOI <- getFOI(A,uds, spr.rm = F, beta = 1, lambda = 1)
 
 # Plot FOI rasters
 x11(width = 4.5,height = 3.5)
@@ -193,8 +194,24 @@ names(outdf) <- c("sim", "nu", "Ax","Atoti","Atotj", "foi_ud", "foi_full1", "foi
 outdf$social <- rep(social, each = 15)                           
 head(outdf)
 
+#### effect of length of tracking ####
+# I simulated trajectories of different lengths: 500 (outdf object), 1000, 2500, and 5000
+# steps, to see how this influences the correlation surface and estimated FOI
+
+# import the data and merge into a single df
+lendb <- do.call(rbind, c(lapply(list.files("outputs/", "231205", full.names = T), read.csv, head=F))) 
+lendb <- lendb[,-10]
+names(lendb) <- c("sim", "nu", "Ax","Atoti","Atotj", "foi_ud", "foi_full1", "foi_full2", "overlap")
+lendb$social <- rep(c(0,0.7,0.96,1),20)
+lendb500 <- outdf %>% group_by(sim) %>% filter(nu == 0.5, social %in% c(0,0.7,0.96,1)) %>% slice(2) %>% as.data.frame()
+lendb <- rbind(lendb500,lendb)
+lendb$nsteps <- rep(c(500,1000, 2500, 5000), each = 80)
+rm(lendb500)
+
+# plot effect of length
+lendb %>% ggplot(aes(nsteps,foi_full1))+geom_point(aes(color = factor(social)))
+
 ### Visualization ####
-colpal4 <- c("#75cee8", "#80a0b7", "#955464", "#9e2632")
 
 # FOI relative to minimum value, with and without covariance term. This plot
 # shows that greater interaction strength leads to greater FOI in general. This
@@ -361,68 +378,5 @@ ggarrange(p1,p2,p5,p4,p.len,
           legend.grob = get_legend(list(p1,p3)), legend = "right", align = "hv", labels="auto")
 dev.off()
 
-#### effect of length of tracking ####
-# I simulated trajectories of different lengths: 500 (outdf object), 1000, 2500, and 5000
-# steps, to see how this influences the correlation surface and estimated FOI
 
-# import the data and merge into a single df
-lendb <- do.call(rbind, c(lapply(list.files("outputs/", "231205", full.names = T), read.csv, head=F))) 
-lendb <- lendb[,-10]
-names(lendb) <- c("sim", "nu", "Ax","Atoti","Atotj", "foi_ud", "foi_full1", "foi_full2", "overlap")
-lendb$social <- rep(c(0,0.7,0.96,1),20)
-lendb500 <- outdf %>% group_by(sim) %>% filter(nu == 0.5, social %in% c(0,0.7,0.96,1)) %>% slice(2) %>% as.data.frame()
-lendb <- rbind(lendb500,lendb)
-lendb$nsteps <- rep(c(500,1000, 2500, 5000), each = 80)
-rm(lendb500)
-
-# plot effect of length
-lendb %>% ggplot(aes(nsteps,foi_full1))+geom_point(aes(color = factor(social)))
-
-
-
-
-
-#------------
-# FOIvs overlap
-filter(outdf, near(nu,1/24)) %>% slice_min()%>% pivot_longer(cols = starts_with("foi"), names_to = "calc", values_to = "foi") %>% 
-  filter(social<1, calc == "foi_full1") %>% 
-  ggplot(aes(overlap/Ax, foi, group = nu,color=factor(1/(24*nu))))+
-  geom_smooth(method = "lm", se = F)+
-  geom_point()+
-  labs(x = "Home range overlap", y = "Force of infection", color = "Mean decay time")+
-  theme_classic(base_size = 14)+
-  scale_color_discrete(labels = c("2 h", "4 h", "8 h", "12 h", "1 day", "3 days", "7 days"))+
-  theme(legend.position = c(0.1,0.95), legend.justification = c(0.1,0.95), legend.background = element_blank())+
-  scale_y_log10()
-
-outdf %>% filter(near(nu,1/24)) %>% slice_max(order_by = Ax, n = 1, by = sim) %>% 
-  ggplot()+
-  geom_point(aes(1/Atot/min(1/Atot),foi_ud/min(foi_ud)), color = "steelblue", size=2)+
-  geom_point(aes(1/Atot/min(1/Atot), foi_full1/min(foi_ud)), color="darkred", size=2)+
-  theme_classic(base_size = 14)+
-  labs(x = "Relative FOI - HR overlap", y = "Relative FOI - PMoveSTIR")
-
-
-outdf %>% filter(near(nu,1/24)) %>% 
-  mutate(foi_HR = 1*1/24*1/nu*overlap^2/(Atot/7)) %>% 
-  ggplot()+
-  geom_abline(slope = 1, linetype=2)+
-  geom_point(aes(foi_HR,foi_ud), color = "steelblue", size=2)+
-  geom_point(aes(foi_HR,foi_full1), color = "darkred", size=2)+
-  theme_classic(14)+
-  labs(x = "FOI - HR overlap", y = "FOI - PMoveSTIR")
-  
-# FOI estimated using only UD is proportional to the one using the home range
-# overlap, but when you include the covariance term you can get significantly
-# higher FOI values, particularly for high interaction strengths
-  
-
-
-# Linear model of FOI vs overlap, for moderate interaction strength and just the
-# full calculation. 
-outdf %>% pivot_longer(cols = starts_with("foi"), names_to = "calc", values_to = "foi") %>% 
-  filter(social<1, calc == "foi_full1") %>% 
-  lm(foi~overlap+nu, data = .) %>% summary()
-# linear model shows relationship between overlap and foi. nu has a clear
-# negative effect; faster decay rates result in lower FOI
 
