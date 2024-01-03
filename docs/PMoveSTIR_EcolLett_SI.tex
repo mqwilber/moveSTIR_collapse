@@ -121,7 +121,7 @@ Including correlation in movement into this formulation of PMoveSTIR is more the
 
 \section*{Appendix 2: Applying the PMoveSTIR framework under different degrees of spatial and temporal heterogeneity}
 
-Equation \ref{eq:foi_cov} in the main text is the most general formulation of PMoveSTIR, where utilization distributions and between-individual spatial covariance are time-varying and heterogeneous in space. For example, this could account for daily changes in habitat use and social interactions. The approach can be modified to consider different degrees of spatial and temporal heterogeneity. This allows us to link FOI to different metrics such as temporally varying utilization distributions, stationary utilization distributions, and home range overlap. 
+Equation 4 in the main text is the most general formulation of PMoveSTIR, where utilization distributions and between-individual spatial covariance are time-varying and heterogeneous in space. For example, this could account for daily changes in habitat use and social interactions. The approach can be modified to consider different degrees of spatial and temporal heterogeneity. This allows us to link FOI to different metrics such as temporally varying utilization distributions, stationary utilization distributions, and home range overlap. 
 
 In the lower left-hand corner of Fig. 1 in the main text, we have the case where space use is uniform and time is stationary. For simplicity, we also assume that pathogen decay is exponentially distributed with a rate of decay $\nu$ such that $S(s) = \exp(-\nu s)$. Given these assumptions, we can write the FOI equation as
 \begin{equation}
@@ -152,7 +152,6 @@ To improve intuition, we can redefine $Cov(\delta_{i \in x}, \delta_{j \in x} | 
 In equations \ref{eq:foi_stationary} and \ref{eq:stationary_cor}, the $1/\nu$ term represents the scaling due to the parasite decay, assuming we are integrating over infinite lags. In practice we will actually have a limited time given by the data, which sets an upper limit on the lags that can be considered. If this time is short relative to the parasite decay function there could be substantial error in the estimation. A more formal approach is then to use the integral over a specific period  $\int_0^{\tau} e^{-\nu s}ds=(1-e^{-\nu\tau})/\nu$.
 Equation \ref{eq:stationary_cor} highlights that the key quantity we need to understand is the correlation in host $i$'s and host $j$'s use of location $x$ at different time lags $s$, i.e. the temporal cross-correlation in space use.
 This correlation is most easily understood for short time lags ($s\approx0$), for which positive values indicate that individuals visit locations at the same time or one shortly after the other. In contrast, negative correlations at short lags indicate the individuals rarely encounter each other directly.
-In what follows, we focus on this case and explore how and under what circumstances correlated movement can influence the FOI. We analyze different scenarios of movement analytically, using simulations, as well as empirical data.  In Appendix X, we examine two additional formulations of PMoveSTIR that highlight the flexibility of this approach for linking range distributions (including home ranges and UDs) and spatial-temporal infection risk.
 
 \section*{Appendix 2: Deriving PMoveSTIR given an assumption of statistical stationarity}
 
@@ -232,6 +231,8 @@ When $\pi < 1$, the contribution of correlated movements to FOI will be positive
 This example illustrates three important points: the contributions of correlated movement to indirect transmission risk will depend strongly on 1) the movement dynamics as reflected in $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ and 2) the rate of pathogen decay relative to host movement rates.  Third, the contribution due to correlated movements could potentially increase, decrease, or have no effect on local FOI depending on the lag considered.  
 
 \bibliography{references}
+
+\clearpage
 
 \begin{figure}
     \includegraphics[width=\textwidth]{figures/example_xcorrs.pdf}
