@@ -68,10 +68,10 @@ As we did in the main text, we can envision simulating many different movement t
 
 \begin{equation}
     h^*_{i \leftarrow j}(t, A_{x, \rho}) = \int_{-\infty}^{t} \beta' \lambda E[\delta'_{x_i(t)}(A_{x, \rho}) \delta'_{x_j(u)}(A_{x, \rho + r})] e^{-\nu(t - u)} du.
-    \label{eq:prob_foi}
+    \label{eq:prob_foi2}
 \end{equation} 
 
-We can rewrite equation \ref{eq:prob_foi} as
+We can rewrite equation \ref{eq:prob_foi2} as
 
 \begin{equation}
     \begin{aligned}
@@ -119,43 +119,9 @@ Integrating $\hat{h}^*_{i \leftarrow j}(t, x)$ over some area of interest center
 
 Including correlation in movement into this formulation of PMoveSTIR is more theoretically and empirically challenging, and we leave this task for a later paper.
 
-\section*{Appendix 2: Applying the PMoveSTIR framework under different degrees of spatial and temporal heterogeneity}
-
-Equation 4 in the main text is the most general formulation of PMoveSTIR, where utilization distributions and between-individual spatial covariance are time-varying and heterogeneous in space. For example, this could account for daily changes in habitat use and social interactions. The approach can be modified to consider different degrees of spatial and temporal heterogeneity. This allows us to link FOI to different metrics such as temporally varying utilization distributions, stationary utilization distributions, and home range overlap. 
-
-In the lower left-hand corner of Fig. 1 in the main text, we have the case where space use is uniform and time is stationary. For simplicity, we also assume that pathogen decay is exponentially distributed with a rate of decay $\nu$ such that $S(s) = \exp(-\nu s)$. Given these assumptions, we can write the FOI equation as
-\begin{equation}
-    \begin{aligned}
-        h^*_{i \leftarrow j}(A_x) = \beta' \lambda \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \frac{1}{\nu} +  \int_{0}^{\infty} Cov(\delta_{i \in A_x}, \delta_{j \in A_x} | s) e^{-\nu s} ds\right]
-    \end{aligned}
-    \label{eq:uniform_stationary1}
-\end{equation}
-where the covariance in contact is constant across all areas $A_x$ on the landscape (such that $\delta_{i \in A_x}$ indicates the use of some arbitrary area $A_x$).  
-If hosts are moving independently (i.e., covariance is 0) we obtain $\frac{\tilde{\beta}}{A_x} \frac{A_x}{A_{tot}} \frac{A_x}{A_{tot}}  \frac{\lambda}{\nu}$. Given a gridded landscape with non-overlapping grids and $x$ is a single grid cell, summing over all $n$ areas $A_x$ that comprise the landscape yields $\bar{h}_{i \leftarrow j} =\frac{\tilde{\beta}}{A_\text{tot}} \frac{\lambda}{\nu}$, which is the standard mass action assumption of transmission \citep{McCallum2001}. 
-
-Finally, the lower-right corner represents the special case of statistical stationarity in movement (i.e., the mean location is constant through time, though the animal is still moving).
-Again assuming that pathogen survival in the environment follows $S(s) = e^{-\nu (s)}$, where $\nu$ is a constant pathogen decay rate,  we can simplify equation \ref{eq:foi_cov} to (derivation in Appendix 2)
-\begin{equation}
-    \begin{aligned}
-   h^*_{i \leftarrow j}(x) = \frac{\tilde{\beta}}{A_x} \lambda \left[p_i(x)p_j(x) \frac{1}{\nu} + \int_{0}^{\infty} Cov(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds\right]
-    \end{aligned}
-    \label{eq:foi_stationary}
-\end{equation}
-The key insight here is that, given a stationarity assumption, the expected force of infection in location $x$ depends on i) the marginal probabilities that host $i$ and host $j$ use location $x$ (i.e. their UDs),  and ii) the covariance in how host $i$ and host $j$ use location $x$, integrated over different time lags $s$. The UD product is proportional to the probability of encounter between two individuals when their movement is independent \citep{Noonan2021}.  
-To improve intuition, we can redefine $Cov(\delta_{i \in x}, \delta_{j \in x} | s) = \sigma_i(x) \sigma_j(x) Cor(\delta_{i \in x}, \delta_{j \in x} | s)$, where $\sigma_i(x) = \sqrt{p_i(x)(1 - p_i(x))}$  and $\sigma_j(x) = \sqrt{p_j(x)(1 - p_j(x))}$ are the standard deviation in probability of host $i$ and $j$ using location $x$, respectively.  We can then write
-\begin{equation}
-    \begin{aligned}
-    h^*_{i \leftarrow j}(x) = \beta' \lambda [ \underbrace{p_i(x)p_j(x) \frac{1}{\nu}}_{\substack{\text{FOI contribution from} \\ \text{shared space use}}} + \sigma_i(x) \sigma_j(x) \underbrace{\int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds]}_{\substack{\text{FOI contribution from} \\ \text{correlated movement}}}.
-    \end{aligned}
-    \label{eq:stationary_cor}
-\end{equation}
-In equations \ref{eq:foi_stationary} and \ref{eq:stationary_cor}, the $1/\nu$ term represents the scaling due to the parasite decay, assuming we are integrating over infinite lags. In practice we will actually have a limited time given by the data, which sets an upper limit on the lags that can be considered. If this time is short relative to the parasite decay function there could be substantial error in the estimation. A more formal approach is then to use the integral over a specific period  $\int_0^{\tau} e^{-\nu s}ds=(1-e^{-\nu\tau})/\nu$.
-Equation \ref{eq:stationary_cor} highlights that the key quantity we need to understand is the correlation in host $i$'s and host $j$'s use of location $x$ at different time lags $s$, i.e. the temporal cross-correlation in space use.
-This correlation is most easily understood for short time lags ($s\approx0$), for which positive values indicate that individuals visit locations at the same time or one shortly after the other. In contrast, negative correlations at short lags indicate the individuals rarely encounter each other directly.
-
 \section*{Appendix 2: Deriving PMoveSTIR given an assumption of statistical stationarity}
 
-To derive equation 6 in the main text that assumes stationarity in utilization distributions, we start with equation 4 in the main text
+To derive equation 5 in the main text that assumes stationarity in utilization distributions, we start with equation 4 in the main text
 
 \begin{equation}
     \begin{aligned}
@@ -177,16 +143,47 @@ $$
 h^*_{i \leftarrow j}(x) = \frac{\tilde{\beta}}{A_x} \lambda \left[p_i(x) p_j(x) \int_0^\infty S(\tau) d\tau  + \int_{-\infty}^t Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x)) S(t - u) du\right].
 $$
 
-Moreover, given stationarity, we know that $Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x))$ just depends on the time lag $\tau = t - u$ and not specific time stamps. Thus, we can write
+Moreover, given stationarity, we know that $Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x))$ just depends on the time lag $s = t - u$ and not specific time stamps. Thus, we can write
 
 \begin{equation}
     \begin{aligned}
-   h^*_{i \leftarrow j}(x) = \frac{\tilde{\beta}}{A_x} \lambda \left[p_i(x)p_j(x) \int_0^\infty S(\tau) d\tau + \int_{0}^{\infty} Cov(\delta_{i \in x}, \delta_{j \in x} | \tau) S(\tau) d\tau\right].
+   h^*_{i \leftarrow j}(x) = \frac{\tilde{\beta}}{A_x} \lambda \left[p_i(x)p_j(x) \int_0^\infty S(s) d\tau + \int_{0}^{\infty} Cov(\delta_{i \in x}, \delta_{j \in x} | \tau) S(s) ds\right].
     \end{aligned}
     \label{eq:foi_stationary}
 \end{equation}
 
-By replacing $S(\tau)$ with the exponential survival function $e^{-\nu \tau}$ we obtain equation 6 in the main text.
+By replacing $S(s)$ with the exponential survival function $e^{-\nu s}$ we obtain equation 5 in the main text.
+
+In the lower left-hand corner of Fig. 1 in the main text, we have the case where space use is uniform and time is stationary. We again assume that pathogen decay is exponentially distributed with a rate of decay $\nu$ such that $S(s) = \exp(-\nu s)$. Given these assumptions, we can write equation \ref{eq:foi_stationary} as
+\begin{equation}
+    \begin{aligned}
+        h^*_{i \leftarrow j}(A_x) = \beta' \lambda \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \frac{1}{\nu} +  \int_{0}^{\infty} Cov(\delta_{i \in A_x}, \delta_{j \in A_x} | s) e^{-\nu s} ds\right]
+    \end{aligned}
+    \label{eq:uniform_stationary1}
+\end{equation}
+where the covariance in contact is constant across all areas $A_x$ on the landscape (such that $\delta_{i \in A_x}$ indicates the use of some arbitrary area $A_x$).  
+If hosts are moving independently (i.e., covariance is 0) we obtain $\frac{\tilde{\beta}}{A_x} \frac{A_x}{A_{tot}} \frac{A_x}{A_{tot}}  \frac{\lambda}{\nu}$. Given a gridded landscape with non-overlapping grids and $x$ is a single grid cell, summing over all $n$ areas $A_x$ that comprise the landscape yields $\bar{h}_{i \leftarrow j} =\frac{\tilde{\beta}}{A_\text{tot}} \frac{\lambda}{\nu}$, which is the standard mass action assumption of transmission \citep{McCallum2001}. 
+
+% Finally, the lower-right corner represents the special case of statistical stationarity in movement (i.e., the mean location is constant through time, though the animal is still moving).
+% Again assuming that pathogen survival in the environment follows $S(s) = e^{-\nu (s)}$, where $\nu$ is a constant pathogen decay rate,  we can simplify equation \ref{eq:foi_cov} to (derivation in Appendix 2)
+% \begin{equation}
+%     \begin{aligned}
+%    h^*_{i \leftarrow j}(x) = \frac{\tilde{\beta}}{A_x} \lambda \left[p_i(x)p_j(x) \frac{1}{\nu} + \int_{0}^{\infty} Cov(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds\right]
+%     \end{aligned}
+%     \label{eq:foi_stationary}
+% \end{equation}
+% The key insight here is that, given a stationarity assumption, the expected force of infection in location $x$ depends on i) the marginal probabilities that host $i$ and host $j$ use location $x$ (i.e. their UDs),  and ii) the covariance in how host $i$ and host $j$ use location $x$, integrated over different time lags $s$. The UD product is proportional to the probability of encounter between two individuals when their movement is independent \citep{Noonan2021}.  
+% To improve intuition, we can redefine $Cov(\delta_{i \in x}, \delta_{j \in x} | s) = \sigma_i(x) \sigma_j(x) Cor(\delta_{i \in x}, \delta_{j \in x} | s)$, where $\sigma_i(x) = \sqrt{p_i(x)(1 - p_i(x))}$  and $\sigma_j(x) = \sqrt{p_j(x)(1 - p_j(x))}$ are the standard deviation in probability of host $i$ and $j$ using location $x$, respectively.  We can then write
+% \begin{equation}
+%     \begin{aligned}
+%     h^*_{i \leftarrow j}(x) = \beta' \lambda [ \underbrace{p_i(x)p_j(x) \frac{1}{\nu}}_{\substack{\text{FOI contribution from} \\ \text{shared space use}}} + \sigma_i(x) \sigma_j(x) \underbrace{\int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds]}_{\substack{\text{FOI contribution from} \\ \text{correlated movement}}}.
+%     \end{aligned}
+%     \label{eq:stationary_cor}
+% \end{equation}
+% In equations \ref{eq:foi_stationary} and \ref{eq:stationary_cor}, the $1/\nu$ term represents the scaling due to the parasite decay, assuming we are integrating over infinite lags. In practice we will actually have a limited time given by the data, which sets an upper limit on the lags that can be considered. If this time is short relative to the parasite decay function there could be substantial error in the estimation. A more formal approach is then to use the integral over a specific period  $\int_0^{\tau} e^{-\nu s}ds=(1-e^{-\nu\tau})/\nu$.
+% Equation \ref{eq:stationary_cor} highlights that the key quantity we need to understand is the correlation in host $i$'s and host $j$'s use of location $x$ at different time lags $s$, i.e. the temporal cross-correlation in space use.
+% This correlation is most easily understood for short time lags ($s\approx0$), for which positive values indicate that individuals visit locations at the same time or one shortly after the other. In contrast, negative correlations at short lags indicate the individuals rarely encounter each other directly.
+
 
 \section*{Appendix 3: Beyond the corners of PMoveSTIR}
 
@@ -213,19 +210,19 @@ This could be generalized to any number of intervals within the period $T$, depe
 
 \section*{Appendix 4: Analytical example of how correlated movement and indirect transmission can alter FOI}
 
-The effects of correlated movement on FOI relative to habitat overlap become analytically more difficult to generalize when we consider pathogens with indirect transmission.  This is because the correlation function $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ can be highly non-trivial even in the simple case when two hosts are moving together.  
+The effects of correlated movement on FOI relative to habitat overlap become analytically more difficult to generalize when we consider pathogens with indirect transmission.  This is because the correlation function $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ can be highly non-trivial even in the simple case when two hosts are moving together (see Fig. \ref{fig:xcorrs} for some examples).  
 While determining the analytical form of $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ for common movement models is beyond the scope of this study, we can use a relatively simple movement scenario to get an analytical sense of how indirect transmission and correlated movements can interact to affect transmission risk.
 
-The scenario is two hosts moving back and forth between two patches, and spending $\eta$ time units in each patch.  As with the example of direct transmission, we assume that the hosts are moving together. If we plot $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ of this movement scenario, we get the saw-tooth pattern observed in Fig. \ref{fig:xcorrs}d.  
+The scenario is two hosts moving back and forth between two patches, and spending $\eta$ time units in each patch.  As with the example of direct transmission in the main text, we assume that the hosts are moving together. If we plot $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ of this movement scenario, we get the saw-tooth pattern observed in Fig. \ref{fig:xcorrs}a.  
 Correlation in movement is 1 at lag 0 (because hosts are together constantly) and decreases to approximately -1 by time $\eta$ before increasing close to 1 by time $2\eta$, etc. 
-We assume that the pathogen cannot survive longer than $\eta$ in the environment (i.e., $\pi \leq 1$), then we can ignore all correlations after lag $s = \eta$ and we can approximate $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) \approx (-2 / \eta)s + 1$.  With this approximation, we can write our FOI equation as (derivation in Appendix X)
+We assume that the pathogen cannot survive longer than $\eta$ in the environment (i.e., $\pi \leq 1$), then we can ignore all correlations after lag $s = \eta$ and we can approximate $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) \approx (-2 / \eta)s + 1$.  With this approximation, we can write our FOI equation as
 
 
 \begin{equation}
     h^*_{i \leftarrow j}(x) = \beta' \lambda \pi \eta \left[ \underbrace{\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}}}_{\substack{\text{Contribution due} \\ \text{to habitat overlap}}} + \underbrace{\frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) (1 - \pi)}_{\substack{\text{Contribution due} \\ \text{to correlated movement}}} \right].
     \label{eq:uniform_indirect}
 \end{equation}
-As $\pi$ gets small, note that we recover equation 9 in the main text.  Equation \ref{eq:uniform_indirect} shows that the degree of contribution of correlated movement to FOI depends on the relative persistence time of the pathogen compared to the residence time of the host.  
+As $\pi$ gets small, we recover equation 7 in the main text.  Equation \ref{eq:uniform_indirect} shows that the degree of contribution of correlated movement to FOI depends on the relative persistence time of the pathogen compared to the residence time of the host.  
 When the pathogen persists from $\eta$ time units (i.e. $\pi = 1$) the contribution of correlation to FOI is zero.  This is because negative and positive correlations in $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ cancel out as we integrate from zero to $\eta$.  
 When $\pi < 1$, the contribution of correlated movements to FOI will be positive, and the relative contribution of correlated movements compared to habitat overlap will approach unity (i.e., an equal contribution) as $\pi$ approaches 0. 
 This example illustrates three important points: the contributions of correlated movement to indirect transmission risk will depend strongly on 1) the movement dynamics as reflected in $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ and 2) the rate of pathogen decay relative to host movement rates.  Third, the contribution due to correlated movements could potentially increase, decrease, or have no effect on local FOI depending on the lag considered.  
@@ -236,7 +233,7 @@ This example illustrates three important points: the contributions of correlated
 
 \begin{figure}
     \includegraphics[width=\textwidth]{figures/example_xcorrs.pdf}
-    \caption{Variation in cross-correlation values for different combinations of position histories. }
+    \caption{Variation in cross-correlation values for different combinations of position histories. The extreme variety of cross-correlation patterns between two moving hosts makes the effect of correlation on indirect transmission more difficult to generalize than direct transmission.}
     \label{fig:xcorrs}
 \end{figure}
 
