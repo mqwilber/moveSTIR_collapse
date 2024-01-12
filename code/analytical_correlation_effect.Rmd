@@ -25,7 +25,7 @@ $$
 
  If both hosts are moving randomly on a landscape and the area of potential contact is $A_x$ then we can rewrite this equation as
  
- $$
+$$
 \begin{aligned}
     h^*_{i \leftarrow j}(x) = \beta' \lambda \left[ \frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \int_0^{\infty} S(\tau) d\tau + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | \tau) S(\tau) d\tau\right].
 \end{aligned}
@@ -50,7 +50,7 @@ $$
 $$
 We also know that if a pathogen only survives $\pi s$ time units, then $\int_0^{\infty} S(\tau) d\tau = \pi s$.  We can then substitute in and we get
 
- $$
+$$
 \begin{aligned}
     h^*_{i \leftarrow j}(x) = \beta' \lambda \pi s [ \frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}})].
 \end{aligned}
@@ -106,7 +106,7 @@ lines(x, y, type="l") #
 
 With this approximation we can we write our FOI equation in this particular case as
 
- $$
+$$
 \begin{aligned}
     h^*_{i \leftarrow j}(x) &= \beta' \lambda \left[ \frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \pi s + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \int_{0}^{\pi s} (\frac{-2}{s} \tau + 1) d\tau\right] \\
     &= \beta' \lambda \left[ \frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \pi s + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) (\frac{-\tau^2}{s} + \tau) |_0^{\pi s} \right] \\
