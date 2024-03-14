@@ -178,7 +178,7 @@ Given these assumptions, we define the pairwise FOI host $j$ exerts on host $i$ 
 \end{equation}
 where $\lambda$ is the pathogen deposition rate, $\delta_{x_j(u)}(x)$ is an indicator variable that is one if host $j$ is in location $x$ at time $u$ and zero otherwise, $\delta_{I_j(u)}(I)$ is an indicator function that is one if host $j$ is in an infected state at time $u$ and zero otherwise, and $S(t-u)$ is the probability that any pathogen deposited at time $u < t$ is still transmissible at time $t$ \citep[see][for a full derivation]{Wilber2022}. 
 The term $\beta'$ is the rate at which host $i$ picks up pathogen within location $x$ and can be re-written as $\tilde{\beta} / A_x$, where $\tilde{\beta}$ can be considered a ``search efficiency'' term, with units area/time (e.g., $m^2 / day$), and $A_x$ gives the area of location $x$ (e.g., 100 $m^2$). 
-Therefore, the total acquisition rate scales with the area in which contact can occur; in larger areas, the acquiring host would have to search for longer to encounter an infectious dose, reducing the total acquisition rate and the corresponding FOI. Moving forward, we assume that the depositing host is always infected, and shedding pathogen infectious stages continuously at a constant rate. This assumption is equivalent to building a contact network and also represents the structural form of FOI needed to compute pathogen invasion thresholds \citep{Wilber2022}.
+Therefore, the total acquisition rate scales with the area in which contact can occur; in larger areas, the acquiring host would have to search for longer to encounter an infectious dose, reducing the total acquisition rate and the corresponding FOI. Moving forward, we assume that the depositing host is always infected, and shedding pathogen infectious stages continuously at a constant rate. Assuming the depositing host always infected is equivalent to building a contact network and also represents the structural form of FOI needed to compute pathogen invasion thresholds \citep{Wilber2022}.
 
 Considering probabilistic space use (i.e., we know where an individual is at a given time and location with some probability), we can re-write equation \ref{eq:original_foi} as
 \begin{equation}
@@ -356,7 +356,7 @@ Our analyses emphasize the importance of this next step by showing that correlat
 
 \section*{Acknowledgments}
 
-TODO
+Thanks to Dr. A. Houston, B. Trout, M. Turner and TWRA for capture and logistical support during fieldwork. Funding for this study was provided by the United States Department of Agriculture (USDA) National Institute of Food and Agriculture (McIntire Stennis project TEN00MS-113; Hatch Project 7001607) and the USDA American Rescue Plan (APP-21535). A portion of the computation for this work was performed on the University of Tennessee Infrastructure for Scientific Applications and Advanced Computing (ISAAC) computational resources.
 
 \clearpage
 
