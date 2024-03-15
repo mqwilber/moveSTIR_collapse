@@ -59,7 +59,7 @@
 \bigskip
 
 \noindent
-\textbf{Running title}: 
+\textbf{Running title}: Temporal correlation reshapes disease dynamics
 
 \bigskip
 
@@ -73,19 +73,27 @@
 
 \noindent
 \textsuperscript{1}School of Natural Resources, University of Tennessee, Knoxville, TN \\
-\textsuperscript{a} \\
-\textsuperscript{b} \\
-\textsuperscript{c}
+\textsuperscript{a} jvargass@utk.edu\\
+\textsuperscript{b} lmuller@utk.edu\\
+\textsuperscript{c} dgrove@utk.edu\\
+\textsuperscript{d} jkosiews@vols.utk.edu\\
+\textsuperscript{e} dmetts1@vols.utk.edu\\
+\textsuperscript{f} mwilber@utk.edu
 
 \bigskip
 
 \noindent
-\textbf{Corresponding author}:
+\textbf{Corresponding author}: Mark Wilber\\
+School of Natural Resources University of Tennessee\\
+51A McCord Hall 2640 Morgan Circle Drive\\
+Knoxville TN 37996-4563\\
+UNITED STATES\\
++1 865 974 7126; mwilber@utk.edu
 
 \bigskip
 
 \noindent
-\textbf{Keywords}:
+\textbf{Keywords}: wildlife disease, host overlap, utilization distribution, animal movement
 
 \bigskip
 
@@ -94,18 +102,18 @@
 
 \bigskip
 \noindent
-\textbf{Statement of authorship}: 
+\textbf{Statement of authorship}: JSVS and MQW conceptualized and developed the methods. JSVS performed simulations and analyses. LM, DG, JK and DM collected animal movement data. JSVS wrote the first draft of the manuscript, and all coauthors contributed substantially to revisions. 
 
 \bigskip
 \noindent
-\textbf{Data accessibility statement}: 
+\textbf{Data accessibility statement}: Data used in the manuscript, as well as code to generate simulations and analyze data, are available at on \url{https://github.com/juansvs/moveSTIR_collapse}
 
 \bigskip
 \noindent
-\textbf{Abstract}:  \\
-\textbf{Main text}:  \\
-\textbf{References}:  \\
-\textbf{Figures and tables}: \\
+\textbf{Abstract}: 147 words\\
+\textbf{Main text}:  5480 words\\
+\textbf{References}: 48 \\
+\textbf{Figures and tables}: 5 figures \\
 
 \newpage
 
@@ -113,8 +121,8 @@
 \linenumbers
 
 \section*{Abstract}
+Despite decades of epidemiological theory making relatively simple assumptions about host movements, it is increasingly clear that non-random movements drastically affect disease transmission. To better predict transmission risk, theory needs to simultaneously account for how the environment affects host space use and how social dynamics affect correlation in space use. We develop new theory that decomposes the relative contributions of fine-scale space use and correlated movements to spatio-temporal transmission risk. Using analytical results, simulations, and empirical movement data, we show that even weak correlations can increase transmission risk by orders of magnitude compared to independent movement. Accounting for correlation is especially critical for pathogens with direct transmission or short environmental persistence. Our theory provides clear expectations for what has been observed empirically but largely ignored in disease models---movement correlation can reshape epidemiological landscapes, creating transmission hotspots whose magnitude and location are not necessarily predictable from spatial overlap alone.
 
-Despite decades of epidemiological theory making relatively simple assumptions about host movements, it has become increasingly clear that non-random movements and fine-scale habitat use can drastically affect disease transmission. To better predict transmission risk, theory needs to simultaneously account for how the environment affects host space use and how social dynamics affect correlation in space use among hosts. We develop new theory that decomposes the relative contributions of fine-scale space use and correlated, pairwise host movements to spatio-temporal transmission risk. Through analytical results, simulations, and application to empirical movement data, we show that even weak spatio-temporal correlations among host movements in space and time can lead to orders of magnitude differences in transmission risk at the landscape scale compared to contact and transmission metrics that only consider spatial overlap. We find that the effect of correlation is critical for estimating transmission risk of pathogens that are directly transmitted or with short environmental persistence. Our theory provides clear expectations for what has been observed empirically but largely ignored in movement and disease models -- correlation in movement can reshape epidemiological landscapes, leading to hotspots of transmission whose magnitude and location are not necessarily predictable from models of joint space use.
 
 % Understanding how animal movement influences disease transmission processes is critical to manage disease in wildlife and to eventually predict outbreaks or spillovers. These goals, however, require a thorough understanding of the intricate relationships between the environment, movement, and interactions among individuals, particularly processes with complex temporal dynamics.
 % We determined how the risk of disease transmission in wildlife varies across space and time under different epidemiological conditions (parasite persistence in the environment, transmission contact distance), different degrees of social interaction, and different conditions of data availability. For this, we derived a new framework to estimate a spatially explicit, pairwise, expected risk of disease transmission based on animal movement data (e.g. GPS tracking data). We derived general conclusions related to direct transmission analytically, tested the influence of epidemiological covariates and data availability using simulations. Finally, we applied our framework to empirical tracking data of white-tailed deer. 
@@ -132,10 +140,10 @@ Formally linking social factors, environmental factors, animal movement, contact
 Nevertheless, understanding how these processes interact at an individual scale requires detailed movement information and theory to translate movement into an epidemiological context.
 
 
-Most epidemiological theory is built upon the assumption of independent host movements, and there is little theory that quantifies how non-independent, correlated host movements affect contact and transmission risk. While there is a large body of empirical work that quantifies how correlated and social movements can reshape contact and transmission landscapes \citep[e.g.,][]{Kjaer2008,Grear2010,Schauber2015a}, we lack a modeling approach that isolates the role of social interactions on spatio-temporal force of infection (FOI, the risk of transmission experienced by a host per unit time). This limits our ability to ask questions such as: how much can correlated, non-independent movements affect spatio-temporal infection risk compared to spatial overlap? Moreover, recent studies have shown that spatial transmission risk can be highly localized \citep{Albery2021} and is not necessarily predicted by animal space use \citep{Yang2023a}. We hypothesize that non-independent animal movements can (at least partially) account for these observations and develop a modeling approach to rigorously test this hypothesis and systematically quantify the contribution of space use and correlated animal movements to spatio-temporal transmission risk.
+Most epidemiological theory is built upon the assumption of independent host movements, and there is little theory that quantifies how non-independent, correlated movements affect contact and transmission risk. While there is a large body of empirical work that quantifies how correlated and social movements can reshape contact and transmission landscapes \citep[e.g.,][]{Kjaer2008,Grear2010,Schauber2015a}, we lack a modeling approach that isolates the role of social interactions on spatio-temporal force of infection (FOI, the risk of transmission experienced by a host per unit time). This limits our ability to ask questions such as: how much can correlated, non-independent movements affect spatio-temporal infection risk compared to spatial overlap? Moreover, recent studies have shown that spatial transmission risk can be highly localized \citep{Albery2021} and is not necessarily predicted by animal space use \citep{Yang2023a}. We hypothesize that non-independent animal movements can (at least partially) account for these observations and develop a modeling approach to rigorously test this hypothesis and systematically quantify the contribution of space use and correlated animal movements to spatio-temporal transmission risk.
 
 
-Recent approaches developed at the interface of movement and disease ecology leverage high-resolution animal tracking data to gain insight into contact among individuals and disease transmission \citep{Richardson2015,Wilber2022,Yang2023}. For example, movement-driven modeling of spatio-temporal infection risk (MoveSTIR) builds dynamic spatio-temporal contact networks from movement data to estimate the risk of infection for different individuals across space and time \citep{Wilber2022}. MoveSTIR provides a theoretical foundation to translate contacts into the epidemiological currency of FOI. These studies have highlighted the importance of individual heterogeneity and temporal scale for disease dynamics, particularly how indirect contact---individuals at the same place at different times---can significantly reshape contact and transmission networks \citep{Richardson2015,Yang2023}. Current approaches are nonetheless based on occurrence, rather than range, distributions \citep[in the terminology of ][]{Alston2022} -- meaning they only consider where animals were observed and not where they \emph{potentially} could have moved. This approach makes it difficult to systematically link observed encounters with environmental drivers, and to predict how social or environmental changes affect contact and transmission. 
+Recent approaches developed at the interface of movement and disease ecology leverage high-resolution animal tracking data to gain insight into contact among individuals and disease transmission \citep{Richardson2015,Wilber2022,Yang2023}. For example, movement-driven modeling of spatio-temporal infection risk (MoveSTIR) builds dynamic contact networks from movement data to estimate the risk of infection for different individuals across space and time \citep{Wilber2022}. MoveSTIR provides a theoretical foundation to translate contacts into the epidemiological currency of FOI. These studies have highlighted the importance of individual heterogeneity and temporal scale for disease dynamics, particularly how indirect contact---individuals at the same place at different times---can significantly reshape contact and transmission networks \citep{Richardson2015,Yang2023}. Current approaches are nonetheless based on occurrence, rather than range, distributions \citep[in the terminology of ][]{Alston2022} -- meaning they only consider where animals were observed and not where they \emph{potentially} could have moved. This approach makes it difficult to systematically link observed encounters with environmental drivers, and to predict how social or environmental changes affect contact and transmission. 
 
 Alternatively, spatio-temporal contact could be studied probabilistically by using utilization distributions (UDs). The UD represents the probability---transient or long-term \citep{Tao2016}---of an organism using a particular area \citep{Worton1989}. The high spatial and temporal resolution of modern tracking data serves to build UDs based on biologically realistic movement models \citep{Kranstauber2012,Fleming2014}, and to link them with underlying resources \citep{Potts2023}.
 Individual UDs also serve to study pairwise interactions, for example to quantify home range overlap \citep{Winner2018}, or to estimate the expected location and rate of encounter between individuals \citep{Noonan2021}, which could be used to infer transmission risk \citep{Godfrey2010, Godfrey2013,Noonan2021}. 
@@ -210,7 +218,7 @@ For example, when UDs are stationary in time equation and pathogen decays expone
 
 \begin{equation}
     \begin{aligned}
-    h^*_{i \leftarrow j}(x) = \beta' \lambda [ \underbrace{p_i(x)p_j(x) \frac{1}{\nu}}_{\substack{\text{FOI contribution from} \\ \text{shared space use}}} + \sigma_i(x) \sigma_j(x) \underbrace{\int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds]}_{\substack{\text{FOI contribution from} \\ \text{correlated movement}}}.
+    h^*_{i \leftarrow j}(x) = \beta' \lambda [ \underbrace{p_i(x)p_j(x) \frac{1}{\nu}}_{\substack{\text{FOI contribution from} \\ \text{shared space use}}} + \sigma_i(x) \sigma_j(x) \underbrace{\int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds}]_{\substack{\text{FOI contribution from} \\ \text{correlated movement}}}.
     \end{aligned}
     \label{eq:stationary_cor}
 \end{equation}
@@ -393,7 +401,7 @@ Thanks to Dr. A. Houston, B. Trout, M. Turner and TWRA for capture and logistica
 
 \clearpage
 
-\bibliographystyle{abbrvnat}
+
 \bibliography{references}
 
 \end{document}
