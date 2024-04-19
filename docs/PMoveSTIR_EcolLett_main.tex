@@ -213,7 +213,7 @@ where $\sigma_i(x) = \sqrt{p_i(x)(1 - p_i(x))}$  is the standard deviation in pr
 \subsection*{Analytical and simulation insight into correlated movement and FOI}
 
 Leveraging PMoveSTIR, we used analysis and simulation to ask: how much can correlated movements affect spatio-temporal infection risk for directly and indirectly transmitted pathogens relative to spatial overlap? 
-First, we used PMoveSTIR to derive equations that explicitly quantify how much correlation can augment or reduce force of infection due to direct or indirect contact compared to random movement.
+First, we used PMoveSTIR to derive equations that explicitly quantify how much correlation can augment or reduce force of infection due to direct or indirect contact compared to random movement. Using an example with direct contact, we then show how correlation in movement at the pairwise level can scale up to affect the dynamics of mean-field, population models that assume density-dependent transmission and random movement.
 Second, we used simulations to explore how temporally correlated movements affect  transmission, and how the pairwise FOI estimate depends on epidemiological factors such as contact distance and pathogen decay. Additionally, empirically estimating the correlation component in equation \ref{eq:stationary_cor} depends on the amount of data available. Therefore, we also explored the implications of tracking duration (the total time an animal is tracked) on the estimated FOI. For the simulations, we focused on the lower-right corner of Fig. \ref{fig:square} (equation \ref{eq:stationary_cor}), where we assumed statistical stationarity in movement. The process for calculating the FOI across the landscape is summarized in Fig. \ref{fig:steps}.
 
 We simulated 20 replicate movement tracks for each combination of parameters. In every simulation, two individuals moved around established home ranges according to an Ornstein-Uhlenbeck process; i.e., they move randomly but are attracted back towards the center of their home range as they drift away. To create different levels of correlation, we modified the initial simulated tracks using a convolution approach with a social interaction kernel \citep{Scharf2018}. This method accounts for constant or temporally varying attraction between pairs of individuals. For our purposes we assumed attraction strength was constant in time, but varied across pairs from 0 (completely independent movement) to 1 (joint movement). %Strong interactions led to similar and highly overlapping trajectories, which could represent animals in a herd, courting/mating pairs, or parents with their offspring.
@@ -256,7 +256,7 @@ recognizing that $\sigma_i(x) \sigma_j(x) = \sqrt{\frac{A_x}{A_{tot}}(1 - \frac{
 
 % \subsubsection*{Direct transmission}
 
-For hosts that are moving together, $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ will be exactly unity when lag $s = 0$ and near unity when lag $s$ is near zero. When pathogens are strictly directly transmitted, $\pi$ is also small and if $\pi \eta << \eta$ then we can reasonably approximate $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) = 1$ for s from 0 to $\pi \eta$.  We can then write equation \ref{eq:uniform_stationary2} as 
+For hosts that are moving together, $\rho = Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ will be exactly unity when lag $s = 0$ and near unity when lag $s$ is near zero. When pathogens are strictly directly transmitted, $\pi$ is also small and if $\pi \eta << \eta$ then we can reasonably approximate $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) = \rho = 1$ for s from 0 to $\pi \eta$.  We can then write equation \ref{eq:uniform_stationary2} as 
 
 \begin{equation}
     \begin{aligned}
@@ -270,6 +270,35 @@ As the area $A_x$ in which an epidemiological contact can occur gets smaller rel
 This finding makes intuitive sense but is almost never considered in epidemiological models. If the area of potential contact is small and hosts are moving randomly, there is a very low chance that hosts will be there together at the same time. Correlated movements significantly increase this chance, even when correlation is low (e.g. 0.1). The contribution of correlation to FOI can be 10 times greater than spatial overlap if the area of contact is small (e.g., $<$ 5\% of the total area; Fig. \ref{fig:analytical_corr}). Large correlations across multiple areas result in a significantly greater FOI across the entire landscape. 
 
 In contrast, when $A_x$ approaches $A_{tot}$ (or more generally when the probability of using a particular area is very high), the importance of correlated movement relative to habitat overlap becomes minimal (Fig. \ref{fig:analytical_corr}). For example, if two hosts use a particular area together because of high resource availability, then it does not matter for FOI if social factors are leading to additional correlated movement. This result extends beyond epidemiological contexts and shows when correlated movements can significantly alter contact risk based on metrics such as home range overlap or CDE.  In Appendix S3, we expand this example to examine the effects of correlated movement on FOI given indirect transmission.
+
+\subsubsection*{Scaling up to the population-level -- analytical results}
+
+Using equation \ref{eq:uniform_direct}, we can also understand the implications of correlated movement for standard mean-field models often used in disease ecology. To do this, consider a standard \textbf{S}usceptible-\textbf{I}nfected-\textbf{R}ecovered model at the individual-level, where $p_{i, S}(t)$, $p_{i, I}(t)$, and $p_{i, R}(t)$ are the probability that individual $i$ is in the S, I, or R state at time time $t$, respectively.  If individuals are moving on a gridded landscape without overlapping areas (our assumption from above), we can write down a set of ordinary differential equations that describe the individual-level transitions in the system
+
+\begin{equation}
+    \begin{aligned}
+        \frac{d p_{i, S}(t)}{dt} &= -p_{i, S}(t) \sum_{j \in N} \sum_{x \in Area} h_{i \leftarrow j}^*(x, t) \\
+        \frac{d p_{i, I}(t)}{dt} &= p_{i, S}(t) \sum_{j \in N} \sum_{x \in Area} h_{i \leftarrow j}^*(x, t) - \gamma p_{i, I}(t) \\
+        \frac{d p_{i, R}(t)}{dt} &= \gamma p_{i, I}(t) \\
+    \end{aligned}
+    \label{eq:sir_individual}
+\end{equation}
+where $\sum_{j \in N}$ is summing over all individuals in the population, $\sum_{x \in Area}$ is summing over all gridded areas on the landscape, and $h^*_{i \leftarrow j}(x, t)$ is the force of infection felt by $i$ from $j$ at location $x$ at time $t$. Substituting a slight modification of equation \ref{eq:uniform_direct} for $h^*_{i \leftarrow j}(x, t)$ we can write 
+
+$$
+h^*_{i \leftarrow j}(x, t) = \frac{\tilde{\beta} \lambda \pi \eta}{A_x} p_{j, I}(t) \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \rho \right].
+$$
+where $\rho$ is the pairwise correlation between $i$ and $j$ at location $x$, which we assume to be the same across individuals and locations for this derivation. Plugging this form of $h^*_{i \leftarrow j}(x, t)$ into equation \ref{eq:sir_individual}, summing each equation over all $N$ individuals in the population, and assuming $N$ is sufficiently large, we get (Appendix X)
+
+\begin{equation}
+    \begin{aligned}
+        \frac{d S(t)}{dt} &= - S(t) \underbrace{\beta^* [1 + (1 - \frac{A_x}{A_{tot}})n\rho] I(t)}_{\text{Force of infection}}  \\
+        \frac{d I(t)}{dt} &=  S(t) \underbrace{\beta^* [1 + (1 - \frac{A_x}{A_{tot}})n\rho] I(t)}_{\text{Force of infection}} - \gamma I(t) \\
+        \frac{d R(t)}{dt} &= \gamma I(t) \\
+    \end{aligned}
+    \label{eq:sir_with_corr}
+\end{equation}
+where $n = A_{tot} / A_{x}$ is the number of grid cells that compose the landscape of area $A_{tot}$ and $\beta^* = \frac{\tilde{\beta} \lambda \pi \eta}{A_{tot}}$. When correlation $\rho = 0$, we get back the well-known SIR model with density-dependent transmission.  However, when $\rho \neq 0$ correlation increases or decreases the force of infection compared to the standard mean-field model, depending on the sign of $\rho$.  Moreover, as contacts occur in smaller areas (i.e., individuals need to be closer to each other for contact and transmission to occur), $A_x / A_{tot}$ gets smaller and even small values of $\rho$ can change epidemiological dynamics.  This effect is because as $A_x$ goes to zero, $A_x / A_{tot}$ also goes to 0 and $n$ goes to infinity, augmenting the effects of a non-zero $\rho$. The key point is that even low levels of correlation can significantly alter epidemiological dynamics relative to mean field models.  To further emphasize this point, the basic reproduction number for the model given above is $R_0 = \frac{\beta^* [1 + (1 - \frac{A_x}{A_{tot}})n\rho] N}{\gamma}$. Positive $\rho$ increases $R_0$ relative to the mean-field SIR model, increasing the generational explosive spread of a pathogen invading a population.
 
 % \subsubsection*{Indirect transmission}
 
