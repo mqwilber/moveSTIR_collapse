@@ -229,7 +229,7 @@ This example illustrates three important points: the contributions of correlated
 
 \section*{Appendix 5: Scaling up to the population-level -- analytical results and derivations}
 
-To demonstrate the implications of correlated movement on classic mean-field models epidemiological models, consider a typical \textbf{S}usceptible-\textbf{I}nfected-\textbf{R}ecovered model at the individual-level, where $p_{i, S}(t)$, $p_{i, I}(t)$, and $p_{i, R}(t)$ are the probability that individual $i$ is in the S, I, or R state at time $t$, respectively.  If individuals are moving on a gridded landscape without overlapping areas (our assumption in the main text), we can write down a set of ordinary differential equations that describe the individual-level transitions between states as
+To demonstrate the implications of correlated movement on classic mean-field epidemiological models, consider a standard \textbf{S}usceptible-\textbf{I}nfected-\textbf{R}ecovered model at the individual-level, where $p_{i, S}(t)$, $p_{i, I}(t)$, and $p_{i, R}(t)$ are the probability that individual $i$ is in the S, I, or R state at time $t$, respectively.  If individuals are moving on a gridded landscape without overlapping areas (our assumption in the main text), we can write down a set of ordinary differential equations (ODEs) that describe the individual-level transitions between states as
 
 \begin{equation}
     \begin{aligned}
@@ -239,7 +239,7 @@ To demonstrate the implications of correlated movement on classic mean-field mod
     \end{aligned}
     \label{eq:sir_individual}
 \end{equation}
-where $\sum_{j \in N_{-i}}$ is summing over all individuals in the population excluding $i$, $\sum_{x \in Area}$ is summing over all gridded areas on the landscape, and $h^*_{i \leftarrow j}(x, t)$ is the force of infection felt by $i$ from $j$ at location $x$ at time $t$.
+where $\sum_{j \in N_{-i}}$ is summing over all individuals in the population excluding $i$, $\sum_{x \in Area}$ is summing over all grid cells on the landscape, and $h^*_{i \leftarrow j}(x, t)$ is the force of infection felt by $i$ from $j$ at location $x$ at time $t$.
 
 Using equation 7 in the main text, we can write $h^*_{i \leftarrow j}(x, t)$
 
@@ -256,33 +256,31 @@ $$
 We can then simplify to
 
 $$
-p_{i, S}(t) \sum_{j \in N_{-i}} p_{j, I}(t)  \left[\frac{\beta'}{A_{tot}} + \frac{\beta'}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) n \rho \right],
+p_{i, S}(t) \sum_{j \in N_{-i}} p_{j, I}(t)  \left[\frac{\hat{\beta}}{A_{tot}} + \frac{\hat{\beta}}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) n \rho \right],
 $$
-where because space use is uniform, summing over the gridded areas is equivalent to multiplying the term within the area summation by $n$, where $n = A_{tot} / A_x$ is the number of grid cells. Note we also set $\beta' = \tilde{\beta} \lambda \pi \eta$ for notational simplicity. We can further simplify this equation to
+where because space use is uniform, summing over the grid cells is equivalent to multiplying the term within the area summation by $n$, where $n = A_{tot} / A_x$ is the number of grid cells. Note we also set $\hat{\beta} = \tilde{\beta} \lambda \pi \eta$ for notational simplicity. We can further simplify this equation to
 
 $$
-p_{i, S}(t) \frac{\beta'}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] (I - p_{i, I}(t)),
+p_{i, S}(t) \frac{\hat{\beta}}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] (I - p_{i, I}(t)),
 $$
 where $I(t) = \sum_{k \in N} p_{k, I}(t)$ and we subtract by $p_{i, I}(t)$ because we assume that $i$ cannot infect itself. Plugging this simplified equation back into our system of ODEs we get
 
 
 \begin{equation}
     \begin{aligned}
-        \frac{d p_{i, S}(t)}{dt} &= -p_{i, S}(t) \frac{\beta'}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] [I(t) - p_{i, I}(t)] \\
-        \frac{d p_{i, I}(t)}{dt} &= p_{i, S}(t) \frac{\beta'}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] [I(t) - p_{i, I}(t)] - \gamma p_{i, I}(t) \\
-        \frac{d p_{i, R}(t)}{dt} &= \gamma p_{i, I}(t),
+        \frac{d p_{i, S}(t)}{dt} &= -p_{i, S}(t) \frac{\hat{\beta}}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] [I(t) - p_{i, I}(t)] \\
+        \frac{d p_{i, I}(t)}{dt} &= p_{i, S}(t) \frac{\hat{\beta}}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] [I(t) - p_{i, I}(t)] - \gamma p_{i, I}(t) \\
+        \frac{d p_{i, R}(t)}{dt} &= \gamma p_{i, I}(t).
     \end{aligned}
     \label{eq:sir_individual_simplified}
 \end{equation}
-where $\beta' = $
-
 
 We then sum $\frac{d p_{i, S}(t)}{dt}$, $\frac{d p_{i, I}(t)}{dt}$, and $\frac{d p_{i, R}(t)}{dt}$ over all $N$ individuals to obtain
 
 \begin{equation}
     \begin{aligned}
-        \frac{d S(t)}{dt} &= -\frac{\beta'}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] [S(t)I(t) - \sum_{i \in N} p_{i, I}(t) p_{i, S}(t)] \\
-        \frac{d I(t)}{dt} &= \frac{\beta'}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] [S(t)I(t) - \sum_{i \in N} p_{i, I}(t) p_{i, S}(t)] - \gamma p_{i, I}(t) \\
+        \frac{d S(t)}{dt} &= -\frac{\hat{\beta}}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] [S(t)I(t) - \sum_{i \in N} p_{i, I}(t) p_{i, S}(t)] \\
+        \frac{d I(t)}{dt} &= \frac{\hat{\beta}}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] [S(t)I(t) - \sum_{i \in N} p_{i, I}(t) p_{i, S}(t)] - \gamma p_{i, I}(t) \\
         \frac{d R(t)}{dt} &= \gamma p_{i, I}(t).
     \end{aligned}
     \label{eq:sir_population_full}
@@ -298,7 +296,7 @@ Finally, we can recognize that when $N$ is large, $S(t)I(t) >> \sum_{i \in N} p_
     \end{aligned}
     \label{eq:sir_with_corr}
 \end{equation}
-where $\beta^* = \frac{\beta'}{A_{tot}}$.
+where $\beta^* = \frac{\hat{\beta}}{A_{tot}}$.
 
 \bibliography{references}
 
