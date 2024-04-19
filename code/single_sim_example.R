@@ -227,7 +227,7 @@ p1 <- outdf %>% group_by(sim) %>%
   geom_boxplot(aes(social, foi_full1/mean(foi_ud), group = social), width = 0.015, color = "darkred", position = position_nudge(0.01))+
   geom_boxplot(aes(social, foi_ud/mean(foi_ud), group = social), width=0.015, color = "steelblue", position = position_nudge(-0.01))+
   labs(x = "Interaction strength", y = "Relative FOI")+
-  theme_minimal(base_size = 12)+
+  theme_minimal(base_size = 14)+
   scale_color_manual(name='Correlation',
                      values = c("darkred", "steelblue"), 
                      breaks = c("With", "Without"))+
@@ -239,7 +239,7 @@ p2 <- filter(outdf, social==0) %>% slice_head(by=sim, n=1) %>%
   ggplot(aes(overlap, (foi_full1/foi_ud)))+
   geom_hline(yintercept = 1,linetype=2)+
   geom_point()+
-  theme_minimal(base_size = 12)+
+  theme_minimal(base_size = 14)+
   labs(x = "Home Range Overlap", y = "FOI ratio")
   # scale_y_log10()
 p2
@@ -318,7 +318,7 @@ p4 <- outdf %>%  group_by(sim) %>%
   geom_hline(yintercept = 1, linetype=2)+
   geom_point(show.legend = F, position = position_dodge(width = 0.2))+
   scale_y_log10()+
-  theme_minimal(base_size = 12)+
+  theme_minimal(base_size = 14)+
   labs(x = "Decay time (days)", y = "FOI ratio", color = "Interaction")+  
   scale_color_discrete(type=hcl.colors(4, "BluGrn", rev=T))
 p4
@@ -341,9 +341,11 @@ p5 <- outdf %>% filter(near(nu, 1/2), social %in% c(0,0.7,0.96,1)) %>%
   ggplot(aes(Ax/Atoti/1e4,foi_full1/mean(foi_full1), color = factor(social)))+
   # stat_smooth(method = "lm", se = F)+
   geom_point(show.legend = F)+
-  theme_minimal(base_size = 12)+
-  labs(x = expression(paste("Relative cell size (",A[x]/A[tot],")")), y = "Relative FOI", color = "Interaction")+
-  scale_color_discrete(type=hcl.colors(4, "BluGrn", rev=T))
+  theme_minimal(base_size = 14)+
+  labs(x = expression(paste("Relative cell size ",A[x]/A[tot],"(%)")), y = "Relative FOI", color = "Interaction")+
+  scale_color_discrete(type=hcl.colors(4, "BluGrn", rev=T))+
+  # scale_x_continuous(labels = \(x) parse(text=gsub("e", " %*% 10^", scales::scientific_format()(x))))
+  scale_x_continuous(labels = \(x) x*100)
 # theme(legend.text = element_text(size = 10), legend.title = element_text(size=11))
 p5
 p6 <- outdf %>% filter(near(nu, 1/2), social %in% c(0,0.7,0.96,1)) %>% 
@@ -352,7 +354,7 @@ p6 <- outdf %>% filter(near(nu, 1/2), social %in% c(0,0.7,0.96,1)) %>%
   geom_hline(yintercept = 1, linetype=2)+
   # stat_smooth(method = "lm", se = F)+
   geom_point(show.legend = F)+
-  theme_minimal(base_size = 12)+
+  theme_minimal(base_size = 14)+
   labs(x = expression(paste("Relative cell size (",A[x]/A[tot],")")), y = "FOI ratio", color = "Interaction")+
   scale_color_discrete(type=hcl.colors(4, "BluGrn", rev=T))+
   theme(legend.text = element_text(size = 10), legend.title = element_text(size=11))+
@@ -373,9 +375,9 @@ p.len <- lendb %>% ggplot(aes(nsteps,foi_full1/foi_ud))+
 p.len
 
 # Export combined figure
-pdf("docs/figures/sim_results.pdf", width = 9,height = 6)
-ggarrange(p1,p2,p5,p4,p.len,
-          legend.grob = get_legend(list(p1,p3)), legend = "right", align = "hv", labels="auto")
+pdf("docs/figures/sim_results.pdf", width = 8.6,height = 6)
+ggarrange(p1,p2,p5,p4,p.len,as_ggplot(get_legend(p3)), align = "hv", labels=c("a","b","c","d","e"))+
+  theme(plot.margin = unit(c(2,5,2,2),"mm"))
 dev.off()
 
 
