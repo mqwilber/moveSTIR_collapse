@@ -1,0 +1,398 @@
+﻿\documentclass[11pt]{article}
+\usepackage[sc]{mathpazo} %Like Palatino with extensive math support
+\usepackage{amsmath}
+\usepackage{fullpage}
+\usepackage[authoryear,sectionbib,sort]{natbib}
+\linespread{1.7}
+\usepackage[utf8]{inputenc}
+\usepackage{lineno}
+\usepackage{titlesec}
+\usepackage{graphicx}
+\titleformat{\section}[block]{\Large\bfseries\filcenter}{\thesection}{1em}{}
+\titleformat{\subsection}[block]{\Large\itshape\filcenter}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}[block]{\large\itshape}{\thesubsubsection}{1em}{}
+\titleformat{\paragraph}[runin]{\itshape}{\theparagraph}{1em}{}[. ]\renewcommand{\refname}{Literature Cited}
+
+%%%%%%%%%%%%%%%%%%%%%
+% Line numbering
+%%%%%%%%%%%%%%%%%%%%%
+%
+% Please use line numbering with your initial submission and
+% subsequent revisions. After acceptance, please turn line numbering
+% off by adding percent signs to the lines %\usepackage{lineno} and
+% to %\linenumbers{} and %\modulolinenumbers[3] below.
+%
+% To avoid line numbering being thrown off around math environments,
+% the math environments have to be wrapped using
+% \begin{linenomath*} and \end{linenomath*}
+%
+% (Thanks to Vlastimil Krivan for pointing this out to us!)
+
+\title{Correlated host movements can reshape spatio-temporal disease dynamics: modeling the contributions of space use to transmission risk using movement data}
+
+% This version of the LaTeX template was last updated on
+% May 11, 2023.
+
+%%%%%%%%%%%%%%%%%%%%%
+% Authorship
+%%%%%%%%%%%%%%%%%%%%%
+% Please remove authorship information while your paper is under review,
+% unless you wish to waive your anonymity under double-blind review. You
+% will need to add this information back in to your final files after
+% acceptance.
+
+\author{Juan S. Vargas Soto$^{1}$ \\
+Justin Kosiewska$^{1}$ \\
+Lisa I. Muller$^{1}$ \\
+Dan Grove$^{1}$ \\
+Dailee Metts$^{1}$ \\
+Mark Q. Wilber$^{1, \ast}$
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\noindent{} 1. School of Natural Resources, University of Tennessee, Knoxville, TN
+
+\noindent{} $\ast$ Corresponding author; e-mail: mwilber@utk.edu.
+
+\bigskip
+
+\textit{Manuscript elements}: Figures 1-5, Appendices A-E 
+
+\bigskip
+
+\textit{Keywords}: transmission; contact; wildlife disease; spatial overlap; utilization distribution; animal movement
+
+\bigskip
+
+\textit{Manuscript type}: Article. %Or note, natural history miscellany note, comment, reply, invited symposium, featured topic, or historical perspective.
+
+\bigskip
+
+\noindent{\footnotesize Prepared using the suggested \LaTeX{} template for \textit{Am.\ Nat.}}
+
+\linenumbers{}
+\modulolinenumbers[3]
+
+\newpage{}
+
+\section*{Abstract}
+
+Despite decades of epidemiological theory making relatively simple assumptions about host movements, it is increasingly clear that non-random movements drastically affect disease transmission. To better predict transmission risk, theory needs to simultaneously account for how the environment affects host space use and how social dynamics affect correlation in space use. We develop new theory that decomposes the relative contributions of fine-scale space use and correlated movements to spatio-temporal transmission risk. Using analytical results, simulations, and empirical movement data, we show that even weak correlations can increase transmission risk by orders of magnitude compared to independent movement. Accounting for correlation is especially critical for pathogens with direct transmission or short environmental persistence. Our theory provides clear expectations for what has been observed empirically but largely ignored in disease models---movement correlation can reshape epidemiological landscapes, creating transmission hotspots whose magnitude and location are not necessarily predictable from spatial overlap alone.
+
+\newpage{}
+
+\section*{Introduction}
+
+Individual movement is a critical factor influencing wildlife disease dynamics \citep{Dougherty2018,Manlove2022};
+Movement determines encounters with other individuals of the same species, other species, or pathogens in the environment \citep{Martinez-Garcia2020,Das2023}. 
+These encounters are necessary for the transmission of infectious diseases, and efforts have sought to identify where they occur, how often, and how they are influenced by environmental and social drivers \citep{Titcomb2021,Dougherty2022,Webber2023}. 
+Formally linking social factors, environmental factors, animal movement, contact, and pathogen transmission would improve our ability to predict and prevent outbreaks and represent a significant advancement for management of wildlife diseases.  
+Nevertheless, understanding how these processes interact at an individual scale requires detailed movement information and theory to translate movement into an epidemiological context.
+
+
+Most epidemiological theory is built upon the assumption of independent host movements, and there is little theory that quantifies how non-independent, correlated movements affect contact and transmission risk. Despite a large body of empirical work that quantifies how correlated and social movements can reshape contact and transmission landscapes \citep[e.g.,][]{Kjaer2008,Grear2010,Schauber2015a}, we lack models that isolate the role of social interactions on spatio-temporal force of infection (FOI, the risk of transmission experienced by a host per unit time). This limits our ability to ask questions like: how do non-independent movements affect spatio-temporal infection risk, compared to spatial overlap? Moreover, recent studies have shown that spatial transmission risk can be highly localized \citep{Albery2021} and is not necessarily predicted by animal space use \citep{Yang2023a}. We hypothesize that non-independent animal movements can (at least partially) account for these observations and develop a modeling approach to rigorously test this hypothesis and systematically quantify the contribution of space use and correlated movements to spatio-temporal transmission risk.
+
+Recent developments at the interface of movement and disease ecology leverage high-resolution animal tracking data to gain insight into contact among individuals and disease transmission \citep{Richardson2015,Wilber2022,Yang2023}. For example, movement-driven spatio-temporal infection risk (MoveSTIR) builds dynamic contact networks from movement data to estimate individual risk of infection across space and time \citep{Wilber2022}. MoveSTIR provides a theoretical foundation to translate contacts into the epidemiological currency of FOI. These studies have highlighted the importance of individual heterogeneity and temporal scale for epidemiology, particularly how indirect contact---individuals at the same place at different times---can significantly reshape contact and transmission networks \citep{Richardson2015,Yang2023}. Current approaches are nonetheless based on occurrence, rather than range, distributions \citep[in the terminology of ][]{Alston2022} -- meaning they only consider where animals were and not where they \emph{potentially} could be. This approach makes it difficult to systematically link encounters with environmental drivers, and to predict how social or environmental changes affect contact and transmission. 
+
+Alternatively, spatio-temporal contact could be studied probabilistically, using utilization distributions (UDs). The UD represents the probability---transient or long-term \citep{Tao2016}---of an organism using some area \citep{Worton1989}. The high spatial and temporal resolution of modern tracking data serves to build UDs based on biologically realistic movement models \citep{Kranstauber2012,Fleming2014}, and to link them with underlying resources \citep{Potts2023}.
+Additionally, combining individual UDs informs about pairwise interactions, by allowing to quantify home range overlap \citep{Winner2018}, or to estimate the expected location and rate of encounters \citep{Noonan2021}, which could serve to infer transmission risk \citep{Godfrey2010, Godfrey2013,Noonan2021}. 
+Moreover, because UDs can be directly linked to environmental drivers of movement \citep{Signer2017}, they could be used for prospective analyses, to predict contact and transmission in novel environments, or to understand cascading effects of environmental and social perturbations from individual movement to population and landscape-level disease transmission. 
+
+Current contact metrics based on UDs focus only on direct interaction, ignoring temporal dynamics that are especially relevant for epidemiological processes. The Conditional Distribution of Encounters (CDE) \citep{Noonan2021}, for example, estimates local probabilities of encounter assuming that individuals move independently.
+While a useful simplification, social interactions like territoriality or gregariousness can invalidate this assumption \citep{Manlove2018,Sah2018}. In these cases, temporal correlations in space use could increase or decrease the probability of encounter expected given independent movement \citep{Kjaer2008,Schauber2015a}. 
+Moreover, direct interactions do not necessarily equate to \emph{epidemiological contacts}, which comprise contact formation, contact duration, pathogen acquisition, pathogen shedding, and pathogen decay. As some pathogens can persist in the environment for months or years (e.g. anthrax, chronic wasting disease--CWD), ignoring these processes could severely underestimate transmission risk \citep{Wilber2022,Yang2023,Richardson2015}.
+
+% The previously developed MoveSTIR implicitly accounts for such correlations, but only applies for observed data. In contrast, the CDE provides a basis for estimating encounter probabilities across the landscape, but ignores correlated movements and temporal dynamics of indirect contact.
+% To assess the role correlated movement can play of epidemiological landscapes \citep[\emph{sensu}][]{Manlove2022} an approach is needed that combines the range-distribution inference of UDs and CDEs \citep{Alston2022,Noonan2021} with the epidemiological focus of MoveSTIR to link UDs with epidemiological dynamics. 
+
+Here, we develop a model we refer to as Probabilistic MoveSTIR (PMoveSTIR) to estimate epidemiological contact and expected FOI across space and time from UDs and correlated animal movements. We derive a general model that links transient, spatially heterogeneous UDs to transmission, and provide modifications to consider stationarity in space or time.
+Deriving analytical results and applying PMoveSTIR to simulated data, we demonstrate the sometimes sizable importance of correlated host movements on  transmission risk, indicating that ignoring social drivers of contact could severely bias epidemiological inference. Using data on movement of white-tailed deer (\emph{Odocoileus virginianus}), we show that correlated movements can increase potential FOI by orders of magnitude for a hypothetical directly transmitted pathogen but are relatively unimportant for a hypothetical pathogen with long persistence times. Moreover, non-independent movements can yield highly heterogeneous transmission landscapes, supporting the emerging idea that fine-scale patterns of transmission dynamics are common in wildlife \citep{Albery2021} and are contributed to by correlated host movements. By precisely quantifiying the two fundamental components of non-random movements, fine-scale space use and correlation in movement, PMoveSTIR is a key next step for developing predictive models that link movement data to spatio-temporal infection dynamics on real landscapes.
+
+\section*{Methods}
+
+\subsection*{Model development - Linking utilization distributions to transmission through PMoveSTIR}
+
+PMoveSTIR builds on the MoveSTIR model \citep{Wilber2022} and formally links UDs, direct and indirect contacts, correlated movements, and spatial estimates of FOI. Essentially, we want to know, for two individuals $i$ and $j$ moving and interacting across a landscape, what the FOI $i$ experiences from $j$, across space and time is.  
+
+As in MoveSTIR, we assume that transmission happens by an infected host depositing pathogen into the environment and another host picking that pathogen up. 
+Deposition and acquisition can represent a range of processes, from coughing and inhaling in a matter of seconds, to depositing parasite eggs or larvae in the environment and another individual consuming these days or weeks later. 
+Considering transmission through deposition and acquisition clearly links direct and indirect transmission along a continuum \citep{Wilber2022}, and it encompasses standard density-dependent transmission as a special case \citep{Cortez2021}. 
+
+In PMoveSTIR, ``contacts'' occur if both individuals visit a given location $x$, which could be a habitat patch or a grid cell. 
+Locations $x$ do not overlap so the sum of their areas equals some total area over which individuals can move (see Appendix A for a derivation when $x$ is a point, not an area). 
+Furthermore, we assume that the likelihood of contact is uniform within $x$, consistent with a so-called top-hat encounter function \citep{Gurarie2013,Wilber2022}.
+
+Given these assumptions, we define the pairwise FOI host $j$ exerts on host $i$ in location $x$ at time $t$ as \citep{Wilber2022}
+\begin{equation}
+    h_{i \leftarrow j}(t, x) = \int_{-\infty}^{t} \beta' \lambda \delta_{x_j(u)}(x) \delta_{I_j(u)}(I) S(t - u) du
+    \label{eq:original_foi}
+\end{equation}
+where $\lambda$ is the pathogen deposition rate, $\delta_{x_j(u)}(x)$ is an indicator variable that is one if host $j$ is in location $x$ at time $u$ and zero otherwise, $\delta_{I_j(u)}(I)$ is an indicator function that is one if host $j$ is infected at time $u$ and zero otherwise, and $S(t-u)$ is the probability that  pathogens deposited at time $u < t$ are still transmissible at time $t$ \citep[see][for a full derivation]{Wilber2022}. 
+The term $\beta'$ is the rate at which host $i$ acquires pathogen within location $x$ and can be re-written as $\tilde{\beta} / A_x$, where $\tilde{\beta}$ can be considered a ``search efficiency'' term, with units area/time (e.g., $m^2 / day$), and $A_x$ gives the area of location $x$ (e.g., 100 $m^2$). 
+Therefore, the total acquisition rate scales with the area in which contact can occur; in larger areas, the acquiring host would have to search for longer to encounter an infectious dose, reducing the total acquisition rate and the corresponding FOI. Moving forward, we assume that the depositing host is always infected, and shedding pathogen infectious stages at a constant rate. This assumption is equivalent to building a contact network and also represents the structural form of FOI needed to compute pathogen invasion thresholds \citep{Wilber2022}.
+
+Considering probabilistic space use (i.e., we know where an individual is at a given time and location with some probability), we can re-write equation \ref{eq:original_foi} as
+\begin{equation}
+    h_{i \leftarrow j}(t, x) = \int_{-\infty}^{t} \beta' \lambda \delta'_{x_i(t)}(x) \delta'_{x_j(u)}(x) S(t - u) du
+    \label{eq:prob_foi}
+\end{equation}
+where $\delta'_{x_i(t)}(x)$ is a random variable that specifies whether host $i$ is in location $x$ at time $t$ (defined equivalently for $j$).  This means that $h_{i \leftarrow j}(t, x)$ is also a random variable, and we can express its expected value as 
+\begin{equation}
+    E[h_{i \leftarrow j}(t, x)] := h^*_{i \leftarrow j}(t, x) = \int_{-\infty}^{t} \beta' \lambda E[\delta'_{x_i(t)}(x) \delta'_{x_j(u)}(x)] S(t - u) du.
+    \label{eq:expected_foi}
+\end{equation}
+Interpreting this expectation, we are asking: if we simulated some movement process thousands of times, what is the probability that host $i$ is in location $x$ at time $t$, and host $j$ was in $x$ at a previous time $u$? 
+
+\subsubsection*{Linking equation \ref{eq:expected_foi} to utilization distributions}
+
+For two random variables $Y$ and $Z$, $E[YZ] = E[Y]E[Z] + Cov(Y, Z)$.  We can therefore write equation \ref{eq:expected_foi} as
+\begin{equation}
+    \begin{aligned}
+        h^*_{i \leftarrow j}(t, x) &= \int_{-\infty}^{t} \frac{\tilde{\beta}}{A_x} \lambda E[\delta'_{x_i(t)}(x) \delta'_{x_j(u)}(x)] S(t - u) du \\
+        &= \frac{\tilde{\beta}}{A_x} \lambda \int_{-\infty}^{t} [E[\delta'_{x_i(t)}(x)] E[\delta'_{x_j(u)}(x)] + Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x))] S(t - u) du \\
+        &= \frac{\tilde{\beta}}{A_x} \lambda \int_{-\infty}^{t} [p_i(x, t) p_j(x, u) + Cov(\delta'_{x_i(t)}(x), \delta'_{x_j(u)}(x))] S(t - u) du \\
+    \end{aligned}
+    \label{eq:foi_cov}
+\end{equation}
+where we use the fact that the expectation of an indicator variable is a probability \citep{Grimmett2001}. The terms $p_i(x, t)$ and $p_j(x,u)$ give the probabilities that host $i$ and $j$ are in location $x$ at times $t$ and $u$, respectively, and can also be written as $p_i(x, t) = \int_{A_x} f_i(s, t) ds$ where $f_i(s, t)$ is the probability density of host $i$ using the point $s$ at time $t$ and the integral is over the area $A_x$ (defined equivalently for host $j$). Thus, we have obtained an equation that links the transient utilization distributions $f_i(s, t)$ and $f_j(s, u)$ with the spatio-temporal FOI.
+This general PMoveSTIR formulation accounts for heterogeneity in space and time, but the model can consider other scenarios, such as uniform space use, time-varying UDs, or UDs stationary in time (Fig. \ref{fig:square}, Appendix B, C). 
+
+For example, when UDs are stationary in time, and pathogen decays exponentially in the environment at rate $\nu$, equation \ref{eq:foi_cov} becomes (derivation in Appendix B)
+
+\begin{equation}
+    \begin{aligned}
+    h^*_{i \leftarrow j}(x) = \beta' \lambda [ \underbrace{p_i(x)p_j(x) \frac{1}{\nu}}_{\substack{\text{FOI contribution from} \\ \text{shared space use}}} + \sigma_i(x) \sigma_j(x) \underbrace{\int_{0}^{\infty} Cor(\delta_{i \in x}, \delta_{j \in x} | s) e^{-\nu s} ds}_{\substack{\text{FOI contribution from} \\ \text{correlated movement}}}.
+    \end{aligned}
+    \label{eq:stationary_cor}
+\end{equation}
+where $\sigma_i(x) = \sqrt{p_i(x)(1 - p_i(x))}$  is the standard deviation in probability of host $i$ using location $x$.  Importantly, this shows that the expected FOI between two individuals is a result of 1) shared space use, and 2) correlation in host movements across different time lags.  
+
+\subsection*{Analytical and simulation insight into correlated movement and FOI}
+
+Leveraging PMoveSTIR, we used analysis and simulation to ask: how much can correlated movements affect spatio-temporal infection risk for directly and indirectly transmitted pathogens relative to spatial overlap? 
+First, we used PMoveSTIR to derive equations that explicitly quantify how much correlation can augment or reduce force of infection due to direct or indirect contact compared to random movement. Using an example with direct contact, we then show how correlation in movement at the pairwise level can scale up to affect the dynamics of mean-field, population models that assume density-dependent transmission and random movement.
+Second, we used simulations to explore how temporally correlated movements affect  transmission, and how the pairwise FOI estimate depends on epidemiological factors such as contact distance and pathogen decay. Additionally, empirically estimating the correlation component in equation \ref{eq:stationary_cor} depends on the amount of data available. Therefore, we also explored the implications of tracking duration (the total time an animal is tracked) on the estimated FOI. For the simulations, we focused on the lower-right corner of Fig. \ref{fig:square} (equation \ref{eq:stationary_cor}), where we assumed statistical stationarity in movement. The process for calculating the FOI across the landscape is summarized in Fig. \ref{fig:steps}.
+
+We simulated 20 replicate movement tracks for each combination of parameters. In every simulation, two individuals moved around established home ranges according to an Ornstein-Uhlenbeck process; i.e., they move randomly but are attracted back towards the center of their home range as they drift away. To create different levels of correlation, we modified the initial simulated tracks using a convolution approach with a social interaction kernel \citep{Scharf2018}. This method accounts for constant or temporally varying attraction between pairs of individuals. For our purposes we assumed attraction strength was constant in time, but varied across pairs from 0 (completely independent movement) to 1 (joint movement). %Strong interactions led to similar and highly overlapping trajectories, which could represent animals in a herd, courting/mating pairs, or parents with their offspring.
+For every scenario, we fitted continuous-time movement models (CTMM) to the simulated tracks, and estimated individual UDs using autocorrelated kernel density estimation \citep[AKDE, ][]{Calabrese2016}. We estimated the UDs on a grid of square cells, where the cell side $d$ is the approximate threshold contact distance for epidemiological contact. 
+
+We used the UDs to calculate the product of the probabilities of use ($p_i(x)p_j(x)$) and the product of their standard deviations ($\sqrt{p_i(x)(1-p_i(x))}\sqrt{p_j(x)(1-p_j(x))}$) for each grid cell. Both products are symmetrical for every pair of individuals. 
+The lagged correlation term in equation \ref{eq:stationary_cor} is calculated based on the position history for each individual at locations that both visited (locations that only one or neither individual visited have a correlation of zero). The position history is a binary vector that specifies whether each individual was present (1) or absent (0) at location $x$ at time $t$. 
+The order of visits matters, so these correlation values can be asymmetric between individuals. 
+Correlations can appear spuriously even in the absence of a true interaction, particularly for time series that are autocorrelated. To address this issue, we performed a pre-whitening step to remove the potential effects of autocorrelation on the estimated cross-correlation. Pre-whitening consists of fitting an autoregression model to one of the series, and filtering both time series using the coefficients from that model \citep{Dean2016}. Additionally, we retained only correlation values deemed significantly different from 0, i.e. correlations with absolute values greater than a threshold of $1.96/\sqrt(N)$, where $N$ is the length of each time series \citep{Dean2016}. All other values were set to 0 as they are considered random noise.
+We then scale each correlation value by the exponential pathogen survival function $S(s) = e^{-\nu s}$, where $s$ is the lag corresponding to each cross-correlation (between 0 and $t-dt$), $dt$ is the (constant) time lag between observations, and $\nu$ is the decay rate of the pathogen in the environment. 
+
+Substituting the terms in equation \ref{eq:stationary_cor} and scaling by the epidemiological parameters $\tilde\beta\lambda/ A_x$ we obtain the per-cell FOI. 
+Through these simulations we explore how the expected FOI is influenced by correlation in space use, home range overlap, pathogen decay rate, and contact distance. 
+
+\subsection*{Empirical application - White-tailed deer}
+
+To test the role of space-use and correlated movements on potential transmission risk in a real system, we applied the PMoveSTIR model to GPS-tracking data for five white-tailed deer from Ames Plantation, Tennessee, USA (one adult male and four adult females). 
+Deer were captured and equipped with GPS collars that recorded fixes every 30 minutes (Lotek LiteTrack Iridium 420, Newmarket, Ontario, Canada; IACUC \# 2850-1021 from the University of Tennessee).  All individuals used in this study were captured at the end of March 2023 but we only included movement data from May to June in this study, to eliminate any effects of capture.  As for the simulations, we used CTMM and AKDE to estimate individual UDs \citep{Calabrese2016}. We used the CTMMs to interpolate the positions to regular 10-minute intervals, to fill in missed positions, and to get the same timestamps across individuals \citep{Yang2023}.  Assuming a threshold contact distance of $d=10$m, we divided the landscape in a grid of 10x10m cells. 
+
+We modeled two hypothetical pathogens. The first pathogen had a relatively short persistence time in the environment, surviving for an average of 1 hour  ($\nu=1\text{ h}^{-1 }$). In this case, transmission is largely direct and this might represent a pathogen like SARS-COV-2, which can infect and transmit between white-tailed deer \citep{Hale2022}. The second hypothetical pathogen had a long persistence time, remaining viable for over a year on average ($\nu=0.9 \text{ yr }^{-1}$). In this case, transmission is largely indirect and might reflect a pathogen like CWD, which can transmit directly and indirectly between deer and can persist for years in the environment \citep{Saunders2012a}. The $\beta'$ and $\lambda$ parameters are scalars in PMoveSTIR and do not affect any relative comparisons, so we set them both to unity. As in the simulations, we pre-whitened and filtered correlation values to remove potentially spurious correlations. 
+We used these data to explore how differences in overlap across home ranges and correlated movement influence the expected FOI with real animal trajectories.
+
+\section*{Results}
+
+\subsection*{The importance of correlated movements on FOI -- analytical results}
+
+Consider the situation where movement is statistically stationary and hosts use space uniformly (equation S11). 
+For illustrative purposes, consider two hosts moving together across some area $A_{tot}$. We assume that 1) hosts spend $\eta$ time units within a habitat patch/grid cell before moving to the next one, 2) the pathogen survival function $S(s)$ is a step function with a survival probability of one when lag $s \leq \pi \eta$ and zero when $s > \pi \eta$.  
+The term $\pi \eta$ gives the time the pathogen survives in the environment as a function of host residence time, where $\pi$ ranges from near zero for directly transmitted pathogens to some arbitrarily large number for pathogens with long environmental persistence.  
+In this scenario, transmission can only occur while both animals are in the same patch. With these assumptions, we can rewrite equation equation S11 as 
+\begin{equation}
+    \begin{aligned}
+        h^*_{i \leftarrow j}(A_x) = \beta' \lambda \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} \pi \eta + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \int_{0}^{\pi \eta} Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) ds\right],
+    \end{aligned}
+    \label{eq:uniform_stationary2}
+\end{equation}
+recognizing that $\sigma_i(x) \sigma_j(x) = \sqrt{\frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}})}\sqrt{\frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}})} = \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}})$ when both hosts are using space uniformly.
+
+For hosts that are moving together, $\rho = Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ will be exactly unity when lag $s = 0$ and near unity when lag $s$ is near zero. When pathogens are strictly directly transmitted, $\pi$ is also small and if $\pi \eta << \eta$ then we can reasonably approximate $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s) = \rho = 1$ for s from 0 to $\pi \eta$.  We can then write equation \ref{eq:uniform_stationary2} as 
+
+\begin{equation}
+    \begin{aligned}
+        h^*_{i \leftarrow j}(A_x) = \beta' \lambda \pi \eta \left[\underbrace{\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}}}_{\substack{\text{Contribution due} \\  \text{to habitat overlap}}} + \underbrace{\frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}})}_{\substack{\text{Contribution due} \\ \text{to correlated movement}}} \right].
+    \end{aligned}
+    \label{eq:uniform_direct}
+\end{equation}
+The relative contribution of correlation in movement with respect to the contribution due to habitat overlap is simply $(1 - (A_x / A_{tot})) / (A_x / A_{tot})=A_{tot}/A_x-1$. 
+Thus, PMoveSTIR allows us to put intuitive bounds on the importance of correlated movements for direct transmission risk. 
+As the area $A_x$ in which an epidemiological contact can occur gets smaller relative to the total area in which the hosts are moving $A_{tot}$, correlated movement can have an orders of magnitude larger contribution to direct transmission FOI than habitat overlap (Fig. \ref{fig:analytical_corr}). 
+This finding makes sense but is almost never considered in epidemiological models. If the area of potential contact is small and hosts are moving randomly, there is a very low chance that hosts will be there together at the same time. Correlated movements significantly increase this chance, even when correlation is low (e.g. 0.1). The contribution of correlation to FOI can be 10 times greater than spatial overlap if the area of contact is small (e.g., $<$ 5\% of the total area; Fig. \ref{fig:analytical_corr}). Large correlations across multiple areas result in a significantly greater FOI across the entire landscape. 
+
+In contrast, when $A_x$ approaches $A_{tot}$ (or more generally when the probability of using a particular area is very high), the importance of correlated movement relative to habitat overlap becomes minimal (Fig. \ref{fig:analytical_corr}). For example, if two hosts use a particular area together because of high resource availability, then it does not matter for FOI if social factors are leading to additional correlated movement. This result extends beyond epidemiological contexts and shows when correlated movements can significantly alter contact risk based on metrics such as home range overlap or CDE.  In Appendix D, we expand this example to examine the effects of correlated movement on FOI given indirect transmission.
+
+\subsection*{Scaling up to the population-level -- analytical results}
+
+Using equation \ref{eq:uniform_direct}, we can also understand the implications of correlated movement for standard mean-field models often used in disease ecology. To do this, consider a standard \textbf{S}usceptible-\textbf{I}nfected-\textbf{R}ecovered model at the individual-level, where $p_{i, S}(t)$, $p_{i, I}(t)$, and $p_{i, R}(t)$ are the probability that individual $i$ is in the S, I, or R state at time $t$, respectively.  If individuals are moving on a gridded landscape without overlapping areas (our assumption from above), we can write down a set of ordinary differential equations that describe the individual-level transitions in the system
+
+\begin{equation}
+    \begin{aligned}
+        \frac{d p_{i, S}(t)}{dt} &= -p_{i, S}(t) \sum_{j \in N_{-i}} p_{j, I}(t)  \sum_{x \in Area} h_{i \leftarrow j}^*(x, t) \\
+        \frac{d p_{i, I}(t)}{dt} &= p_{i, S}(t) \sum_{j \in N_{-i}} p_{j, I}(t)  \sum_{x \in Area} h_{i \leftarrow j}^*(x, t) - \gamma p_{i, I}(t) \\
+        \frac{d p_{i, R}(t)}{dt} &= \gamma p_{i, I}(t) \\
+    \end{aligned}
+    \label{eq:sir_individual}
+\end{equation}
+where $\sum_{j \in N_{-i}}$ is summing over all individuals in the population excluding $i$, $\sum_{x \in Area}$ is summing over all gridded areas on the landscape, and $h^*_{i \leftarrow j}(x, t)$ is the force of infection felt by $i$ from $j$ at location $x$ at time $t$. Substituting a slight modification of equation \ref{eq:uniform_direct} for $h^*_{i \leftarrow j}(x, t)$ we can write 
+
+$$
+h^*_{i \leftarrow j}(x, t) = \frac{\tilde{\beta} \lambda \pi \eta}{A_x} \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \rho \right].
+$$
+where $\rho$ is the pairwise correlation between $i$ and $j$ at location $x$, which we assume to be the same across individuals and locations for this derivation. Plugging $h^*_{i \leftarrow j}(x, t)$ into equation \ref{eq:sir_individual}, summing each equation over all $N$ individuals in the population, and assuming $N$ is sufficiently large, we get (derivation in Appendix E)
+
+\begin{equation}
+    \begin{aligned}
+        \frac{d S(t)}{dt} &= - S(t) \underbrace{\beta^* [1 + (1 - \frac{A_x}{A_{tot}})n\rho] I(t)}_{\text{Force of infection}}  \\
+        \frac{d I(t)}{dt} &=  S(t) \underbrace{\beta^* [1 + (1 - \frac{A_x}{A_{tot}})n\rho] I(t)}_{\text{Force of infection}} - \gamma I(t) \\
+        \frac{d R(t)}{dt} &= \gamma I(t) \\
+    \end{aligned}
+    \label{eq:sir_with_corr}
+\end{equation}
+where $n = A_{tot} / A_{x}$ is the number of grid cells that compose the landscape of area $A_{tot}$ and $\beta^* = \frac{\tilde{\beta} \lambda \pi \eta}{A_{tot}}$. When correlation $\rho = 0$, we get back the well-known SIR model with density-dependent transmission.  However, when $\rho \neq 0$ correlation increases or decreases the force of infection compared to the standard mean-field model, depending on the sign of $\rho$.  Moreover, as contacts occur in smaller areas (i.e., individuals need to be closer to each other for contact and transmission to occur), $A_x / A_{tot}$ gets smaller and even small values of $\rho$ can change epidemiological dynamics.  This effect is because as $A_x$ goes to zero, $A_x / A_{tot}$ also goes to 0 and $n$ goes to infinity, augmenting the effects of a non-zero $\rho$. The key point is that even low levels of correlation can significantly alter epidemiological dynamics relative to mean field models.  To further emphasize this point, the basic reproduction number for the model given above is $R_0 = \frac{\beta^* [1 + (1 - \frac{A_x}{A_{tot}})n\rho] N}{\gamma}$. Positive $\rho$ increases $R_0$ relative to the mean-field SIR model (i.e., $R_0$ when $\rho = 0$), increasing the generational explosive spread of a pathogen invading a population.
+
+\subsection*{Simulation study}
+
+%The overall FOI varied more than four orders of magnitude among simulations, in response to both movement and epidemiological parameters. 
+\subsubsection*{Effect of correlated movement on pairwise FOI}
+
+In our simulations, greater interaction strengths led to higher overlap among home ranges, but there were also pairs moving independently with similarly high  ($>$0.9) overlap. 
+These scenarios allowed us to compare the FOI while teasing apart the effects of spatial overlap and temporal correlation in space use. 
+
+The FOI was higher for pairs with higher interaction values (i.e. with stronger attraction), in part due to the resulting increase in spatial overlap. 
+However, we saw an even greater increase in FOI when we accounted for temporal correlation, and the difference between the two increased with higher interaction strengths (Fig. \ref{fig:simresults}a). For very similar trajectories (interaction$>$0.9), the FOI with correlation was more than ten times the FOI estimated without correlation, and there was a more than 100-fold difference for perfectly overlapping trajectories.  
+
+% Methods that ignore temporal correlation could therefore be significantly underestimating transmission risk. 
+
+The FOI was generally greater when we accounted for correlation; in only 19\% of cases the estimates were equal with or without correlation, and in no instance was there a decrease. This effect is to be expected as we only included attraction in the simulations. 
+We found that correlation could increase the estimated FOI even for pairs that moved independently. While this was generally rare (86\% of cases had less than 20\% increase),
+there were  instances where the estimated FOI was more than three times greater. Larger effects were more likely for pairs with a high degree of home range overlap (Fig. \ref{fig:simresults}d). 
+
+While the expected correlation is 0 when individuals move independently, joint space use could lead to apparent correlations, especially when there are few observations in a given cell. These correlations can persist after pre-whitening and removing the majority of statistically spurious correlations. Apparent correlations are important to consider when analyzing empirical data where the true correlation and the degree of attraction/avoidance among individuals are unknown. Temporal reshuffling methods such as those proposed by \citet{Spiegel2016} can be a useful tool to establish the baseline ``apparent'' correlations that appear for non-socially interacting individuals.
+
+\subsubsection*{Influence of epidemiological parameters}
+
+The FOI was inversely proportional to decay rate, meaning transmission risk is greater for pathogens that can survive longer in the environment, all else being equal (Fig. \ref{fig:simresults}b).
+However, the increase in FOI due to correlated movement is greatest for pathogens with short survival times. While longer pathogen survival times increase the probability of indirect epidemiological contact, the expected rate of encounter at longer lags approximates the expected rate of encounter under independent movement, so correlations at long lags have only a small modifying effect on the expected FOI (Fig. \ref{fig:simresults}e). 
+
+The effect of contact distance on FOI depended on interaction strength and the effect of correlation (Fig. \ref{fig:simresults}c). Consistent with our analytical results, when animals are highly correlated in their movements (i.e., have a high interaction strength) the importance of correlation is diminished as contact distances increase.
+However, our simulations also show that for non-perfectly overlapping individuals, longer contact distances can increase the probability of finding two individuals in the same cell sufficiently to offset the inherent reduction in transmission in larger areas (remember, $\beta' = \tilde{\beta} / A_x$), therefore increasing the relative contribution of correlation to FOI for trajectories that are already close in space (Fig. \ref{fig:simresults}c).
+
+\subsubsection*{Influence of data availability}
+
+ 
+With longer time series, the number of cells that both animals visited (where correlation is calculated) increased linearly. This resulted in greater overall FOIs (although local correlation values could decrease) with more tracking data (Fig. \ref{fig:simresults}e). 
+
+Since we did not include any environmental drivers of movement, the expected correlation is uniform across the landscape. The cumulative correlation, however, is not related to the product of either the UDs or the standard deviations. This result highlights the challenge of predicting an expected correlation based on currently used metrics of movement and space use.
+
+%Getting more data means that the correlations at the local (cell) level become more accurate, and that the correlation can be estimated for more locations. %Empirical movement studies should therefore try to ensure that the tracking duration is sufficient for the animals to cover the majority of their home range, so that estimated correlations are representative of the true underlying relationship. Given the complexity of the correlation, which may be determined through a combination of environmental factors and specific social interactions, predicting the underlying correlation surface could prove quite challenging. 
+
+\subsection*{Empirical example: white-tailed deer}
+
+The total potential FOI varied more than six orders of magnitude across pairs of deer, partially due to differences in spatial overlap, which ranged between 0 and 90\% (Bhattacharyya coefficient; Fig. \ref{fig:empiricalres}). While higher overlap generally correlated with higher FOIs, we estimated significantly higher values when we accounted for correlation in movement, and the difference was not necessarily related with overlap (Fig. \ref{fig:empiricalres}a-c).  For the pair with the highest spatial overlap, the FOI was more than ten times greater when we accounted for correlation. Temporally reshuffling the trajectories of these individuals following \citet{Spiegel2016} confirmed that this increase in FOI due to correlation was far beyond what we would expect from any  spurious, ``apparent'' correlations that could arise in independently moving hosts (as identified in our simulations). For all pairs considered, ignoring correlation could result in between 5\% and 96\% underestimation of FOI. These effects of correlation on FOI were strongest for pathogens with a fast decay rate. For a pathogen like CWD that can persist for very long in the environment, the FOI was virtually identical with or without correlation in host movement (Fig. \ref{fig:empiricalres}c). 
+
+Given the localized nature of interactions, the changes in overall FOI are caused by increases at particular cells. Consequently, the estimated FOI is heterogeneous across the landscape (Fig.\ref{fig:empiricalres}b). These effects at the local and individual scale affect population-level pathogen transmission. For example, given a simple Susceptible-Infected-Recovered model and short pathogen persistence time in the environment, the $R_0$ on our network of five individuals was more than ten times greater when we accounted for correlation (Fig. \ref{fig:empiricalres}d). Thus, we would predict more explosive transmission through a network that considers fine-scale space use and correlation compared to one that assumes independent movement.
+
+\section*{Discussion}
+
+We develop a new model, PMoveSTIR, that disentangles the contributions of spatial overlap and correlated movements to spatio-temporal contact and transmission risk.   Our results provide clear expectations for what has been previously observed empirically but largely ignored in movement and disease models -- correlation in movement can reshape epidemiological landscapes, leading to hotspots of transmission whose magnitude and location are not necessarily predictable from models of joint space use, in particular for directly transmitted or short-lived pathogens.  We linked our theory to standard mean-field population models in disease ecology to analytically show how even weak correlations in movement between pairs on the landscape can significantly alter population-level disease dynamics compared to standard assumptions of independent movement.
+
+% PMoveSTIR explicitly emphasizes processes relevant for transmission, such as contact---direct and indirect---among individuals, pathogen shedding and survival in the environment, and, importantly, correlation in space use. 
+% This framing sets our model apart from recent developments for inferring contact, which focus only on direct encounters and assume hosts move independently \citep{Noonan2021,Das2023}. This assumption can significantly underestimate transmission risk, with consequences for inferred disease spread across the population.
+
+PMoveSTIR provides a clear, quantitative guide to assess when fine-scale, temporally synchronous movement data are necessary for capturing disease dynamics and when coarser scale, asynchronous data focused strictly on UD estimation are sufficient. 
+In particular, we show that correlation in movement and synchronicity can be critical aspects of transmission for faster-paced pathogens, i.e. pathogens with short environmental persistence and transmission driven by short-term contacts \citep[cf.][]{Dougherty2018,Manlove2022}, such as canine distemper virus, rabies, or SARS-COV-2 (SCV2). 
+SCV2 is of particular public health interest and recent studies have shown that it can infect a wide-range of wildlife hosts, including white-tailed deer \citep{Palmer2021,Hale2022}. There is also evidence that white-tailed deer can transmit SCV2 between each other in controlled experiments and in the wild \citep{Martins2022,Hale2022}, suggesting SCV2 can successfully invade, spread, and persist in wildlife.  In our analysis of empirical white-tailed deer movements, we found that ignoring correlation in movements and focusing only on patterns of space use led to a ten-fold change in $R_0$ for a SCV2-like pathogen on even a simple network, with significant implications for pathogen spread.  In contrast, our simulation and empirical results show that correlation may only have marginal effects on transmission of pathogens with longer persistence times like CWD and anthrax, and joint space use would be largely sufficient for understanding local transmission risk.
+
+
+% Interestingly, transmission patterns of CWD in white-tailed deer only partially support this finding, as increased genetic relatedness (a proxy for social connectedness) increased the probability of infection beyond shared space use \citep{Grear2010}. Given the complex relationship between animal movements and time-lagged correlations (Fig. S1), there could be scenarios where correlations or direct contacts can disproportionately affect transmission risk even for pathogens with long environmental persistence.  PMoveSTIR provides a theoretical foundation to explore these scenarios in future studies.
+
+Correlations in space use that are not accounted for by UDs typically reflect social interactions, for example
+herding animals, parents with their offspring, or mates temporally moving together \citep{Scharf2016,Yang2021}. 
+White-tailed deer female groups, for example, have high social affinity. Thus, pairs of deer with equivalent habitat overlap have substantially higher contact rates when both individuals are within the same social group \citep{Schauber2007a,Kjaer2008,Schauber2015a,Grear2010}. This is likely the case in our empirical study; the pair with the greatest home range overlap and potential FOI was a mother--daughter pair. The overlap and interaction among them is consistent with the rose petal hypothesis \citep{Porter1991}, in which the home ranges of offspring radiate around the home range of their parent. The potential FOI in this case was over 10 times greater than for other pairs, despite similar degrees of habitat overlap. Importantly, 91\% of the total FOI (for a hypothetical directly transmitted pathogen like SCV2) would be missed if we only considered overlapping UDs for these individuals \citep[e.g., using a metric like CDE][]{Noonan2021}. While the importance of social interactions for contact rates has been documented previously in white-tailed deer \citep{Grear2010,Schauber2015a}, PMoveSTIR allows us to directly quantify the contribution of these social interactions to the FOI and move from qualitative conclusions to movement-informed quantitative models of disease invasion.
+
+In practice, however, correlations influencing FOI may arise from fine-scale temporal patterns of resource use unrelated to social interactions. For instance, consider two individuals independently visiting a common resource at similar times \citep[e.g., a watering hole,][]{VanderWaal2017}. If the resource is highly localized in space and time, the joint, stationary UD would not necessarily predict this as an area of high contact and transmission risk. Rather, observed contacts in this area would be associated with correlation in movement and not long-term, predicted space use.
+Alternatively, temporally varying UDs (i.e., the top right corner in Fig. \ref{fig:square}) would correctly capture that the joint occurrences were a result of spatio-temporal patterns of space use, reducing the relative importance of correlations on FOI. Unfortunately, non-parametrically estimating transient UDs at fine temporal scales with limited data points is not often feasible. Therefore, while the correlation term of PMoveSTIR will remain crucial to capture epidemiologically important spatial correlations in movement, it does not always provide an exact separation between spatial and social factors driving transmission risk.
+
+By linking movement data and inferred contact with underlying environmental factors, a broad goal of PMoveSTIR is to create an epidemiological risk landscape independent of geographical location \citep{Merkle2018,Manlove2022}. This landscape could enable out-of-sample prediction of transmission risk, for example to forecast future disease dynamics in the study population, project population-wide disease spread as information on more individuals becomes available, or quantify transmission risk for other populations in similar environments. Our model provides a generalizable theoretical foundation to perform similar analyses across different host-pathogen systems, and it can be integrated with any UD estimation method \citep{Signer2017,Merkle2018,Michelot2020,Potts2023}. In addition to movement covariates, PMoveSTIR can also incorporate spatially and temporally heterogeneous epidemiological parameters, for example pathogen survival rates that vary between habitats and seasons \citep{Daversa2017}, or spatially localized shedding \citep{Weinstein2018a}.
+
+% Previous studies have created system-specific models that make this link, for example using probabilities of use informed by step selection functions with environmental covariates to simulate local disease dynamics \citep{Merkle2018}.
+
+A key challenge for making out-of-sample predictions is empirically estimating the correlation surface.  While this term is well-defined in theory (equation \ref{eq:stationary_cor}), finite movement data can inherently only provide a patchy view of the true correlation surface (e.g., Fig. \ref{fig:steps}).  Our simulations showed that when animals were experiencing known social attraction at a time lag of zero, empirically estimated spatial correlations underestimated the contribution of correlation to FOI. This underestimation is not surprising because, without interpolation, we are limited to analyzing correlations where joint occurrences were observed and not where they potentially could have occurred. We did not use spatial interpolation tools (e.g., Kriging from a spatially-explicit statistical model, Clough-Tocher 2D interpolators, etc.) so our estimates provide a conservative view of how correlation could reshape epidemiological landscapes.  To adequately predict transmission landscapes out-of-sample, future work will need to develop robust approaches for estimating and predicting the entire correlation surface. 
+
+Predicting epidemiological landscapes from host movements relies on the key assumption that environmental characteristics strongly influence movement and space use. While there is a growing number of methods that quantify the effect of environmental characteristics on movement and habitat use \citep[reviewed in][]{Hooten2017a}, there has been much less work exploring how (and if) environment affects and predicts correlation and synchrony among hosts.  Therefore, an essential next-step for building epidemiological landscapes will be predictive models of spatio-temporal correlation among individuals \citep[e.g.][]{Brandell2021}.
+Our analyses emphasize the importance of this next step by showing that correlations at a local (cell) scale can create a vastly more heterogeneous transmission landscape. Moreover, correlations can lead to localized transmission hotspots that are not necessarily predictable from joint space use \citep{Yang2023a}, and may contribute to the growing empirical recognition that fine-scale, localized transmission hotspots are present in many empirical host-pathogen systems \citep{Albery2021}.  Whether these localized transmission hotspots are predictable \emph{a priori} remains to be seen, but ignoring correlated movements can make the task orders of magnitude more difficult for some pathogens.
+
+%%%%%%%%%%%%%%%%%%%%%
+% Acknowledgments
+%%%%%%%%%%%%%%%%%%%%%
+% You may wish to remove the Acknowledgments section while your paper 
+% is under review (unless you wish to waive your anonymity under
+% double-blind review) if the Acknowledgments reveal your identity.
+% If you remove this section, you will need to add it back in to your
+% final files after acceptance.
+
+\section*{Acknowledgments}
+
+Thanks to Dr. A. Houston, B. Trout, M. Turner and TWRA for capture and logistical support during fieldwork. Funding for this study was provided by the United States Department of Agriculture (USDA) National Institute of Food and Agriculture (McIntire Stennis project TEN00MS-113; Hatch Project 7001607) and the USDA American Rescue Plan (APP-21535). A portion of the computation for this work was performed on the University of Tennessee Infrastructure for Scientific Applications and Advanced Computing (ISAAC) computational resources.
+
+%%%%%%%%%%%%%%%%%%%%%
+% Statement of Authorship
+%%%%%%%%%%%%%%%%%%%%%
+% This section should also be commented out while your MS is undergoing
+% double-blind review. The specifics should of course be adapted to
+% your paper, but the paragraph below gives some hints of possible
+% contributions.
+
+% \section*{Statement of Authorship}
+
+% JSVS and MQW conceptualized and developed the methods. JSVS performed simulations and analyses. JK led collection of animal movement data, assisted by DG, LIM, DM, and MQW. JSVS wrote the first draft of the manuscript, and all coauthors contributed substantially to revisions. 
+
+\section*{Data and Code Availability}
+
+Data used in the manuscript, as well as code to generate simulations and analyze data, are available at \texttt{https://github.com/juansvs/moveSTIR\_collapse}
+
+\bibliographystyle{amnat.bst}
+\bibliography{references.bib}
+
+% \clearpage
+
+\begin{figure}
+    \includegraphics[width=\textwidth]{figures/conceptual_figure_pmovestir_mod.pdf}
+    \caption{Conceptual figure describing the model developed in this manuscript: probabilistic movement-driven modeling of spatio-temporal infection risk. PMoveSTIR can be thought of as square where the dimensions represent heterogeneity in space and time. The upper right-hand corner is the most general case: heterogeneous space use by hosts, and movement dynamics that are not statistically stationary.  As space becomes increasingly uniform or movement becomes more statistically stationary, PMoveSTIR reduces to the upper-left hand corner or the lower-right hand corner, respectively.  We primarily focus on the lower-right hand corner in this manuscript.  When space use is uniform and movement is statistically stationary, we are in the lower-left hand corner and recover mass action transmission as a special case (Appendix B; assuming host movements are uncorrelated).}
+  \label{fig:square}
+\end{figure}
+
+ \begin{figure}
+     \includegraphics[width=\textwidth]{figures/steps_diagram.png}
+     \caption{Flow diagram for calculating spatial force of infection (FOI) from movement data using PMoveSTIR. Starting from position data, we estimate individual utilization distributions, and use them to estimate the product of the UDs and their standard deviations (SDs). In addition, individual position histories are used to estimate the pairwise temporal cross-correlation in space use at each cell (e.g., the correlation term in equation \ref{eq:stationary_cor}). All three elements are combined and scaled by epidemiological parameters to obtain a spatially explicit, pairwise, directional FOI. Note that here and in the manuscript we do not spatially interpolate the correlation surface. We therefore provide a conservative view of how correlation contributes to landscape-level FOI.}
+  \label{fig:steps}
+ \end{figure}
+
+\begin{figure}
+    \includegraphics[width=\textwidth]{figures/correlation_analytical_figure.pdf}
+    \caption{The relationship between the relative contribution of correlation in movement and spatial to pairwise force of infection (FOI) and the relative area of contact. This analytical relationship is derived in equation \ref{eq:uniform_direct} assuming direct contact.  When the relative area of contact is small relative to the total area over which animals can move (e.g., $<$ 10\%), even weakly correlated movements can significantly increase FOI relative to spatial overlap.}
+    \label{fig:analytical_corr}
+\end{figure}
+
+\begin{figure}
+    \includegraphics[width=\textwidth]{figures/sim_results.pdf}
+    \caption{\small Analysis of simulated movement data show how the force of infection (FOI) varies depending on strength of attraction between individuals and epidemiological parameters such as the pathogen decay rate, the threshold distance that defines a contact, and the data availability.  \textbf{a)} FOI generally increases as a function of attraction strength, but the estimated values are greater when correlation is considered (red boxplots) than when only spatial overlap is considered (blue);  \textbf{b)} The estimated FOI as a function of home range overlap (as measured by the Bhattacharyya coefficient) shows how correlation can have an apparent effect even for animals that move independently;   \textbf{c)} Longer epidemiological contact distances can increase, or have no effect on the estimated FOI, depending on the interaction strength; \textbf{d)} The contribution of correlation to the overall FOI decreased with longer decay times; \textbf{e)} The FOI ratio increases with longer time series as correlation information becomes available for a larger proportion of the space used. A FOI ratio greater than one indicates that correlated movement is increasing FOI relative to spatial overlap and a ratio less than one indicates that correlated movement is decreasing the FOI. In c-e, darker shades indicate stronger attraction between individuals. }
+  \label{fig:simresults}
+\end{figure}
+
+\begin{figure}
+    \includegraphics[width=\textwidth]{figures/deer_results.png}
+    \caption{\small Application of the PMoveSTIR framework to movements of white-tailed deer in TN, USA. \textbf{a)} Home ranges of five individuals with different degrees of overlap. The points show the GPS locations, and the lines are the boundaries of the home ranges, estimated as the region that contains 95\% of the utilization distribution density. \textbf{b)} Detail of the home ranges of the two individuals that overlapped the most. The color surface shows the estimated FOI, highlighting how accounting for temporal correlation creates a heterogeneous surface of disease transmission risk with distinct hotspots. \textbf{c)} The ratio of FOI values calculated with versus without correlation shows increased relevance of correlation with higher home range overlap. This effect is greater for pathogens with short environmental persistence like SCV2 (orange dots) than for pathogens with long persistence like CWD (blue triangles). \textbf{d)} Transmission networks created with the PMoveSTIR framework including correlation (left), without correlation (middle), and using the home range overlap (right). The size of the nodes represents the cumulative FOI experienced by each individual, and the width of the edges represents the pairwise FOI. We show only one direction here, but values were similar in both directions within a pair. Sizes and widths have the same scale in all three networks. $R_0$ values should only be interpreted with respect to each other and not in absolute value.}
+  \label{fig:empiricalres}
+\end{figure}
+
+
+\end{document}
