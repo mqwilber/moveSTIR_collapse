@@ -197,7 +197,7 @@ For two random variables $Y$ and $Z$, $E[YZ] = E[Y]E[Z] + Cov(Y, Z)$.  We can th
     \label{eq:foi_cov}
 \end{equation}
 where we use the fact that the expectation of an indicator variable is a probability \citep{Grimmett2001}. The terms $p_i(x, t)$ and $p_j(x,u)$ give the probabilities that host $i$ and $j$ are in location $x$ at times $t$ and $u$, respectively, and can also be written as $p_i(x, t) = \int_{A_x} f_i(s, t) ds$ where $f_i(s, t)$ is the probability density of host $i$ using the point $s$ at time $t$ and the integral is over the area $A_x$ (defined equivalently for host $j$). Thus, we have obtained an equation that links the transient utilization distributions $f_i(s, t)$ and $f_j(s, u)$ with the spatio-temporal FOI.
-This general PMoveSTIR formulation accounts for heterogeneity in space and time, but the model can consider other scenarios, such as uniform space use, or  UDs stationary in time  (Fig. \ref{fig:square}, Appendix 2). 
+This general PMoveSTIR formulation accounts for heterogeneity in space and time, but the model can consider other scenarios, such as uniform space use, time-varying UDs, or UDs stationary in time (Fig. \ref{fig:square}, Appendix 2-3). 
 
 For example, when UDs are stationary in time, and pathogen decays exponentially in the environment at rate $\nu$, equation \ref{eq:foi_cov} becomes (derivation in Appendix 2)
 
@@ -269,26 +269,26 @@ Thus, PMoveSTIR allows us to put intuitive bounds on the importance of correlate
 As the area $A_x$ in which an epidemiological contact can occur gets smaller relative to the total area in which the hosts are moving $A_{tot}$, correlated movement can have an orders of magnitude larger contribution to direct transmission FOI than habitat overlap (Fig. \ref{fig:analytical_corr}). 
 This finding makes intuitive sense but is almost never considered in epidemiological models. If the area of potential contact is small and hosts are moving randomly, there is a very low chance that hosts will be there together at the same time. Correlated movements significantly increase this chance, even when correlation is low (e.g. 0.1). The contribution of correlation to FOI can be 10 times greater than spatial overlap if the area of contact is small (e.g., $<$ 5\% of the total area; Fig. \ref{fig:analytical_corr}). Large correlations across multiple areas result in a significantly greater FOI across the entire landscape. 
 
-In contrast, when $A_x$ approaches $A_{tot}$ (or more generally when the probability of using a particular area is very high), the importance of correlated movement relative to habitat overlap becomes minimal (Fig. \ref{fig:analytical_corr}). For example, if two hosts use a particular area together because of high resource availability, then it does not matter for FOI if social factors are leading to additional correlated movement. This result extends beyond epidemiological contexts and shows when correlated movements can significantly alter contact risk based on metrics such as home range overlap or CDE.  In Appendix S3, we expand this example to examine the effects of correlated movement on FOI given indirect transmission.
+In contrast, when $A_x$ approaches $A_{tot}$ (or more generally when the probability of using a particular area is very high), the importance of correlated movement relative to habitat overlap becomes minimal (Fig. \ref{fig:analytical_corr}). For example, if two hosts use a particular area together because of high resource availability, then it does not matter for FOI if social factors are leading to additional correlated movement. This result extends beyond epidemiological contexts and shows when correlated movements can significantly alter contact risk based on metrics such as home range overlap or CDE.  In Appendix 4, we expand this example to examine the effects of correlated movement on FOI given indirect transmission.
 
-\subsubsection*{Scaling up to the population-level -- analytical results}
+\subsection*{Scaling up to the population-level -- analytical results}
 
-Using equation \ref{eq:uniform_direct}, we can also understand the implications of correlated movement for standard mean-field models often used in disease ecology. To do this, consider a standard \textbf{S}usceptible-\textbf{I}nfected-\textbf{R}ecovered model at the individual-level, where $p_{i, S}(t)$, $p_{i, I}(t)$, and $p_{i, R}(t)$ are the probability that individual $i$ is in the S, I, or R state at time time $t$, respectively.  If individuals are moving on a gridded landscape without overlapping areas (our assumption from above), we can write down a set of ordinary differential equations that describe the individual-level transitions in the system
+Using equation \ref{eq:uniform_direct}, we can also understand the implications of correlated movement for standard mean-field models often used in disease ecology. To do this, consider a standard \textbf{S}usceptible-\textbf{I}nfected-\textbf{R}ecovered model at the individual-level, where $p_{i, S}(t)$, $p_{i, I}(t)$, and $p_{i, R}(t)$ are the probability that individual $i$ is in the S, I, or R state at time $t$, respectively.  If individuals are moving on a gridded landscape without overlapping areas (our assumption from above), we can write down a set of ordinary differential equations that describe the individual-level transitions in the system
 
 \begin{equation}
     \begin{aligned}
-        \frac{d p_{i, S}(t)}{dt} &= -p_{i, S}(t) \sum_{j \in N} \sum_{x \in Area} h_{i \leftarrow j}^*(x, t) \\
-        \frac{d p_{i, I}(t)}{dt} &= p_{i, S}(t) \sum_{j \in N} \sum_{x \in Area} h_{i \leftarrow j}^*(x, t) - \gamma p_{i, I}(t) \\
+        \frac{d p_{i, S}(t)}{dt} &= -p_{i, S}(t) \sum_{j \in N_{-i}} p_{j, I}(t)  \sum_{x \in Area} h_{i \leftarrow j}^*(x, t) \\
+        \frac{d p_{i, I}(t)}{dt} &= p_{i, S}(t) \sum_{j \in N_{-i}} p_{j, I}(t)  \sum_{x \in Area} h_{i \leftarrow j}^*(x, t) - \gamma p_{i, I}(t) \\
         \frac{d p_{i, R}(t)}{dt} &= \gamma p_{i, I}(t) \\
     \end{aligned}
     \label{eq:sir_individual}
 \end{equation}
-where $\sum_{j \in N}$ is summing over all individuals in the population, $\sum_{x \in Area}$ is summing over all gridded areas on the landscape, and $h^*_{i \leftarrow j}(x, t)$ is the force of infection felt by $i$ from $j$ at location $x$ at time $t$. Substituting a slight modification of equation \ref{eq:uniform_direct} for $h^*_{i \leftarrow j}(x, t)$ we can write 
+where $\sum_{j \in N_{-i}}$ is summing over all individuals in the population excluding $i$, $\sum_{x \in Area}$ is summing over all gridded areas on the landscape, and $h^*_{i \leftarrow j}(x, t)$ is the force of infection felt by $i$ from $j$ at location $x$ at time $t$. Substituting a slight modification of equation \ref{eq:uniform_direct} for $h^*_{i \leftarrow j}(x, t)$ we can write 
 
 $$
-h^*_{i \leftarrow j}(x, t) = \frac{\tilde{\beta} \lambda \pi \eta}{A_x} p_{j, I}(t) \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \rho \right].
+h^*_{i \leftarrow j}(x, t) = \frac{\tilde{\beta} \lambda \pi \eta}{A_x} \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \rho \right].
 $$
-where $\rho$ is the pairwise correlation between $i$ and $j$ at location $x$, which we assume to be the same across individuals and locations for this derivation. Plugging this form of $h^*_{i \leftarrow j}(x, t)$ into equation \ref{eq:sir_individual}, summing each equation over all $N$ individuals in the population, and assuming $N$ is sufficiently large, we get (Appendix X)
+where $\rho$ is the pairwise correlation between $i$ and $j$ at location $x$, which we assume to be the same across individuals and locations for this derivation. Plugging $h^*_{i \leftarrow j}(x, t)$ into equation \ref{eq:sir_individual}, summing each equation over all $N$ individuals in the population, and assuming $N$ is sufficiently large, we get (Appendix 5)
 
 \begin{equation}
     \begin{aligned}

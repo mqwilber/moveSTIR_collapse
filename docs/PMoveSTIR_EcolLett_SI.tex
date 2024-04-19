@@ -227,6 +227,79 @@ When the pathogen persists from $\eta$ time units (i.e. $\pi = 1$) the contribut
 When $\pi < 1$, the contribution of correlated movements to FOI will be positive, and the relative contribution of correlated movements compared to habitat overlap will approach unity (i.e., an equal contribution) as $\pi$ approaches 0. 
 This example illustrates three important points: the contributions of correlated movement to indirect transmission risk will depend strongly on 1) the movement dynamics as reflected in $Cor(\delta_{i \in A_x}, \delta_{j \in A_x} | s)$ and 2) the rate of pathogen decay relative to host movement rates.  Third, the contribution due to correlated movements could potentially increase, decrease, or have no effect on local FOI depending on the lag considered.  
 
+\section*{Appendix 5: Scaling up to the population-level -- analytical results and derivations}
+
+To demonstrate the implications of correlated movement on classic mean-field models epidemiological models, consider a typical \textbf{S}usceptible-\textbf{I}nfected-\textbf{R}ecovered model at the individual-level, where $p_{i, S}(t)$, $p_{i, I}(t)$, and $p_{i, R}(t)$ are the probability that individual $i$ is in the S, I, or R state at time $t$, respectively.  If individuals are moving on a gridded landscape without overlapping areas (our assumption in the main text), we can write down a set of ordinary differential equations that describe the individual-level transitions between states as
+
+\begin{equation}
+    \begin{aligned}
+        \frac{d p_{i, S}(t)}{dt} &= -p_{i, S}(t) \sum_{j \in N_{-i}} p_{j, I}(t) \sum_{x \in Area} h_{i \leftarrow j}^*(x, t) \\
+        \frac{d p_{i, I}(t)}{dt} &= p_{i, S}(t) \sum_{j \in N_{-i}} p_{j, I}(t)  \sum_{x \in Area} h_{i \leftarrow j}^*(x, t) - \gamma p_{i, I}(t) \\
+        \frac{d p_{i, R}(t)}{dt} &= \gamma p_{i, I}(t) \\
+    \end{aligned}
+    \label{eq:sir_individual}
+\end{equation}
+where $\sum_{j \in N_{-i}}$ is summing over all individuals in the population excluding $i$, $\sum_{x \in Area}$ is summing over all gridded areas on the landscape, and $h^*_{i \leftarrow j}(x, t)$ is the force of infection felt by $i$ from $j$ at location $x$ at time $t$.
+
+Using equation 7 in the main text, we can write $h^*_{i \leftarrow j}(x, t)$
+
+$$
+h^*_{i \leftarrow j}(x, t) = \frac{\tilde{\beta} \lambda \pi \eta}{A_x} \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \rho \right],
+$$
+where $\rho$ indicates the level correlation between individuals. 
+
+Focusing on the term $p_{i, S}(t) \sum_{j \in N_{-i}} p_{j, I}(t) \sum_{x \in Area} h_{i \leftarrow j}^*(x, t)$, we can expand this term as
+
+$$
+p_{i, S}(t) \sum_{j \in N_{-i}} p_{j, I}(t) \sum_{x \in Area} \frac{\tilde{\beta} \lambda \pi \eta}{A_x} \left[\frac{A_x}{A_{tot}}\frac{A_x}{A_{tot}} + \frac{A_x}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) \rho \right].
+$$
+We can then simplify to
+
+$$
+p_{i, S}(t) \sum_{j \in N_{-i}} p_{j, I}(t)  \left[\frac{\beta'}{A_{tot}} + \frac{\beta'}{A_{tot}}(1 - \frac{A_x}{A_{tot}}) n \rho \right],
+$$
+where because space use is uniform, summing over the gridded areas is equivalent to multiplying the term within the area summation by $n$, where $n = A_{tot} / A_x$ is the number of grid cells. Note we also set $\beta' = \tilde{\beta} \lambda \pi \eta$ for notational simplicity. We can further simplify this equation to
+
+$$
+p_{i, S}(t) \frac{\beta'}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] (I - p_{i, I}(t)),
+$$
+where $I(t) = \sum_{k \in N} p_{k, I}(t)$ and we subtract by $p_{i, I}(t)$ because we assume that $i$ cannot infect itself. Plugging this simplified equation back into our system of ODEs we get
+
+
+\begin{equation}
+    \begin{aligned}
+        \frac{d p_{i, S}(t)}{dt} &= -p_{i, S}(t) \frac{\beta'}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] [I(t) - p_{i, I}(t)] \\
+        \frac{d p_{i, I}(t)}{dt} &= p_{i, S}(t) \frac{\beta'}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] [I(t) - p_{i, I}(t)] - \gamma p_{i, I}(t) \\
+        \frac{d p_{i, R}(t)}{dt} &= \gamma p_{i, I}(t),
+    \end{aligned}
+    \label{eq:sir_individual_simplified}
+\end{equation}
+where $\beta' = $
+
+
+We then sum $\frac{d p_{i, S}(t)}{dt}$, $\frac{d p_{i, I}(t)}{dt}$, and $\frac{d p_{i, R}(t)}{dt}$ over all $N$ individuals to obtain
+
+\begin{equation}
+    \begin{aligned}
+        \frac{d S(t)}{dt} &= -\frac{\beta'}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] [S(t)I(t) - \sum_{i \in N} p_{i, I}(t) p_{i, S}(t)] \\
+        \frac{d I(t)}{dt} &= \frac{\beta'}{A_{tot}} \left[1 + (1 - \frac{A_x}{A_{tot}}) n \rho \right] [S(t)I(t) - \sum_{i \in N} p_{i, I}(t) p_{i, S}(t)] - \gamma p_{i, I}(t) \\
+        \frac{d R(t)}{dt} &= \gamma p_{i, I}(t).
+    \end{aligned}
+    \label{eq:sir_population_full}
+\end{equation}
+
+Finally, we can recognize that when $N$ is large, $S(t)I(t) >> \sum_{i \in N} p_{i, I}(t) p_{i, S}(t)$ such that we can approximate this term as $S(t)I(t)$ for large $N$. We then obtain the SIR equation given in the main text
+
+\begin{equation}
+    \begin{aligned}
+        \frac{d S(t)}{dt} &= - S(t) \underbrace{\beta^* [1 + (1 - \frac{A_x}{A_{tot}})n\rho] I(t)}_{\text{Force of infection}}  \\
+        \frac{d I(t)}{dt} &=  S(t) \underbrace{\beta^* [1 + (1 - \frac{A_x}{A_{tot}})n\rho] I(t)}_{\text{Force of infection}} - \gamma I(t) \\
+        \frac{d R(t)}{dt} &= \gamma I(t) \\
+    \end{aligned}
+    \label{eq:sir_with_corr}
+\end{equation}
+where $\beta^* = \frac{\beta'}{A_{tot}}$.
+
 \bibliography{references}
 
 \clearpage
